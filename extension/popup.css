@@ -1,0 +1,276 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 380px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #1a1a1a;
+  color: #fff;
+  line-height: 1.5;
+}
+
+.popup-container {
+  padding: 20px;
+  min-height: 300px;
+}
+
+.state {
+  transition: opacity 0.2s ease;
+}
+
+.state.hidden {
+  display: none;
+}
+
+/* Loading State */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #333;
+  border-top-color: #ff6b6b;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 30px auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Confirmation State */
+.confirmation-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.checkmark {
+  width: 32px;
+  height: 32px;
+  background: #51cf66;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #fff;
+  font-weight: bold;
+}
+
+.confirmation-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Bookmark Preview */
+.bookmark-preview {
+  background: #2d2d2d;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border-left: 3px solid #ff6b6b;
+}
+
+.preview-title {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.preview-url {
+  font-size: 12px;
+  color: #999;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Timer */
+.timer-container {
+  margin-bottom: 16px;
+}
+
+.timer-bar {
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.timer-progress {
+  height: 100%;
+  background: #ff6b6b;
+  width: 100%;
+  transition: width 0.1s linear;
+}
+
+.timer-text {
+  font-size: 12px;
+  color: #999;
+  text-align: center;
+}
+
+/* Input Sections */
+.input-section {
+  margin-bottom: 16px;
+}
+
+.section-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ff6b6b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.input-field {
+  width: 100%;
+  background: #2d2d2d;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #fff;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #ff6b6b;
+}
+
+.input-field::placeholder {
+  color: #666;
+}
+
+textarea.input-field {
+  min-height: 60px;
+}
+
+.char-count {
+  font-size: 11px;
+  color: #666;
+  text-align: right;
+  margin-top: 4px;
+}
+
+/* Tags */
+.tags-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  background: #ff6b6b;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tag-remove {
+  cursor: pointer;
+  font-weight: bold;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.tag-remove:hover {
+  opacity: 1;
+}
+
+/* Buttons */
+.button-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: #ff6b6b;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #ff5252;
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: #333;
+  color: #999;
+  flex: 0.3;
+}
+
+.btn-secondary:hover {
+  background: #444;
+  color: #fff;
+}
+
+/* Error State */
+.error-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.error-icon {
+  width: 32px;
+  height: 32px;
+  background: #ff6b6b;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #fff;
+  font-weight: bold;
+}
+
+.error-message {
+  background: #2d2d2d;
+  padding: 12px;
+  border-radius: 4px;
+  border-left: 3px solid #ff6b6b;
+  font-size: 13px;
+  margin-bottom: 16px;
+  color: #ccc;
+}

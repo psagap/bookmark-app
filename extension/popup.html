@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Save Bookmark</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Loading state -->
+    <div id="loading-state" class="state hidden">
+      <div class="spinner"></div>
+      <p>Saving bookmark...</p>
+    </div>
+
+    <!-- Confirmation state -->
+    <div id="confirmation-state" class="state">
+      <div class="confirmation-header">
+        <span class="checkmark">✓</span>
+        <h2>Bookmark Saved!</h2>
+      </div>
+
+      <div class="bookmark-preview">
+        <p id="preview-title" class="preview-title"></p>
+        <p id="preview-url" class="preview-url"></p>
+      </div>
+
+      <!-- Timer progress bar -->
+      <div class="timer-container">
+        <div class="timer-bar">
+          <div id="timer-progress" class="timer-progress"></div>
+        </div>
+        <p class="timer-text"><span id="timer-seconds">7</span>s to add notes/tags</p>
+      </div>
+
+      <!-- Note input -->
+      <div class="input-section">
+        <label for="note-input" class="section-label">ADD A NOTE</label>
+        <textarea
+          id="note-input"
+          class="input-field"
+          placeholder="Start typing..."
+          maxlength="500"
+          rows="3"
+        ></textarea>
+        <div class="char-count">
+          <span id="char-count">0</span>/500
+        </div>
+      </div>
+
+      <!-- Tags input -->
+      <div class="input-section">
+        <label for="tags-input" class="section-label">Tags</label>
+        <div class="tags-container">
+          <input
+            id="tags-input"
+            type="text"
+            class="input-field"
+            placeholder="Add tags separated by commas"
+            maxlength="200"
+          >
+          <div id="tags-list" class="tags-list"></div>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="button-group">
+        <button id="save-btn" class="btn btn-primary">Save & Close</button>
+        <button id="close-btn" class="btn btn-secondary">×</button>
+      </div>
+    </div>
+
+    <!-- Error state -->
+    <div id="error-state" class="state hidden">
+      <div class="error-header">
+        <span class="error-icon">!</span>
+        <h2>Save Failed</h2>
+      </div>
+      <p id="error-message" class="error-message"></p>
+      <div class="button-group">
+        <button id="retry-btn" class="btn btn-primary">Retry</button>
+        <button id="error-close-btn" class="btn btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
