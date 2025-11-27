@@ -252,9 +252,9 @@ const WikiPreview = ({ bookmark }) => {
     }, [bookmark.url, description, bookmark.notes, image]);
 
     return (
-        <div className="flex flex-col h-full bg-[#ffffff] text-black relative overflow-hidden font-serif">
-            {/* Header with Logo */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-black/5 bg-white/80 backdrop-blur-sm z-10 flex-shrink-0">
+        <div className="h-full bg-[#ffffff] text-black relative font-serif flex flex-col">
+            {/* Header with Logo - fixed at top */}
+            <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-black/5 bg-white/80 backdrop-blur-sm z-10">
                 <div className="flex items-baseline gap-2">
                     <span className="text-xl font-bold tracking-tight font-serif text-black">Wikipedia</span>
                     <span className="text-sm text-black/50 font-sans font-medium uppercase tracking-wider">Article</span>
@@ -266,8 +266,8 @@ const WikiPreview = ({ bookmark }) => {
                 />
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto relative">
+            {/* Scrollable Content - THIS is the scrollable area */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="p-8 max-w-2xl mx-auto pb-24">
                     {/* Title */}
                     <h1 className="text-5xl font-bold mb-8 font-serif leading-tight text-black">
@@ -302,7 +302,7 @@ const WikiPreview = ({ bookmark }) => {
                 </div>
             </div>
 
-            {/* Keep Reading Button */}
+            {/* Keep Reading Button - fixed at bottom */}
             <div className="absolute bottom-8 left-8 z-20">
                 <a
                     href={bookmark.url}
@@ -522,11 +522,11 @@ const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave }) => {
                 }}
             >
 
-                <div className="grid grid-cols-1 md:grid-cols-2 h-full">
+                <div className="grid grid-cols-1 md:grid-cols-2 h-full overflow-hidden">
 
                     {/* Left: Preview */}
-                    <div className="h-full flex flex-col min-h-0">
-                        <div className="flex-1 min-h-0">
+                    <div className="h-full overflow-hidden flex flex-col">
+                        <div className="flex-1 overflow-y-auto min-h-0">
                             {renderPreview()}
                         </div>
                         {!isWiki && (
@@ -534,7 +534,7 @@ const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave }) => {
                                 href={bookmark.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors bg-black/20"
+                                className="flex-shrink-0 flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors bg-black/20"
                             >
                                 <ExternalLink className="w-4 h-4" />
                                 <span className="truncate">{bookmark.url}</span>
