@@ -35,6 +35,14 @@ const saveBookmarks = (bookmarks) => {
   }
 };
 
+// Clean up title by removing leading parenthetical numbers like "(2)" or "(34)"
+// These are typically browser notification counts or tab numbers
+const cleanTitle = (title) => {
+  if (!title) return title;
+  // Remove leading "(number) " pattern - e.g., "(2) ", "(34) "
+  return title.replace(/^\(\d+\)\s*/, '').trim();
+};
+
 // Routes
 
 // GET all bookmarks with filters
@@ -80,7 +88,7 @@ app.post('/api/bookmarks', (req, res) => {
     id: req.body.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     userId: 'local-user',
     url: req.body.url,
-    title: req.body.title,
+    title: cleanTitle(req.body.title),
     thumbnail: req.body.thumbnail || req.body.ogImage || '',
     createdAt: req.body.createdAt || Date.now(),
     updatedAt: Date.now(),
@@ -257,9 +265,12 @@ app.get('/api/twitter/oembed', async (req, res) => {
   }
 
   try {
+    // Convert x.com URLs to twitter.com for the oEmbed API
+    const twitterUrl = url.replace('x.com', 'twitter.com');
+
     // Build oEmbed URL with all recommended parameters from X's guide
     const params = new URLSearchParams({
-      url: url,
+      url: twitterUrl,
       maxwidth: maxwidth || '550',  // Responsive width (default 550)
       omit_script: '1',        // We load widgets.js once in our app shell
       theme: 'dark',           // Match our dark theme
