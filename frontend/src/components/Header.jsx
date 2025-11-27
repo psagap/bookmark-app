@@ -1,151 +1,60 @@
-import React, { useEffect, useRef, useState } from 'react';
-import './Header.css';
-import FerrisWheel from './FerrisWheel';
+import React, { useState } from 'react';
+import { Search, Plus } from 'lucide-react';
 
-const Header = () => {
-    const navRef = useRef(null);
-    const [currentActiveItem, setCurrentActiveItem] = useState(null);
-    const animRef = useRef(null);
+const Header = ({ onSearch }) => {
+    const [searchValue, setSearchValue] = useState('');
+    const [activeTab, setActiveTab] = useState('all');
 
-    useEffect(() => {
-        const nav = navRef.current;
-        if (!nav) return;
-
-        const items = nav.querySelectorAll('.nav-item');
-
-        const animate = (from, to) => {
-            if (animRef.current) clearInterval(animRef.current);
-
-            const start = Date.now();
-            animRef.current = setInterval(() => {
-                const p = Math.min((Date.now() - start) / 500, 1);
-                const e = 1 - Math.pow(1 - p, 3);
-
-                const x = from + (to - from) * e;
-                const y = -40 * (4 * e * (1 - e));
-                const r = 200 * Math.sin(p * Math.PI);
-
-                nav.style.setProperty('--translate-x', `${x}px`);
-                nav.style.setProperty('--translate-y', `${y}px`);
-                nav.style.setProperty('--rotate-x', `${r}deg`);
-
-                if (p >= 1) {
-                    clearInterval(animRef.current);
-                    animRef.current = null;
-                    nav.style.setProperty('--translate-y', '0px');
-                    nav.style.setProperty('--rotate-x', '0deg');
-                }
-            }, 16);
-        };
-
-        const getCurrentPosition = () => parseFloat(nav.style.getPropertyValue('--translate-x')) || 0;
-
-        const getItemCenter = (item) => {
-            return item.getBoundingClientRect().left + item.offsetWidth / 2 - nav.getBoundingClientRect().left - 5;
-        };
-
-        const moveToItem = (item) => {
-            const current = getCurrentPosition();
-            const center = getItemCenter(item);
-            animate(current, center);
-            nav.classList.add('show-indicator');
-        };
-
-        const setActiveItem = (item) => {
-            items.forEach(i => i.classList.remove('active'));
-            item.classList.add('active');
-            setCurrentActiveItem(item);
-            moveToItem(item);
-        };
-
-        const handleMouseLeave = () => {
-            const activeItem = nav.querySelector('.nav-item.active');
-            if (activeItem) {
-                moveToItem(activeItem);
-            } else {
-                nav.classList.remove('show-indicator');
-                if (animRef.current) clearInterval(animRef.current);
-            }
-        };
-
-        items.forEach(item => {
-            item.addEventListener('mouseenter', () => moveToItem(item));
-            item.addEventListener('mouseleave', handleMouseLeave);
-            item.addEventListener('click', () => setActiveItem(item));
-        });
-
-        nav.addEventListener('mouseleave', handleMouseLeave);
-
-        // Set first item as active by default
-        if (items.length > 0) {
-            setTimeout(() => {
-                setActiveItem(items[0]);
-            }, 100);
-        }
-
-        return () => {
-            if (animRef.current) clearInterval(animRef.current);
-        };
-    }, []);
+    const handleSearch = (e) => {
+        setSearchValue(e.target.value);
+        onSearch?.(e.target.value);
+    };
 
     return (
-        <div className="flex items-center justify-between py-8 px-8">
-            <div className="flex-1 max-w-2xl">
+        <div className="flex items-center justify-between py-6 px-6">
+            {/* Search */}
+            <div className="flex-1 max-w-md">
                 <div className="relative group">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <input
                         type="text"
-                        placeholder="Search my mind..."
-                        className="w-full bg-transparent text-4xl font-serif italic text-muted-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:text-foreground transition-colors"
+                        value={searchValue}
+                        onChange={handleSearch}
+                        placeholder="Search bookmarks..."
+                        className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:bg-white/[0.07] transition-all"
                     />
                 </div>
             </div>
 
-            <div className="flex items-center gap-6 text-muted-foreground">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/50 text-xs font-medium cursor-pointer hover:bg-accent transition-colors">
-                    <FerrisWheel />
-                    <span className="ml-2">Upgraded Features</span>
-                </div>
-
-                <nav
-                    ref={navRef}
-                    className="elastic-nav"
+            {/* Tabs */}
+            <div className="flex items-center gap-1 p-1 bg-white/5 rounded-lg">
+                <button
+                    onClick={() => setActiveTab('all')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                        activeTab === 'all'
+                            ? 'bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/25'
+                            : 'text-muted-foreground hover:text-foreground'
+                    }`}
                 >
-                    <a href="#" className="nav-item">Everything</a>
-                    <a href="#" className="nav-item">Sides</a>
-                </nav>
-
-                {/* SVG Filter for wave distortion */}
-                <svg style={{ display: 'none' }}>
-                    <defs>
-                        <filter id="wave-distort" x="0%" y="0%" width="100%" height="100%">
-                            <feTurbulence
-                                type="fractalNoise"
-                                baseFrequency="0.0038 0.0038"
-                                numOctaves="1"
-                                seed="2"
-                                result="roughNoise"
-                            />
-                            <feGaussianBlur in="roughNoise" stdDeviation="8.5" result="softNoise" />
-                            <feComposite
-                                operator="arithmetic"
-                                k1="0"
-                                k2="1"
-                                k3="2"
-                                k4="0"
-                                in="softNoise"
-                                result="mergedMap"
-                            />
-                            <feDisplacementMap
-                                in="SourceGraphic"
-                                in2="mergedMap"
-                                scale="-42"
-                                xChannelSelector="G"
-                                yChannelSelector="G"
-                            />
-                        </filter>
-                    </defs>
-                </svg>
+                    All
+                </button>
+                <button
+                    onClick={() => setActiveTab('collections')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                        activeTab === 'collections'
+                            ? 'bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/25'
+                            : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                >
+                    Collections
+                </button>
             </div>
+
+            {/* Add button */}
+            <button className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary to-accent text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
+                <Plus className="w-4 h-4" />
+                <span>Add</span>
+            </button>
         </div>
     );
 };

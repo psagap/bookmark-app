@@ -168,23 +168,19 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh }) =>
         const rawAuthorName = tweetData.authorName || title.split(' on X:')[0] || handle.replace('@', '');
         const authorName = rawAuthorName.replace(/^\(\d+\)\s*/, '');
         const tweetText = tweetData.tweetText || title.match(/on X: "(.+?)"/)?.[1] || title.replace(/^.+? on X: /, '').replace(/ \/ X$/, '');
-        const isThread = tweetData.isThread || title.toLowerCase().includes('thread');
         const avatar = tweetData.authorAvatar || `https://unavatar.io/twitter/${handle.replace('@', '')}`;
         const tweetMedia = tweetData.tweetMedia || [];
+        // Check for video content
+        const videoMedia = tweetMedia.find(m => m.type === 'video' || m.type === 'animated_gif');
+        const imageMedia = tweetMedia.find(m => m.type === 'photo' || !m.type);
         // Fallback to thumbnail or ogImage if no tweetMedia
-        const mediaUrl = tweetMedia[0]?.url || thumbnail || metadata?.ogImage;
+        const mediaUrl = imageMedia?.url || thumbnail || metadata?.ogImage;
         const hasMedia = mediaUrl && !mediaUrl.includes('abs.twimg.com/rweb/ssr'); // Exclude X's default og image
+        const hasVideo = videoMedia?.url;
 
         return (
             <GlowingCard className="break-inside-avoid mb-6">
                 <Card className="bg-[#000000] border-[#2f3336] hover:border-[#536471] transition-colors group relative">
-                    {/* Thread indicator */}
-                    {isThread && (
-                        <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-blue-500/20 to-transparent px-4 py-1.5">
-                            <span className="text-[11px] text-blue-400 font-medium">Thread</span>
-                        </div>
-                    )}
-
                     {/* X Logo - Top Left */}
                     <div className="px-4 pt-4 pb-2 flex justify-start">
                         <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white/50">
@@ -192,7 +188,7 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh }) =>
                         </svg>
                     </div>
 
-                    <CardContent className={cn("p-4", isThread && "pt-2")}>
+                    <CardContent className="p-4">
                         {/* Author info */}
                         <div className="flex items-start gap-3 mb-3">
                             <img
@@ -212,8 +208,25 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh }) =>
                             {tweetText}
                         </p>
 
-                        {/* Tweet Media */}
-                        {hasMedia && (
+                        {/* Tweet Video */}
+                        {hasVideo && (
+                            <div className="mt-3 rounded-xl overflow-hidden">
+                                <video
+                                    src={videoMedia.url}
+                                    className="w-full rounded-xl"
+                                    autoPlay
+                                    muted
+                                    loop
+                                    playsInline
+                                    controls={false}
+                                    onMouseEnter={(e) => e.target.controls = true}
+                                    onMouseLeave={(e) => e.target.controls = false}
+                                />
+                            </div>
+                        )}
+
+                        {/* Tweet Image (only show if no video) */}
+                        {!hasVideo && hasMedia && (
                             <div className="mt-3 rounded-xl overflow-hidden">
                                 <img
                                     src={mediaUrl}

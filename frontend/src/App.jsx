@@ -119,14 +119,20 @@ function App() {
   });
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
+    <div className="min-h-screen bg-background text-foreground flex relative">
+      {/* Background gradient glow */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[128px]" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-[128px]" />
+      </div>
+
       <Sidebar />
-      <main className="flex-1 pl-16 min-h-screen">
+      <main className="flex-1 pl-14 min-h-screen relative">
         <Header />
-        <div className="px-8 pb-8">
+        <div className="px-6 pb-8">
 
           {/* Masonry Grid */}
-          <div className="columns-1 md:columns-2 lg:columns-3 xl:columns-4 gap-6 space-y-6">
+          <div className="columns-1 md:columns-2 lg:columns-3 xl:columns-4 gap-5 space-y-5">
 
             {/* Add Card */}
             <AddCard

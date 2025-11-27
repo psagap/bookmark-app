@@ -1,18 +1,19 @@
 :root {
-    --glow-sens: 30;
-    --color-sens: 50;
-    --glow-color: 200deg 80% 70%;
-    --glow-boost: 0%;
+    --glow-sens: 25;
+    --color-sens: 40;
+    --glow-color: 250deg 89% 67%;
+    /* Electric violet */
+    --glow-boost: 5%;
 }
 
-@keyframes slideInFromRight {
+@keyframes slideInUp {
     from {
         opacity: 0;
-        transform: translateX(100px);
+        transform: translateY(20px);
     }
     to {
         opacity: 1;
-        transform: translateX(0);
+        transform: translateY(0);
     }
 }
 
@@ -22,7 +23,7 @@
     border-radius: inherit;
     --pointer-deg: 45deg;
     --pointer-d: 0;
-    animation: slideInFromRight 0.4s ease-out;
+    animation: slideInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glowing-card-wrapper::before,
@@ -32,7 +33,7 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    transition: opacity 0.25s ease-out;
+    transition: opacity 0.3s ease-out;
     z-index: -1;
     pointer-events: none;
 }
@@ -42,21 +43,18 @@
 .glowing-card-wrapper:not(:hover)::after,
 .glowing-card-wrapper:not(:hover) > .glow {
     opacity: 0;
-    transition: opacity 0.75s ease-in-out;
+    transition: opacity 0.5s ease-in-out;
 }
 
-/* Mesh gradient border */
+/* Modern gradient border - violet to cyan */
 .glowing-card-wrapper::before {
     border: 1px solid transparent;
     background:
         linear-gradient(hsl(var(--card)) 0 100%) padding-box,
-        radial-gradient(at 80% 55%, hsla(268,100%,76%,1) 0px, transparent 50%) border-box,
-        radial-gradient(at 69% 34%, hsla(349,100%,74%,1) 0px, transparent 50%) border-box,
-        radial-gradient(at 8% 6%, hsla(136,100%,78%,1) 0px, transparent 50%) border-box,
-        radial-gradient(at 41% 38%, hsla(192,100%,64%,1) 0px, transparent 50%) border-box,
-        radial-gradient(at 86% 85%, hsla(186,100%,74%,1) 0px, transparent 50%) border-box,
-        radial-gradient(at 82% 18%, hsla(52,100%,65%,1) 0px, transparent 50%) border-box,
-        radial-gradient(at 51% 4%, hsla(12,100%,72%,1) 0px, transparent 50%) border-box;
+        radial-gradient(at 0% 0%, hsla(250,89%,67%,0.8) 0px, transparent 50%) border-box,
+        radial-gradient(at 100% 0%, hsla(280,85%,60%,0.6) 0px, transparent 50%) border-box,
+        radial-gradient(at 100% 100%, hsla(190,95%,55%,0.8) 0px, transparent 50%) border-box,
+        radial-gradient(at 0% 100%, hsla(220,90%,60%,0.6) 0px, transparent 50%) border-box;
 
     /* opacity increases as pointer gets near edge */
     opacity: calc((var(--pointer-d) - var(--color-sens)) / (100 - var(--color-sens)));
@@ -65,25 +63,20 @@
     mask-image:
         conic-gradient(
             from var(--pointer-deg) at center,
-            black 25%,
-            transparent 40%,
-            transparent 60%,
-            black 75%
+            black 20%,
+            transparent 35%,
+            transparent 65%,
+            black 80%
         );
 }
 
-/* Mesh gradient background overlay */
+/* Subtle gradient overlay */
 .glowing-card-wrapper::after {
     border: 1px solid transparent;
 
     background:
-        radial-gradient(at 80% 55%, hsla(268,100%,76%,0.15) 0px, transparent 50%),
-        radial-gradient(at 69% 34%, hsla(349,100%,74%,0.15) 0px, transparent 50%),
-        radial-gradient(at 8% 6%, hsla(136,100%,78%,0.15) 0px, transparent 50%),
-        radial-gradient(at 41% 38%, hsla(192,100%,64%,0.15) 0px, transparent 50%),
-        radial-gradient(at 86% 85%, hsla(186,100%,74%,0.15) 0px, transparent 50%),
-        radial-gradient(at 82% 18%, hsla(52,100%,65%,0.15) 0px, transparent 50%),
-        radial-gradient(at 51% 4%, hsla(12,100%,72%,0.15) 0px, transparent 50%);
+        radial-gradient(at 0% 0%, hsla(250,89%,67%,0.08) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, hsla(190,95%,55%,0.08) 0px, transparent 50%);
 
     /* mask to create edge highlighting */
     mask-image:
