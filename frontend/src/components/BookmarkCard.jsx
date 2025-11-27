@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Play, ExternalLink, MoreHorizontal, Pin, Layers, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import GlowingCard from './GlowingCard';
+import TweetEmbed from './TweetEmbed';
 
 const CardMenu = ({ onPin, onCreateSide, onDelete, onRefresh, isPinned, isRefreshing }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -162,90 +163,17 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh }) =>
     }
 
     if (isTweet) {
-        const tweetData = metadata?.tweetData || {};
-        const handle = tweetData.authorHandle || (url.match(/(?:twitter|x)\.com\/(\w+)/)?.[1] ? `@${url.match(/(?:twitter|x)\.com\/(\w+)/)[1]}` : '@user');
-        // Clean author name - remove (1), (2) etc. prefix from title
-        const rawAuthorName = tweetData.authorName || title.split(' on X:')[0] || handle.replace('@', '');
-        const authorName = rawAuthorName.replace(/^\(\d+\)\s*/, '');
-        const tweetText = tweetData.tweetText || title.match(/on X: "(.+?)"/)?.[1] || title.replace(/^.+? on X: /, '').replace(/ \/ X$/, '');
-        const avatar = tweetData.authorAvatar || `https://unavatar.io/twitter/${handle.replace('@', '')}`;
-        const tweetMedia = tweetData.tweetMedia || [];
-        // Check for video content - IMPORTANT: filter out blob URLs as they don't work outside the browser session
-        const videoMedia = tweetMedia.find(m =>
-            (m.type === 'video' || m.type === 'animated_gif') &&
-            m.url &&
-            !m.url.startsWith('blob:') &&
-            (m.url.includes('.mp4') || m.url.includes('video.twimg.com'))
-        );
-        const imageMedia = tweetMedia.find(m => m.type === 'photo' || m.type === 'image' || !m.type);
-        // Fallback to thumbnail or ogImage if no tweetMedia
-        const mediaUrl = imageMedia?.url || thumbnail || metadata?.ogImage;
-        const hasMedia = mediaUrl && !mediaUrl.includes('abs.twimg.com/rweb/ssr'); // Exclude X's default og image
-        // Only show video if we have a valid playable URL (not blob)
-        const hasVideo = videoMedia?.url && !videoMedia.url.startsWith('blob:');
-        // Use poster image from video as fallback if video URL is invalid
-        const videoPoster = tweetMedia.find(m => m.type === 'video')?.poster;
-
+        // Use official Twitter embed for full-fidelity tweets with videos, verification, etc.
         return (
             <GlowingCard className="break-inside-avoid mb-6">
-                <Card className="bg-[#000000] border-[#2f3336] hover:border-[#536471] transition-colors group relative">
-                    {/* X Logo - Top Left */}
-                    <div className="px-4 pt-4 pb-2 flex justify-start">
-                        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white/50">
-                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                        </svg>
+                <Card className="bg-[#000000] border-[#2f3336] hover:border-[#536471] transition-colors group relative overflow-hidden">
+                    {/* Official Twitter Embed */}
+                    <div className="tweet-card-embed" onClick={(e) => e.stopPropagation()}>
+                        <TweetEmbed tweetUrl={url} theme="dark" />
                     </div>
 
-                    <CardContent className="p-4">
-                        {/* Author info */}
-                        <div className="flex items-start gap-3 mb-3">
-                            <img
-                                src={avatar}
-                                alt={authorName}
-                                className="w-10 h-10 rounded-full bg-[#2f3336] flex-shrink-0"
-                                onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${authorName}`; }}
-                            />
-                            <div className="flex-1 min-w-0">
-                                <span className="font-bold text-[15px] text-white truncate block">{authorName}</span>
-                                <div className="text-[#71767b] text-[15px]">{handle}</div>
-                            </div>
-                        </div>
-
-                        {/* Tweet text */}
-                        <p className="text-[15px] text-white leading-normal whitespace-pre-wrap">
-                            {tweetText}
-                        </p>
-
-                        {/* Tweet Video */}
-                        {hasVideo && (
-                            <div className="mt-3 rounded-xl overflow-hidden">
-                                <video
-                                    src={videoMedia.url}
-                                    className="w-full rounded-xl"
-                                    autoPlay
-                                    muted
-                                    loop
-                                    playsInline
-                                    controls={false}
-                                    onMouseEnter={(e) => e.target.controls = true}
-                                    onMouseLeave={(e) => e.target.controls = false}
-                                />
-                            </div>
-                        )}
-
-                        {/* Tweet Image (show if no valid video, or use video poster as fallback) */}
-                        {!hasVideo && (hasMedia || videoPoster) && (
-                            <div className="mt-3 rounded-xl overflow-hidden">
-                                <img
-                                    src={mediaUrl || videoPoster}
-                                    alt="Tweet media"
-                                    className="w-full rounded-xl"
-                                />
-                            </div>
-                        )}
-                    </CardContent>
-
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Hover Actions */}
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                         <CardMenu
                             onPin={() => onPin?.(bookmark)}
                             onCreateSide={() => onCreateSide?.(bookmark)}

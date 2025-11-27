@@ -162,4 +162,33 @@
   .glow-accent {
     box-shadow: 0 0 30px -8px hsla(190 95% 55% / 0.4);
   }
+
+  /* Twitter embed styling */
+  .tweet-card-embed {
+    /* Remove default Twitter embed margins and borders */
+    --twitter-embed-border: none;
+  }
+
+  .tweet-card-embed .twitter-tweet {
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  .tweet-card-embed .twitter-tweet iframe {
+    border-radius: 0 !important;
+  }
+
+  /* Make the embed fit nicely in our card */
+  .tweet-embed-container {
+    width: 100%;
+  }
+
+  .tweet-embed {
+    display: flex;
+    justify-content: center;
+  }
+
+  .tweet-embed .twitter-tweet {
+    margin: 0 !important;
+  }
 }
