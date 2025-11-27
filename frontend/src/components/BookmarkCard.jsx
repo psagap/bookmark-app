@@ -170,13 +170,21 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh }) =>
         const tweetText = tweetData.tweetText || title.match(/on X: "(.+?)"/)?.[1] || title.replace(/^.+? on X: /, '').replace(/ \/ X$/, '');
         const avatar = tweetData.authorAvatar || `https://unavatar.io/twitter/${handle.replace('@', '')}`;
         const tweetMedia = tweetData.tweetMedia || [];
-        // Check for video content
-        const videoMedia = tweetMedia.find(m => m.type === 'video' || m.type === 'animated_gif');
-        const imageMedia = tweetMedia.find(m => m.type === 'photo' || !m.type);
+        // Check for video content - IMPORTANT: filter out blob URLs as they don't work outside the browser session
+        const videoMedia = tweetMedia.find(m =>
+            (m.type === 'video' || m.type === 'animated_gif') &&
+            m.url &&
+            !m.url.startsWith('blob:') &&
+            (m.url.includes('.mp4') || m.url.includes('video.twimg.com'))
+        );
+        const imageMedia = tweetMedia.find(m => m.type === 'photo' || m.type === 'image' || !m.type);
         // Fallback to thumbnail or ogImage if no tweetMedia
         const mediaUrl = imageMedia?.url || thumbnail || metadata?.ogImage;
         const hasMedia = mediaUrl && !mediaUrl.includes('abs.twimg.com/rweb/ssr'); // Exclude X's default og image
-        const hasVideo = videoMedia?.url;
+        // Only show video if we have a valid playable URL (not blob)
+        const hasVideo = videoMedia?.url && !videoMedia.url.startsWith('blob:');
+        // Use poster image from video as fallback if video URL is invalid
+        const videoPoster = tweetMedia.find(m => m.type === 'video')?.poster;
 
         return (
             <GlowingCard className="break-inside-avoid mb-6">
@@ -225,11 +233,11 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh }) =>
                             </div>
                         )}
 
-                        {/* Tweet Image (only show if no video) */}
-                        {!hasVideo && hasMedia && (
+                        {/* Tweet Image (show if no valid video, or use video poster as fallback) */}
+                        {!hasVideo && (hasMedia || videoPoster) && (
                             <div className="mt-3 rounded-xl overflow-hidden">
                                 <img
-                                    src={mediaUrl}
+                                    src={mediaUrl || videoPoster}
                                     alt="Tweet media"
                                     className="w-full rounded-xl"
                                 />

@@ -188,7 +188,7 @@ async function extractTweetMetadata() {
         if (data.tweetMedia.length > 0) break; // Stop if we found images
       }
 
-      // Try video selectors
+      // Try video selectors - attempt to get real video URLs, not blob URLs
       const videoSelectors = [
         'article video',
         'div[data-testid="videoPlayer"] video',
@@ -199,11 +199,30 @@ async function extractTweetMetadata() {
         const video = document.querySelector(selector);
         if (video) {
           const source = video.querySelector('source');
-          data.tweetMedia.push({
-            type: 'video',
-            url: source?.src || video.src || '',
-            poster: video.poster || ''
-          });
+          let videoUrl = source?.src || video.src || '';
+
+          // Filter out blob URLs - they don't work outside this browser session
+          // Try to extract actual video URL from various sources
+          if (videoUrl.startsWith('blob:') || !videoUrl) {
+            // Try to find mp4 URL in any video element attributes or nearby elements
+            const mp4Source = document.querySelector('source[type="video/mp4"]');
+            if (mp4Source?.src && !mp4Source.src.startsWith('blob:')) {
+              videoUrl = mp4Source.src;
+            }
+          }
+
+          // If we still have a blob URL, note it but also save the poster
+          // The poster image can be used as a fallback display
+          const posterUrl = video.poster || '';
+
+          // Only add to media if we have something useful
+          if (videoUrl || posterUrl) {
+            data.tweetMedia.push({
+              type: 'video',
+              url: videoUrl, // May be blob or empty, frontend will handle
+              poster: posterUrl // Poster can be used as fallback
+            });
+          }
           break;
         }
       }
