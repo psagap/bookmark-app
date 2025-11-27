@@ -243,28 +243,30 @@ const oembedCache = new Map();
 
 // GET Twitter oEmbed data with proper parameters for video embeds
 app.get('/api/twitter/oembed', async (req, res) => {
-  const { url } = req.query;
+  const { url, maxwidth } = req.query;
 
   if (!url || !(url.includes('twitter.com') || url.includes('x.com'))) {
     return res.status(400).json({ error: 'Invalid Twitter URL' });
   }
 
-  // Check cache first
-  const cached = oembedCache.get(url);
+  // Check cache first (include maxwidth in cache key)
+  const cacheKey = `${url}:${maxwidth || '550'}`;
+  const cached = oembedCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return res.json(cached.data);
   }
 
   try {
-    // Build oEmbed URL with all recommended parameters
+    // Build oEmbed URL with all recommended parameters from X's guide
     const params = new URLSearchParams({
       url: url,
-      omit_script: '1',        // We load widgets.js once in our app
+      maxwidth: maxwidth || '550',  // Responsive width (default 550)
+      omit_script: '1',        // We load widgets.js once in our app shell
       theme: 'dark',           // Match our dark theme
       hide_thread: '1',        // Don't show parent tweets
       hide_media: '0',         // IMPORTANT: Show media (videos/images)
-      chrome: 'noheader nofooter', // Minimal chrome
-      dnt: 'true'              // Do Not Track for privacy
+      dnt: 'true',             // Do Not Track for privacy
+      lang: 'en'               // Language
     });
 
     const oembedUrl = `https://publish.twitter.com/oembed?${params.toString()}`;
@@ -290,7 +292,7 @@ app.get('/api/twitter/oembed', async (req, res) => {
     };
 
     // Cache the response
-    oembedCache.set(url, {
+    oembedCache.set(cacheKey, {
       data: result,
       expiresAt: Date.now() + (result.cacheAge * 1000)
     });

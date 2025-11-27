@@ -163,32 +163,47 @@
     box-shadow: 0 0 30px -8px hsla(190 95% 55% / 0.4);
   }
 
-  /* Twitter embed styling */
+  /* Twitter/X embed styling - following X's oEmbed guide */
   .tweet-card-embed {
-    /* Remove default Twitter embed margins and borders */
-    --twitter-embed-border: none;
-  }
-
-  .tweet-card-embed .twitter-tweet {
-    margin: 0 !important;
-    width: 100% !important;
-  }
-
-  .tweet-card-embed .twitter-tweet iframe {
-    border-radius: 0 !important;
-  }
-
-  /* Make the embed fit nicely in our card */
-  .tweet-embed-container {
     width: 100%;
   }
 
-  .tweet-embed {
+  /* Remove default Twitter embed margins */
+  .tweet-card-embed .twitter-tweet,
+  .tweet-embed-container .twitter-tweet {
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Style the rendered iframe */
+  .tweet-card-embed .twitter-tweet-rendered,
+  .tweet-embed-container .twitter-tweet-rendered {
+    margin: 0 !important;
+  }
+
+  /* Ensure embed wrapper takes full width */
+  .tweet-embed-wrapper {
+    width: 100%;
+    background: #000000;
+    border-radius: 0;
+  }
+
+  .tweet-embed-container {
+    width: 100%;
     display: flex;
     justify-content: center;
   }
 
-  .tweet-embed .twitter-tweet {
-    margin: 0 !important;
+  /* Hide the blockquote before widgets.js hydrates it */
+  .tweet-embed-container > blockquote.twitter-tweet {
+    visibility: hidden;
+    height: 0;
+    overflow: hidden;
+  }
+
+  /* Show iframe after hydration */
+  .tweet-embed-container > iframe {
+    border: none !important;
   }
 }
