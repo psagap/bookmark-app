@@ -253,17 +253,12 @@ const WikiPreview = ({ bookmark }) => {
 
     return (
         <div className="h-full bg-[#ffffff] text-black relative font-serif flex flex-col">
-            {/* Header with Logo - fixed at top */}
-            <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-black/5 bg-white/80 backdrop-blur-sm z-10">
+            {/* Header - fixed at top */}
+            <div className="flex-shrink-0 flex items-center px-6 py-4 border-b border-black/5 bg-white/80 backdrop-blur-sm z-10">
                 <div className="flex items-baseline gap-2">
                     <span className="text-xl font-bold tracking-tight font-serif text-black">Wikipedia</span>
                     <span className="text-sm text-black/50 font-sans font-medium uppercase tracking-wider">Article</span>
                 </div>
-                <img
-                    src="https://upload.wikimedia.org/wikipedia/commons/6/63/Wikipedia-logo-transparent.png"
-                    alt="Wikipedia Logo"
-                    className="w-8 h-8 opacity-90"
-                />
             </div>
 
             {/* Scrollable Content - THIS is the scrollable area */}
