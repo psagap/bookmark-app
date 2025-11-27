@@ -27,7 +27,7 @@ function initializeDB() {
 // Save bookmark to local server
 async function saveBookmarkToServer(bookmark) {
   try {
-    const response = await fetch('http://localhost:3000/api/bookmarks', {
+    const response = await fetch('http://127.0.0.1:3000/api/bookmarks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(bookmark),
@@ -69,7 +69,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function handleSaveBookmark(bookmark) {
   try {
-    // Try to save to server first
+    // If Twitter URL and no thumbnail, try oEmbed first
+    if ((bookmark.url.includes('twitter.com') || bookmark.url.includes('x.com'))
+        && !bookmark.thumbnail) {
+      try {
+        const oembedResponse = await fetch(
+          `http://127.0.0.1:3000/api/twitter/oembed?url=${encodeURIComponent(bookmark.url)}`
+        );
+
+        if (oembedResponse.ok) {
+          const oembedData = await oembedResponse.json();
+          if (oembedData.thumbnail) {
+            bookmark.thumbnail = oembedData.thumbnail;
+            bookmark.metadata = bookmark.metadata || {};
+            bookmark.metadata.oembedData = {
+              authorName: oembedData.authorName,
+              authorUrl: oembedData.authorUrl
+            };
+          }
+        }
+      } catch (oembedError) {
+        console.warn('oEmbed fetch failed, continuing with original data:', oembedError);
+      }
+    }
+
+    // Try to save to server
     const savedBookmark = await saveBookmarkToServer(bookmark);
     return { source: 'server', bookmark: savedBookmark };
   } catch (serverError) {
@@ -80,8 +104,8 @@ async function handleSaveBookmark(bookmark) {
   }
 }
 
-// Sync offline bookmarks when server becomes available
-async function syncOfflineBookmarks() {
+// Get offline bookmarks from IndexedDB
+async function getOfflineBookmarks() {
   try {
     const db = await initializeDB();
     const transaction = db.transaction([STORE_NAME], 'readonly');
@@ -98,6 +122,51 @@ async function syncOfflineBookmarks() {
   }
 }
 
+// Delete offline bookmark after successful sync
+async function deleteOfflineBookmark(id) {
+  try {
+    const db = await initializeDB();
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    store.delete(id);
+  } catch (error) {
+    console.error('Error deleting offline bookmark:', error);
+  }
+}
+
+// Sync offline bookmarks to server
+async function syncOfflineBookmarks() {
+  const offlineBookmarks = await getOfflineBookmarks();
+
+  if (offlineBookmarks.length === 0) {
+    return;
+  }
+
+  console.log(`Syncing ${offlineBookmarks.length} offline bookmarks...`);
+
+  for (const bookmark of offlineBookmarks) {
+    try {
+      // Try to save to server
+      const response = await fetch('http://localhost:3000/api/bookmarks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bookmark),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      // Successfully synced, delete from IndexedDB
+      await deleteOfflineBookmark(bookmark.id);
+      console.log(`Successfully synced bookmark: ${bookmark.title}`);
+    } catch (error) {
+      console.warn(`Could not sync bookmark "${bookmark.title}", will retry later:`, error);
+      // Keep the bookmark in IndexedDB for next sync attempt
+    }
+  }
+}
+
 // Set up periodic sync (when online)
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Bookmark extension installed');
@@ -105,9 +174,12 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // Check for offline bookmarks periodically
 setInterval(async () => {
-  const offlineBookmarks = await syncOfflineBookmarks();
-  if (offlineBookmarks.length > 0) {
-    console.log(`Found ${offlineBookmarks.length} offline bookmarks to sync`);
-    // Sync logic would go here
+  try {
+    await syncOfflineBookmarks();
+  } catch (error) {
+    console.error('Error during sync attempt:', error);
   }
 }, 60000); // Check every minute
+
+// Also try to sync when extension starts
+syncOfflineBookmarks().catch(err => console.error('Initial sync failed:', err));

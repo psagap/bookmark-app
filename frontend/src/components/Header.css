@@ -1,0 +1,73 @@
+/* Elastic Navigation - No Container */
+.elastic-nav {
+  position: relative;
+  width: fit-content;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 55px;
+  padding: 0 15px;
+  isolation: isolate;
+}
+
+/* Bouncing indicator */
+.elastic-nav::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 6px;
+  width: 12px;
+  height: 12px;
+  background: hsl(var(--primary));
+  border-radius: 50%;
+  transform: translateX(var(--translate-x, 0)) translateY(var(--translate-y, 0)) rotateX(var(--rotate-x, 0deg));
+  transition: none;
+  opacity: 0;
+  z-index: -1;
+  box-shadow:
+    0 4px 16px hsl(var(--primary) / 0.4),
+    0 2px 8px hsl(var(--primary) / 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid hsl(var(--primary) / 0.6);
+}
+
+.elastic-nav.show-indicator::after {
+  opacity: 1;
+}
+
+/* Nav items */
+.nav-item {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 20px;
+  height: 100%;
+  color: hsl(var(--muted-foreground));
+  text-decoration: none;
+  font-family: "Gloria Hallelujah", cursive;
+  font-weight: 400;
+  font-size: 0.875rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  z-index: 1;
+}
+
+.nav-item:hover {
+  color: hsl(var(--foreground));
+  transform: translateY(-2px);
+}
+
+.nav-item.active {
+  color: hsl(var(--foreground));
+  transform: translateY(-2px);
+}
+
+.nav-item:focus {
+  outline: none;
+}
+
+.nav-item:active {
+  transform: translateY(-2px);
+}

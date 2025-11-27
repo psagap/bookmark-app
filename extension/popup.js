@@ -1,220 +1,267 @@
-/**
- * Popup controller
- * Handles UI state, timer, note/tag input, and bookmark saving
- */
+// Auto-detect source/category from URL
+function detectSource(url) {
+  const urlLower = url.toLowerCase();
 
-const TIMEOUT_SECONDS = 7;
-let timeoutId = null;
-let timerInterval = null;
-let remainingSeconds = TIMEOUT_SECONDS;
-let pageMetadata = null;
-let tags = [];
+  // X/Twitter
+  if (urlLower.includes('twitter.com') || urlLower.includes('x.com')) {
+    const isThread = urlLower.includes('/status/') && document.title?.includes('Thread');
+    return {
+      category: 'X',
+      subCategory: isThread ? 'thread' : 'tweet',
+      source: 'X'
+    };
+  }
 
-// DOM Elements
-const confirmationState = document.getElementById('confirmation-state');
-const loadingState = document.getElementById('loading-state');
-const errorState = document.getElementById('error-state');
+  // Instagram
+  if (urlLower.includes('instagram.com')) {
+    let subCategory = 'post';
+    if (urlLower.includes('/reel/')) subCategory = 'reel';
+    else if (urlLower.includes('/stories/')) subCategory = 'story';
+    return { category: 'Instagram', subCategory, source: 'Instagram' };
+  }
 
-const timerProgress = document.getElementById('timer-progress');
-const timerSeconds = document.getElementById('timer-seconds');
-const noteInput = document.getElementById('note-input');
-const tagsInput = document.getElementById('tags-input');
-const tagsList = document.getElementById('tags-list');
-const charCount = document.getElementById('char-count');
-const previewTitle = document.getElementById('preview-title');
-const previewUrl = document.getElementById('preview-url');
+  // Substack
+  if (urlLower.includes('substack.com') || urlLower.includes('.substack.')) {
+    return { category: 'Substack', subCategory: 'article', source: 'Substack' };
+  }
 
-const saveBtn = document.getElementById('save-btn');
-const closeBtn = document.getElementById('close-btn');
-const retryBtn = document.getElementById('retry-btn');
-const errorCloseBtn = document.getElementById('error-close-btn');
-const errorMessage = document.getElementById('error-message');
+  // YouTube
+  if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) {
+    let subCategory = 'video';
+    if (urlLower.includes('/shorts/')) subCategory = 'short';
+    if (urlLower.includes('/playlist')) subCategory = 'playlist';
+    return { category: 'YouTube', subCategory, source: 'YouTube' };
+  }
 
-// Initialize popup
-async function init() {
+  // Wikipedia
+  if (urlLower.includes('wikipedia.org')) {
+    return { category: 'Wikipedia', subCategory: 'article', source: 'Wikipedia' };
+  }
+
+  // GitHub
+  if (urlLower.includes('github.com')) {
+    let subCategory = 'repo';
+    if (urlLower.includes('/issues/')) subCategory = 'issue';
+    else if (urlLower.includes('/pull/')) subCategory = 'pr';
+    else if (urlLower.includes('/discussions/')) subCategory = 'discussion';
+    return { category: 'GitHub', subCategory, source: 'GitHub' };
+  }
+
+  // Reddit
+  if (urlLower.includes('reddit.com')) {
+    return { category: 'Reddit', subCategory: 'post', source: 'Reddit' };
+  }
+
+  // Medium
+  if (urlLower.includes('medium.com')) {
+    return { category: 'Medium', subCategory: 'article', source: 'Medium' };
+  }
+
+  // LinkedIn
+  if (urlLower.includes('linkedin.com')) {
+    let subCategory = 'post';
+    if (urlLower.includes('/article/')) subCategory = 'article';
+    return { category: 'LinkedIn', subCategory, source: 'LinkedIn' };
+  }
+
+  // TikTok
+  if (urlLower.includes('tiktok.com')) {
+    return { category: 'TikTok', subCategory: 'video', source: 'TikTok' };
+  }
+
+  // Default: extract domain as source
   try {
-    // Get page metadata from content script
+    const hostname = new URL(url).hostname.replace('www.', '');
+    const domain = hostname.split('.')[0];
+    const sourceName = domain.charAt(0).toUpperCase() + domain.slice(1);
+    return { category: 'Article', subCategory: 'webpage', source: sourceName };
+  } catch {
+    return { category: 'Article', subCategory: 'webpage', source: 'Web' };
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const timerLine = document.getElementById('timer-line');
+  const pageTitle = document.getElementById('page-title');
+  const pageDomain = document.getElementById('page-domain');
+  const tagsInput = document.getElementById('tags-input');
+  const noteInput = document.getElementById('note-input');
+  const saveBtn = document.getElementById('save-btn');
+  const cancelBtn = document.getElementById('cancel-btn');
+  const retryBtn = document.getElementById('retry-btn');
+
+  const inputState = document.getElementById('main-content');
+  const successState = document.getElementById('success-state');
+  const errorState = document.getElementById('error-state');
+
+  let currentMetadata = null;
+  let timerInterval;
+  const TOTAL_TIME = 7000; // 7 seconds
+  let timeLeft = TOTAL_TIME;
+  let isPaused = false;
+
+  // Initialize
+  try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    chrome.tabs.sendMessage(tab.id, { action: 'getPageMetadata' }, (response) => {
-      if (response && response.success) {
-        pageMetadata = response.data;
-        showConfirmationState();
-        startTimer();
-      } else {
-        showError('Could not detect page content');
-      }
-    });
-  } catch (error) {
-    showError('Failed to initialize: ' + error.message);
-  }
-}
 
-// Show confirmation state and update preview
-function showConfirmationState() {
-  loadingState.classList.add('hidden');
-  errorState.classList.add('hidden');
-  confirmationState.classList.remove('hidden');
-
-  previewTitle.textContent = pageMetadata.title || 'Untitled';
-  previewUrl.textContent = new URL(pageMetadata.url).hostname;
-
-  // Focus note input
-  noteInput.focus();
-}
-
-// Timer countdown (7 seconds)
-function startTimer() {
-  remainingSeconds = TIMEOUT_SECONDS;
-  timerProgress.style.width = '100%';
-
-  timerInterval = setInterval(() => {
-    remainingSeconds--;
-    timerSeconds.textContent = remainingSeconds;
-    timerProgress.style.width = `${(remainingSeconds / TIMEOUT_SECONDS) * 100}%`;
-
-    if (remainingSeconds <= 0) {
-      clearInterval(timerInterval);
-      saveBookmark();
+    // Optimistically set title/domain
+    pageTitle.textContent = tab.title;
+    try {
+      pageDomain.textContent = new URL(tab.url).hostname;
+    } catch (e) {
+      pageDomain.textContent = tab.url;
     }
-  }, 1000);
-}
 
-// Reset timer (called when user types)
-function resetTimer() {
-  clearInterval(timerInterval);
-  startTimer();
-}
+    // Request full metadata
+    chrome.tabs.sendMessage(tab.id, { action: 'getPageMetadata' }, (response) => {
+      if (chrome.runtime.lastError) {
+        // Fallback
+        currentMetadata = {
+          url: tab.url,
+          title: tab.title,
+          favicon: tab.favIconUrl
+        };
+      } else if (response && response.success) {
+        currentMetadata = response.data;
+        pageTitle.textContent = currentMetadata.title || tab.title;
+      }
 
-// Add tag
-function addTag(tagText) {
-  const tag = tagText.trim().toLowerCase();
-  if (tag && !tags.includes(tag)) {
-    tags.push(tag);
-    renderTags();
-    tagsInput.value = '';
+      // Auto-tagging after metadata is ready
+      generateAutoTags(currentMetadata);
+    });
+
+    // Start Timer
+    startTimer();
+
+  } catch (err) {
+    console.error(err);
+    showError('Could not connect to page.');
   }
-}
 
-// Remove tag
-function removeTag(tag) {
-  tags = tags.filter(t => t !== tag);
-  renderTags();
-}
+  function startTimer() {
+    const startTime = Date.now();
+    const endTime = startTime + timeLeft;
 
-// Render tags
-function renderTags() {
-  tagsList.innerHTML = tags
-    .map(tag => `
-      <div class="tag">
-        <span>${tag}</span>
-        <span class="tag-remove" data-tag="${tag}">×</span>
-      </div>
-    `)
-    .join('');
+    timerInterval = setInterval(() => {
+      if (isPaused) return;
 
-  // Add click handlers for remove buttons
-  tagsList.querySelectorAll('.tag-remove').forEach(btn => {
-    btn.addEventListener('click', (e) => removeTag(e.target.dataset.tag));
+      const now = Date.now();
+      const remaining = endTime - now;
+
+      if (remaining <= 0) {
+        clearInterval(timerInterval);
+        timerLine.style.width = '0%';
+        saveBookmark(); // Auto-save when timer ends
+      } else {
+        const percentage = (remaining / TOTAL_TIME) * 100;
+        timerLine.style.width = `${percentage}%`;
+      }
+    }, 16); // ~60fps
+  }
+
+  function pauseTimer() {
+    isPaused = true;
+    timerLine.style.opacity = '0.5';
+  }
+
+  function generateAutoTags(metadata) {
+    if (!metadata) return;
+    const tags = [];
+    const url = metadata.url.toLowerCase();
+
+    // Auto-tags based on detected source
+    if (url.includes('youtube') || url.includes('youtu.be')) tags.push('video');
+    if (url.includes('twitter') || url.includes('x.com')) tags.push('social');
+    if (url.includes('instagram')) tags.push('social');
+    if (url.includes('substack')) tags.push('newsletter', 'read');
+    if (url.includes('github')) tags.push('code', 'dev');
+    if (url.includes('medium') || url.includes('dev.to')) tags.push('article', 'read');
+    if (url.includes('wikipedia')) tags.push('reference', 'learn');
+    if (url.includes('reddit')) tags.push('discussion', 'social');
+    if (url.includes('linkedin')) tags.push('professional', 'social');
+    if (url.includes('tiktok')) tags.push('video', 'social');
+    if (url.includes('design') || url.includes('dribbble') || url.includes('figma')) tags.push('design', 'inspiration');
+
+    // Set tags if any found
+    if (tags.length > 0) {
+      tagsInput.value = tags.join(', ');
+    }
+  }
+
+  // User Interaction pauses timer
+  [tagsInput, noteInput].forEach(input => {
+    input.addEventListener('focus', pauseTimer);
+    input.addEventListener('input', pauseTimer);
   });
-}
 
-// Save bookmark
-async function saveBookmark() {
-  clearInterval(timerInterval);
+  // Save Handler
+  async function saveBookmark() {
+    clearInterval(timerInterval);
 
-  confirmationState.classList.add('hidden');
-  loadingState.classList.remove('hidden');
+    if (!currentMetadata) {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      currentMetadata = { url: tab.url, title: tab.title, favicon: tab.favIconUrl };
+    }
 
-  try {
-    const bookmark = {
-      url: pageMetadata.url,
-      title: pageMetadata.title || 'Untitled',
-      notes: noteInput.value,
-      tags: tags,
-      selectedText: pageMetadata.selectedText,
-      thumbnail: pageMetadata.ogImage,
+    const tags = tagsInput.value.split(',').map(t => t.trim()).filter(t => t);
+    const notes = noteInput.value.trim();
+
+    // Auto-detect source from URL
+    const { category, subCategory, source } = detectSource(currentMetadata.url);
+
+    const bookmarkData = {
+      url: currentMetadata.url,
+      title: currentMetadata.title,
+      category,
+      subCategory,
+      source,
+      tags,
+      notes,
+      thumbnail: currentMetadata.ogImage || currentMetadata.wikipediaData?.thumbnail || '',
+      metadata: {
+        ogDescription: currentMetadata.ogDescription,
+        tweetData: currentMetadata.tweetData,
+        wikipediaData: currentMetadata.wikipediaData
+      }
     };
 
-    // Send to background script to save
-    chrome.runtime.sendMessage(
-      { action: 'saveBookmark', data: bookmark },
-      (response) => {
-        if (response.success) {
-          showSuccess(response.data);
-        } else {
-          showError(response.error || 'Failed to save bookmark');
-        }
+    // Send to background
+    chrome.runtime.sendMessage({ action: 'saveBookmark', data: bookmarkData }, (response) => {
+      if (chrome.runtime.lastError) {
+        showError('Background service error.');
+      } else if (response && response.success) {
+        showSuccess();
+      } else {
+        showError(response?.error || 'Failed to save.');
       }
-    );
-  } catch (error) {
-    showError(error.message);
+    });
   }
-}
 
-// Show success and close
-function showSuccess(result) {
-  setTimeout(() => {
-    if (result.source === 'offline') {
-      showConfirmationState();
-      setStatus('Saved offline - will sync when online');
-    } else {
+  saveBtn.addEventListener('click', saveBookmark);
+
+  cancelBtn.addEventListener('click', () => {
+    window.close();
+  });
+
+  retryBtn.addEventListener('click', () => {
+    errorState.classList.add('hidden');
+    inputState.classList.remove('hidden');
+    startTimer();
+  });
+
+  function showSuccess() {
+    inputState.classList.add('hidden');
+    timerLine.parentElement.classList.add('hidden'); // Hide timer
+    successState.classList.remove('hidden');
+
+    setTimeout(() => {
       window.close();
-    }
-  }, 1000);
-}
+    }, 2000);
+  }
 
-// Show error state
-function showError(message) {
-  loadingState.classList.add('hidden');
-  confirmationState.classList.add('hidden');
-  errorState.classList.remove('hidden');
-  errorMessage.textContent = message;
-}
-
-// Set status message
-function setStatus(message) {
-  const status = document.createElement('div');
-  status.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    background: #51cf66;
-    color: white;
-    padding: 8px;
-    text-align: center;
-    font-size: 12px;
-    z-index: 1000;
-  `;
-  status.textContent = message;
-  document.body.appendChild(status);
-  setTimeout(() => status.remove(), 3000);
-}
-
-// Event listeners
-noteInput.addEventListener('input', () => {
-  resetTimer();
-  charCount.textContent = noteInput.value.length;
-});
-
-tagsInput.addEventListener('keydown', (e) => {
-  resetTimer();
-  if (e.key === 'Enter' || e.key === ',') {
-    e.preventDefault();
-    addTag(tagsInput.value);
+  function showError(msg) {
+    inputState.classList.add('hidden');
+    errorState.classList.remove('hidden');
+    document.getElementById('error-message').textContent = msg;
   }
 });
-
-tagsInput.addEventListener('blur', () => {
-  if (tagsInput.value.trim()) {
-    addTag(tagsInput.value);
-  }
-});
-
-saveBtn.addEventListener('click', saveBookmark);
-closeBtn.addEventListener('click', () => window.close());
-retryBtn.addEventListener('click', init);
-errorCloseBtn.addEventListener('click', () => window.close());
-
-// Start the extension
-init();

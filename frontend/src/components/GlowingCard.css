@@ -1,0 +1,149 @@
+:root {
+    --glow-sens: 30;
+    --color-sens: 50;
+    --glow-color: 200deg 80% 70%;
+    --glow-boost: 0%;
+}
+
+@keyframes slideInFromRight {
+    from {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.glowing-card-wrapper {
+    position: relative;
+    isolation: isolate;
+    border-radius: inherit;
+    --pointer-deg: 45deg;
+    --pointer-d: 0;
+    animation: slideInFromRight 0.4s ease-out;
+}
+
+.glowing-card-wrapper::before,
+.glowing-card-wrapper::after,
+.glowing-card-wrapper > .glow {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    transition: opacity 0.25s ease-out;
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* Hide effects when not hovering */
+.glowing-card-wrapper:not(:hover)::before,
+.glowing-card-wrapper:not(:hover)::after,
+.glowing-card-wrapper:not(:hover) > .glow {
+    opacity: 0;
+    transition: opacity 0.75s ease-in-out;
+}
+
+/* Mesh gradient border */
+.glowing-card-wrapper::before {
+    border: 1px solid transparent;
+    background:
+        linear-gradient(hsl(var(--card)) 0 100%) padding-box,
+        radial-gradient(at 80% 55%, hsla(268,100%,76%,1) 0px, transparent 50%) border-box,
+        radial-gradient(at 69% 34%, hsla(349,100%,74%,1) 0px, transparent 50%) border-box,
+        radial-gradient(at 8% 6%, hsla(136,100%,78%,1) 0px, transparent 50%) border-box,
+        radial-gradient(at 41% 38%, hsla(192,100%,64%,1) 0px, transparent 50%) border-box,
+        radial-gradient(at 86% 85%, hsla(186,100%,74%,1) 0px, transparent 50%) border-box,
+        radial-gradient(at 82% 18%, hsla(52,100%,65%,1) 0px, transparent 50%) border-box,
+        radial-gradient(at 51% 4%, hsla(12,100%,72%,1) 0px, transparent 50%) border-box;
+
+    /* opacity increases as pointer gets near edge */
+    opacity: calc((var(--pointer-d) - var(--color-sens)) / (100 - var(--color-sens)));
+
+    /* border is masked to a cone, originating from the center towards the pointer */
+    mask-image:
+        conic-gradient(
+            from var(--pointer-deg) at center,
+            black 25%,
+            transparent 40%,
+            transparent 60%,
+            black 75%
+        );
+}
+
+/* Mesh gradient background overlay */
+.glowing-card-wrapper::after {
+    border: 1px solid transparent;
+
+    background:
+        radial-gradient(at 80% 55%, hsla(268,100%,76%,0.15) 0px, transparent 50%),
+        radial-gradient(at 69% 34%, hsla(349,100%,74%,0.15) 0px, transparent 50%),
+        radial-gradient(at 8% 6%, hsla(136,100%,78%,0.15) 0px, transparent 50%),
+        radial-gradient(at 41% 38%, hsla(192,100%,64%,0.15) 0px, transparent 50%),
+        radial-gradient(at 86% 85%, hsla(186,100%,74%,0.15) 0px, transparent 50%),
+        radial-gradient(at 82% 18%, hsla(52,100%,65%,0.15) 0px, transparent 50%),
+        radial-gradient(at 51% 4%, hsla(12,100%,72%,0.15) 0px, transparent 50%);
+
+    /* mask to create edge highlighting */
+    mask-image:
+        linear-gradient( to bottom, black, black ),
+        radial-gradient( ellipse at 50% 50%, black 40%, transparent 65% ),
+        radial-gradient( ellipse at 66% 66%, black 5%, transparent 40% ),
+        radial-gradient( ellipse at 33% 33%, black 5%, transparent 40% ),
+        radial-gradient( ellipse at 66% 33%, black 5%, transparent 40% ),
+        radial-gradient( ellipse at 33% 66%, black 5%, transparent 40% ),
+        conic-gradient( from var(--pointer-deg) at center, transparent 5%, black 15%, black 85%, transparent 95% );
+
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+
+    /* opacity increases as pointer gets near edge */
+    opacity: calc((var(--pointer-d) - var(--color-sens)) / (100 - var(--color-sens)));
+    mix-blend-mode: soft-light;
+}
+
+/* Glowing border edges */
+.glowing-card-wrapper > .glow {
+    /* outer padding so the glow can overflow */
+    inset: -20px;
+    pointer-events: none;
+    z-index: 1;
+
+    /* glow is masked to a cone, originating from the center towards the pointer */
+    mask-image:
+        conic-gradient(
+            from var(--pointer-deg) at center,
+            black 2.5%,
+            transparent 10%,
+            transparent 90%,
+            black 97.5%
+        );
+
+    /* opacity increases as pointer gets near edge */
+    opacity: calc((var(--pointer-d) - var(--glow-sens)) / (100 - var(--glow-sens)));
+    mix-blend-mode: plus-lighter;
+}
+
+.glowing-card-wrapper > .glow::before {
+    content: "";
+    position: absolute;
+    inset: 20px;
+    border-radius: inherit;
+    box-shadow:
+        inset 0 0 0 1px hsl( var(--glow-color) / 100%),
+
+        inset 0 0 1px 0 hsl( var(--glow-color) / calc(var(--glow-boost) + 60%)),
+        inset 0 0 3px 0 hsl( var(--glow-color) / calc(var(--glow-boost) + 50%)),
+        inset 0 0 6px 0 hsl( var(--glow-color) / calc(var(--glow-boost) + 40%)),
+        inset 0 0 15px 0 hsl( var(--glow-color) / calc(var(--glow-boost) + 30%)),
+        inset 0 0 25px 2px hsl( var(--glow-color) / calc(var(--glow-boost) + 20%)),
+        inset 0 0 50px 2px hsl( var(--glow-color) / calc(var(--glow-boost) + 10%)),
+
+        0 0 1px 0 hsl( var(--glow-color) / calc(var(--glow-boost) + 60%)),
+        0 0 3px 0 hsl( var(--glow-color) / calc(var(--glow-boost) + 50%)),
+        0 0 6px 0 hsl( var(--glow-color) / calc(var(--glow-boost) + 40%)),
+        0 0 15px 0 hsl( var(--glow-color) / calc(var(--glow-boost) + 30%)),
+        0 0 25px 2px hsl( var(--glow-color) / calc(var(--glow-boost) + 20%)),
+        0 0 50px 2px hsl( var(--glow-color) / calc(var(--glow-boost) + 10%));
+}

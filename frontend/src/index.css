@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Defaulting to the dark/space theme as the primary look */
+    --background: 243 25% 29%;
+    /* Space Indigo */
+    --foreground: 15 9% 75%;
+    /* Silver */
+
+    --card: 243 25% 29%;
+    /* Space Indigo */
+    --card-foreground: 15 9% 75%;
+    /* Silver */
+
+    --popover: 243 25% 29%;
+    /* Space Indigo */
+    --popover-foreground: 15 9% 75%;
+    /* Silver */
+
+    --primary: 307 62% 64%;
+    /* Orchid */
+    --primary-foreground: 243 25% 29%;
+    /* Space Indigo */
+
+    --secondary: 264 24% 48%;
+    /* Dusty Grape */
+    --secondary-foreground: 15 9% 75%;
+    /* Silver */
+
+    --muted: 264 24% 48%;
+    /* Dusty Grape */
+    --muted-foreground: 15 9% 60%;
+    /* Silver (dimmed) */
+
+    --accent: 337 78% 83%;
+    /* Blush Pop */
+    --accent-foreground: 243 25% 29%;
+    /* Space Indigo */
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 264 24% 48%;
+    /* Dusty Grape */
+    --input: 264 24% 48%;
+    /* Dusty Grape */
+    --ring: 307 62% 64%;
+    /* Orchid */
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 243 25% 29%;
+    /* Space Indigo */
+    --foreground: 15 9% 75%;
+    /* Silver */
+
+    --card: 243 25% 29%;
+    /* Space Indigo */
+    --card-foreground: 15 9% 75%;
+    /* Silver */
+
+    --popover: 243 25% 29%;
+    /* Space Indigo */
+    --popover-foreground: 15 9% 75%;
+    /* Silver */
+
+    --primary: 307 62% 64%;
+    /* Orchid */
+    --primary-foreground: 243 25% 29%;
+    /* Space Indigo */
+
+    --secondary: 264 24% 48%;
+    /* Dusty Grape */
+    --secondary-foreground: 15 9% 75%;
+    /* Silver */
+
+    --muted: 264 24% 48%;
+    /* Dusty Grape */
+    --muted-foreground: 15 9% 60%;
+    /* Silver (dimmed) */
+
+    --accent: 337 78% 83%;
+    /* Blush Pop */
+    --accent-foreground: 243 25% 29%;
+    /* Space Indigo */
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 264 24% 48%;
+    /* Dusty Grape */
+    --input: 264 24% 48%;
+    /* Dusty Grape */
+    --ring: 307 62% 64%;
+    /* Orchid */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .font-handwriting {
+    font-family: "Gloria Hallelujah", cursive;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

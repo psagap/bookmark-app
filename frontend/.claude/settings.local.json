@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev)",
+      "Bash(chmod:*)",
+      "Bash(curl:*)",
+      "Bash(cat:*)",
+      "WebSearch",
+      "Bash(node --version)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:www.mediawiki.org)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

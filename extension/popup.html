@@ -1,90 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Save Bookmark</title>
+  <title>Save to Mind</title>
   <link rel="stylesheet" href="popup.css">
 </head>
+
 <body>
-  <div class="popup-container">
-    <!-- Loading state -->
-    <div id="loading-state" class="state hidden">
-      <div class="spinner"></div>
-      <p>Saving bookmark...</p>
+  <div class="container">
+    <!-- Timer Line -->
+    <div class="timer-container">
+      <div id="timer-line" class="timer-line"></div>
     </div>
 
-    <!-- Confirmation state -->
-    <div id="confirmation-state" class="state">
-      <div class="confirmation-header">
-        <span class="checkmark">✓</span>
-        <h2>Bookmark Saved!</h2>
-      </div>
-
-      <div class="bookmark-preview">
-        <p id="preview-title" class="preview-title"></p>
-        <p id="preview-url" class="preview-url"></p>
-      </div>
-
-      <!-- Timer progress bar -->
-      <div class="timer-container">
-        <div class="timer-bar">
-          <div id="timer-progress" class="timer-progress"></div>
-        </div>
-        <p class="timer-text"><span id="timer-seconds">7</span>s to add notes/tags</p>
-      </div>
-
-      <!-- Note input -->
-      <div class="input-section">
-        <label for="note-input" class="section-label">ADD A NOTE</label>
-        <textarea
-          id="note-input"
-          class="input-field"
-          placeholder="Start typing..."
-          maxlength="500"
-          rows="3"
-        ></textarea>
-        <div class="char-count">
-          <span id="char-count">0</span>/500
+    <!-- Main Content -->
+    <div id="main-content">
+      <div class="header">
+        <div class="site-info">
+          <h1 id="page-title">Loading...</h1>
+          <span id="page-domain"></span>
         </div>
       </div>
 
-      <!-- Tags input -->
-      <div class="input-section">
-        <label for="tags-input" class="section-label">Tags</label>
-        <div class="tags-container">
-          <input
-            id="tags-input"
-            type="text"
-            class="input-field"
-            placeholder="Add tags separated by commas"
-            maxlength="200"
-          >
-          <div id="tags-list" class="tags-list"></div>
-        </div>
+      <div class="form-group">
+        <label for="tags-input">TAGS</label>
+        <input type="text" id="tags-input" placeholder="Add tags..." autocomplete="off">
       </div>
 
-      <!-- Action buttons -->
-      <div class="button-group">
-        <button id="save-btn" class="btn btn-primary">Save & Close</button>
-        <button id="close-btn" class="btn btn-secondary">×</button>
+      <div class="form-group">
+        <label for="note-input">NOTE</label>
+        <textarea id="note-input" placeholder="Add a note about this page..." rows="3"></textarea>
+      </div>
+
+      <div class="actions">
+        <button id="save-btn" class="creepy-btn">
+          <span class="creepy-btn__content">Save to Mind</span>
+        </button>
+        <button id="cancel-btn" class="text-btn">Cancel</button>
       </div>
     </div>
 
-    <!-- Error state -->
-    <div id="error-state" class="state hidden">
-      <div class="error-header">
-        <span class="error-icon">!</span>
-        <h2>Save Failed</h2>
+    <!-- Success State -->
+    <div id="success-state" class="hidden">
+      <div class="success-content">
+        <div class="eye-animation">
+          <div class="eye"></div>
+        </div>
+        <h2 class="intriguing-text">Consumed.</h2>
       </div>
-      <p id="error-message" class="error-message"></p>
-      <div class="button-group">
-        <button id="retry-btn" class="btn btn-primary">Retry</button>
-        <button id="error-close-btn" class="btn btn-secondary">Close</button>
-      </div>
+    </div>
+
+    <!-- Error State -->
+    <div id="error-state" class="hidden">
+      <p id="error-message">Something went wrong.</p>
+      <button id="retry-btn" class="creepy-btn">Try Again</button>
     </div>
   </div>
-
   <script src="popup.js"></script>
 </body>
+
 </html>

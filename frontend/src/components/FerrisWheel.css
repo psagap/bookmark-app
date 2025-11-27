@@ -1,0 +1,254 @@
+@property --a {
+  syntax: "<number>";
+  initial-value: 0;
+  inherits: false;
+}
+
+.ferris-wheel-container {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  padding-bottom: 10px;
+  /* Space for stand */
+}
+
+/* Wheel */
+.ferris-wheel {
+  --at: 30s;
+  --a: 0;
+  --t: 10;
+  width: 50px;
+  height: 50px;
+  border: 2px solid #ccc;
+  border-radius: 100%;
+  background-image:
+    repeating-conic-gradient(from calc(1deg * var(--a)),
+      rgba(255, 255, 255, 0.1) 0deg 1deg,
+      transparent 0deg calc(360deg / var(--t)));
+  animation: bgrot var(--at) linear infinite;
+  position: relative;
+  z-index: 2;
+}
+
+/* Spokes */
+.ferris-wheel:before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  transform: translate(-50%, -50%);
+  background:
+    linear-gradient(0deg, transparent 49%, #ccc 49%, #ccc 51%, transparent 51%),
+    linear-gradient(36deg, transparent 49%, #ccc 49%, #ccc 51%, transparent 51%),
+    linear-gradient(72deg, transparent 49%, #ccc 49%, #ccc 51%, transparent 51%),
+    linear-gradient(108deg, transparent 49%, #ccc 49%, #ccc 51%, transparent 51%),
+    linear-gradient(144deg, transparent 49%, #ccc 49%, #ccc 51%, transparent 51%);
+  border-radius: 50%;
+  z-index: -1;
+}
+
+/* Center Hub */
+.ferris-wheel:after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+@keyframes bgrot {
+  from {
+    --a: 0
+  }
+
+  to {
+    --a: 360
+  }
+}
+
+/* Stand (A-Frame) */
+.stand {
+  position: absolute;
+  bottom: -10px;
+  /* Adjust based on container padding */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 35px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.stand:before,
+.stand:after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 2px;
+  height: 100%;
+  background: #ccc;
+}
+
+.stand:before {
+  left: 10px;
+  transform: rotate(-20deg);
+  transform-origin: bottom;
+}
+
+.stand:after {
+  right: 10px;
+  transform: rotate(20deg);
+  transform-origin: bottom;
+}
+
+/* Base of stand */
+.stand-base {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 2px;
+  background: #ccc;
+}
+
+/* Baskets */
+.basket {
+  width: 8px;
+  height: 7px;
+  border: 1px solid #ccc;
+  border-bottom-width: 2px;
+  border-bottom-color: #ff3b30;
+  border-top-width: 1px;
+  offset-path: border-box;
+  offset-rotate: 0deg;
+  offset-anchor: 50% 0%;
+  border-radius: 30%;
+  position: absolute;
+  background: rgba(20, 20, 20, 0.8);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: auto;
+  animation: rot var(--at) linear infinite;
+  animation-delay: calc(-1 * var(--at) * var(--i) / var(--t));
+  z-index: 3;
+}
+
+.basket:before {
+  content: '';
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: #007aff;
+  left: calc(50% - 1.5px);
+  top: -3px;
+  border-radius: 100%;
+  border: 0.5px solid #ccc;
+}
+
+@keyframes rot {
+  from {
+    offset-distance: 0%
+  }
+
+  to {
+    offset-distance: 100%
+  }
+}
+
+/* Flashing Lights on Hover */
+@keyframes flash {
+
+  0%,
+  100% {
+    background-color: #ff3b30;
+    box-shadow: 0 0 2px #ff3b30;
+  }
+
+  50% {
+    background-color: #ffcc00;
+    box-shadow: 0 0 5px #ffcc00;
+  }
+}
+
+.ferris-wheel-container:hover .basket {
+  animation: rot var(--at) linear infinite, flash 1s infinite;
+  animation-delay: calc(-1 * var(--at) * var(--i) / var(--t)), calc(var(--i) * 0.1s);
+  border-color: #fff;
+}
+
+/* Launching Fireworks */
+.firework {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ferris-wheel-container:hover .firework {
+  animation: launchAndExplode 2s ease-out infinite;
+}
+
+.firework:nth-child(1) {
+  left: 20%;
+  animation-delay: 0s;
+  --color: #ff3b30;
+}
+
+.firework:nth-child(2) {
+  left: 80%;
+  animation-delay: 0.5s;
+  --color: #007aff;
+}
+
+.firework:nth-child(3) {
+  left: 40%;
+  animation-delay: 1.0s;
+  --color: #34c759;
+}
+
+.firework:nth-child(4) {
+  left: 60%;
+  animation-delay: 1.5s;
+  --color: #af52de;
+}
+
+@keyframes launchAndExplode {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    background-color: #fff;
+    box-shadow: 0 0 2px #fff;
+  }
+
+  50% {
+    transform: translateY(-60px) scale(1);
+    opacity: 1;
+    background-color: var(--color);
+  }
+
+  60% {
+    transform: translateY(-60px) scale(2);
+    opacity: 1;
+    box-shadow: 0 0 10px var(--color), 0 0 20px var(--color);
+  }
+
+  100% {
+    transform: translateY(-60px) scale(0);
+    opacity: 0;
+  }
+}
