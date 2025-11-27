@@ -238,7 +238,10 @@ app.post('/api/bookmarks/:id/refresh', async (req, res) => {
   }
 });
 
-// GET Twitter oEmbed data
+// In-memory cache for oEmbed responses
+const oembedCache = new Map();
+
+// GET Twitter oEmbed data with proper parameters for video embeds
 app.get('/api/twitter/oembed', async (req, res) => {
   const { url } = req.query;
 
@@ -246,8 +249,27 @@ app.get('/api/twitter/oembed', async (req, res) => {
     return res.status(400).json({ error: 'Invalid Twitter URL' });
   }
 
+  // Check cache first
+  const cached = oembedCache.get(url);
+  if (cached && cached.expiresAt > Date.now()) {
+    return res.json(cached.data);
+  }
+
   try {
-    const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(url)}&omit_script=true`;
+    // Build oEmbed URL with all recommended parameters
+    const params = new URLSearchParams({
+      url: url,
+      omit_script: '1',        // We load widgets.js once in our app
+      theme: 'dark',           // Match our dark theme
+      hide_thread: '1',        // Don't show parent tweets
+      hide_media: '0',         // IMPORTANT: Show media (videos/images)
+      chrome: 'noheader nofooter', // Minimal chrome
+      dnt: 'true'              // Do Not Track for privacy
+    });
+
+    const oembedUrl = `https://publish.twitter.com/oembed?${params.toString()}`;
+    console.log('Fetching oEmbed:', oembedUrl);
+
     const response = await fetch(oembedUrl);
 
     if (!response.ok) {
@@ -256,25 +278,24 @@ app.get('/api/twitter/oembed', async (req, res) => {
 
     const data = await response.json();
 
-    // Extract image from HTML if available
-    let thumbnail = data.thumbnail_url || '';
-
-    // Parse HTML for images if no thumbnail
-    if (!thumbnail && data.html) {
-      const imgMatch = data.html.match(/<img[^>]+src="([^">]+)"/);
-      if (imgMatch) {
-        thumbnail = imgMatch[1];
-      }
-    }
-
-    res.json({
-      thumbnail,
+    const result = {
+      html: data.html,
       authorName: data.author_name,
       authorUrl: data.author_url,
-      html: data.html,
       width: data.width,
-      height: data.height
+      height: data.height,
+      cacheAge: data.cache_age || 3153600000, // Default ~100 years if not specified
+      provider: data.provider_name,
+      type: data.type
+    };
+
+    // Cache the response
+    oembedCache.set(url, {
+      data: result,
+      expiresAt: Date.now() + (result.cacheAge * 1000)
     });
+
+    res.json(result);
   } catch (error) {
     console.error('oEmbed fetch error:', error);
     res.status(500).json({ error: error.message });
