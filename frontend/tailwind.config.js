@@ -51,6 +51,62 @@ module.exports = {
                     DEFAULT: "hsl(var(--card))",
                     foreground: "hsl(var(--card-foreground))",
                 },
+                // Gruvbox-inspired palette
+                gruvbox: {
+                    bg: {
+                        darkest: '#1d2021',
+                        dark: '#282828',
+                        DEFAULT: '#32302f',
+                        light: '#3c3836',
+                        lighter: '#504945',
+                    },
+                    fg: {
+                        DEFAULT: '#ebdbb2',
+                        light: '#fbf1c7',
+                        muted: '#a89984',
+                    },
+                    red: {
+                        DEFAULT: '#cc241d',
+                        light: '#fb4934',
+                    },
+                    orange: {
+                        DEFAULT: '#d65d0e',
+                        light: '#fe8019',
+                    },
+                    yellow: {
+                        DEFAULT: '#d79921',
+                        light: '#fabd2f',
+                    },
+                    aqua: {
+                        DEFAULT: '#689d6a',
+                        light: '#8ec07c',
+                    },
+                    purple: {
+                        DEFAULT: '#b16286',
+                        light: '#d3869b',
+                    },
+                },
+                // Legacy vintage colors (keeping for compatibility)
+                vintage: {
+                    navy: {
+                        darkest: '#1d2021',
+                        dark: '#282828',
+                        DEFAULT: '#32302f',
+                        light: '#3c3836',
+                        lighter: '#504945',
+                    },
+                    amber: {
+                        DEFAULT: '#d79921',
+                        light: '#fabd2f',
+                        lighter: '#fbf1c7',
+                        dark: '#d65d0e',
+                        darker: '#af3a03',
+                    },
+                    cream: '#ebdbb2',
+                    gold: '#fabd2f',
+                    copper: '#fe8019',
+                    rust: '#cc241d',
+                },
             },
             borderRadius: {
                 lg: "var(--radius)",

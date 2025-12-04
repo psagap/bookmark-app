@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,79 +6,94 @@
 
 @layer base {
   :root {
-    /* Neon Aurora Theme */
-    /* Deep violet-black background */
-    --background: 260 30% 8%;
-    /* Soft white text */
-    --foreground: 220 20% 95%;
+    /* Gruvbox Dark Theme */
+    /* Deep dark background */
+    --background: 20 6% 12%;
+    /* Warm cream text */
+    --foreground: 43 59% 81%;
 
-    /* Elevated surface (slightly lighter violet-black) */
-    --card: 260 25% 12%;
-    --card-foreground: 220 20% 95%;
+    /* Card surface - slightly lighter */
+    --card: 20 8% 16%;
+    --card-foreground: 43 59% 81%;
 
-    --popover: 260 25% 14%;
-    --popover-foreground: 220 20% 95%;
+    /* Elevated surfaces */
+    --popover: 20 10% 20%;
+    --popover-foreground: 43 59% 81%;
 
-    /* Electric Neon Purple */
-    --primary: 270 95% 65%;
-    --primary-foreground: 220 20% 98%;
+    /* Gruvbox Yellow - Primary action color */
+    --primary: 42 75% 49%;
+    --primary-foreground: 20 6% 12%;
 
-    /* Deep Indigo */
-    --secondary: 240 30% 20%;
-    --secondary-foreground: 220 20% 90%;
+    /* Slightly lighter card for hover */
+    --secondary: 20 10% 22%;
+    --secondary-foreground: 43 59% 81%;
 
-    --muted: 260 20% 18%;
-    --muted-foreground: 260 15% 60%;
+    /* Muted surfaces */
+    --muted: 20 8% 18%;
+    --muted-foreground: 30 15% 60%;
 
-    /* Cyber Cyan */
-    --accent: 190 100% 50%;
-    --accent-foreground: 260 30% 8%;
+    /* Gruvbox Orange accent */
+    --accent: 27 95% 53%;
+    --accent-foreground: 20 6% 12%;
 
-    --destructive: 0 85% 60%;
-    --destructive-foreground: 220 20% 98%;
+    /* Gruvbox Red for destructive */
+    --destructive: 0 75% 45%;
+    --destructive-foreground: 43 59% 90%;
 
-    --border: 260 20% 20%;
-    --input: 260 20% 18%;
-    --ring: 270 95% 65%;
+    --border: 20 10% 25%;
+    --input: 20 8% 18%;
+    --ring: 42 75% 49%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
-    /* Gradient variables */
-    --gradient-primary: linear-gradient(135deg, hsl(270 95% 65%) 0%, hsl(290 90% 60%) 50%, hsl(320 85% 55%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(190 100% 50%) 0%, hsl(220 90% 60%) 100%);
-    --gradient-surface: linear-gradient(180deg, hsl(260 25% 12%) 0%, hsl(260 30% 8%) 100%);
-    --gradient-glow: radial-gradient(ellipse at 50% 0%, hsla(270 95% 65% / 0.15) 0%, transparent 70%);
+    /* Gruvbox color palette */
+    --gruvbox-bg-darkest: #1d2021;
+    --gruvbox-bg-dark: #282828;
+    --gruvbox-bg: #32302f;
+    --gruvbox-bg-light: #3c3836;
+    --gruvbox-fg: #ebdbb2;
+    --gruvbox-fg-light: #fbf1c7;
+    --gruvbox-red: #cc241d;
+    --gruvbox-red-light: #fb4934;
+    --gruvbox-orange: #d65d0e;
+    --gruvbox-orange-light: #fe8019;
+    --gruvbox-yellow: #d79921;
+    --gruvbox-yellow-light: #fabd2f;
+    --gruvbox-aqua: #689d6a;
+    --gruvbox-aqua-light: #8ec07c;
+    --gruvbox-purple: #b16286;
+    --gruvbox-purple-light: #d3869b;
   }
 
   .dark {
     /* Same as root - dark by default */
-    --background: 260 30% 8%;
-    --foreground: 220 20% 95%;
+    --background: 20 6% 12%;
+    --foreground: 43 59% 81%;
 
-    --card: 260 25% 12%;
-    --card-foreground: 220 20% 95%;
+    --card: 20 8% 16%;
+    --card-foreground: 43 59% 81%;
 
-    --popover: 260 25% 14%;
-    --popover-foreground: 220 20% 95%;
+    --popover: 20 10% 20%;
+    --popover-foreground: 43 59% 81%;
 
-    --primary: 270 95% 65%;
-    --primary-foreground: 220 20% 98%;
+    --primary: 42 75% 49%;
+    --primary-foreground: 20 6% 12%;
 
-    --secondary: 240 30% 20%;
-    --secondary-foreground: 220 20% 90%;
+    --secondary: 20 10% 22%;
+    --secondary-foreground: 43 59% 81%;
 
-    --muted: 260 20% 18%;
-    --muted-foreground: 260 15% 60%;
+    --muted: 20 8% 18%;
+    --muted-foreground: 30 15% 60%;
 
-    --accent: 190 100% 50%;
-    --accent-foreground: 260 30% 8%;
+    --accent: 27 95% 53%;
+    --accent-foreground: 20 6% 12%;
 
-    --destructive: 0 85% 60%;
-    --destructive-foreground: 220 20% 98%;
+    --destructive: 0 75% 45%;
+    --destructive-foreground: 43 59% 90%;
 
-    --border: 260 20% 20%;
-    --input: 260 20% 18%;
-    --ring: 270 95% 65%;
+    --border: 20 10% 25%;
+    --input: 20 8% 18%;
+    --ring: 42 75% 49%;
   }
 }
 
@@ -87,17 +102,56 @@
     @apply border-border;
   }
 
+  html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    text-rendering: optimizeLegibility;
+    letter-spacing: -0.01em;
+  }
+
+  /* Better heading typography */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+  }
+
+  /* Smoother text selection */
+  ::selection {
+    background: rgba(215, 153, 33, 0.3);
+    color: #fbf1c7;
+  }
+
+  /* Title input placeholder styling */
+  #title::placeholder {
+    color: rgba(168, 153, 132, 0.5);
+    font-style: italic;
+    font-weight: 400;
   }
 }
 
 @layer utilities {
-  .font-handwriting {
-    font-family: "Gloria Hallelujah", cursive;
+  /* Typography utilities */
+  .font-display {
+    font-family: 'Cinzel', Georgia, serif;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  .text-balance {
+    text-wrap: balance;
   }
 
   .scrollbar-hide::-webkit-scrollbar {
@@ -109,17 +163,82 @@
     scrollbar-width: none;
   }
 
-  /* Modern gradient utilities */
+  /* Custom scrollbar for non-hidden areas */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(60, 56, 54, 0.3);
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(215, 153, 33, 0.3);
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(215, 153, 33, 0.5);
+  }
+
+  /* Gruvbox mesh gradient background - refined */
+  .gruvbox-mesh-bg {
+    background-color: #1d2021;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 0% 0%, rgba(204, 36, 29, 0.15) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(177, 98, 134, 0.12) 0%, transparent 45%),
+      radial-gradient(ellipse 50% 60% at 100% 100%, rgba(104, 157, 106, 0.1) 0%, transparent 50%),
+      radial-gradient(ellipse 70% 50% at 0% 100%, rgba(254, 128, 25, 0.08) 0%, transparent 45%),
+      radial-gradient(ellipse 100% 100% at 50% 50%, rgba(40, 40, 40, 0.9) 0%, transparent 70%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  /* Animated version */
+  .gruvbox-mesh-bg-animated {
+    background-color: #1d2021;
+    background-image:
+      radial-gradient(at 0% 0%, #cc241d40 0px, transparent 50%),
+      radial-gradient(at 50% 0%, #d6500e30 0px, transparent 50%),
+      radial-gradient(at 100% 0%, #b1628650 0px, transparent 50%),
+      radial-gradient(at 100% 50%, #68986a40 0px, transparent 50%),
+      radial-gradient(at 100% 100%, #d7992130 0px, transparent 50%),
+      radial-gradient(at 50% 100%, #fe801920 0px, transparent 50%),
+      radial-gradient(at 0% 100%, #fb493425 0px, transparent 50%),
+      radial-gradient(at 0% 50%, #d3869b30 0px, transparent 50%),
+      radial-gradient(at 50% 50%, #28282880 0px, transparent 80%);
+    background-attachment: fixed;
+    animation: meshShift 20s ease-in-out infinite;
+  }
+
+  @keyframes meshShift {
+    0%, 100% {
+      background-position: 0% 0%, 50% 0%, 100% 0%, 100% 50%, 100% 100%, 50% 100%, 0% 100%, 0% 50%, 50% 50%;
+    }
+    25% {
+      background-position: 10% 10%, 60% 5%, 90% 10%, 95% 60%, 90% 90%, 40% 95%, 10% 90%, 5% 40%, 55% 55%;
+    }
+    50% {
+      background-position: 5% 15%, 45% 10%, 95% 5%, 90% 45%, 95% 95%, 55% 90%, 5% 95%, 10% 55%, 45% 45%;
+    }
+    75% {
+      background-position: 15% 5%, 55% 15%, 85% 15%, 85% 55%, 85% 85%, 45% 85%, 15% 85%, 15% 45%, 50% 50%;
+    }
+  }
+
+  /* Gruvbox gradient utilities */
   .gradient-primary {
-    background: linear-gradient(135deg, hsl(270 95% 65%) 0%, hsl(290 90% 60%) 50%, hsl(320 85% 55%) 100%);
+    background: linear-gradient(135deg, #d79921 0%, #fe8019 100%);
   }
 
   .gradient-accent {
-    background: linear-gradient(135deg, hsl(190 100% 50%) 0%, hsl(220 90% 60%) 100%);
+    background: linear-gradient(135deg, #fe8019 0%, #fb4934 100%);
   }
 
   .gradient-text {
-    background: linear-gradient(135deg, hsl(270 95% 65%) 0%, hsl(190 100% 50%) 100%);
+    background: linear-gradient(135deg, #fabd2f 0%, #fe8019 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -137,7 +256,7 @@
     inset: 0;
     padding: 1px;
     border-radius: inherit;
-    background: linear-gradient(135deg, hsla(270 95% 65% / 0.5) 0%, hsla(190 100% 50% / 0.3) 100%);
+    background: linear-gradient(135deg, rgba(215, 153, 33, 0.5) 0%, rgba(254, 128, 25, 0.3) 100%);
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
@@ -146,28 +265,47 @@
   }
 
   .glass {
-    background: hsla(260 25% 12% / 0.7);
+    background: rgba(40, 40, 40, 0.85);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
 
   .glass-panel {
-    background: linear-gradient(180deg, hsla(260 25% 15% / 0.6) 0%, hsla(260 30% 10% / 0.4) 100%);
+    background: linear-gradient(180deg, rgba(60, 56, 54, 0.8) 0%, rgba(29, 32, 33, 0.6) 100%);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid hsla(260 20% 80% / 0.08);
+    border: 1px solid rgba(215, 153, 33, 0.15);
   }
 
   .glow-sm {
-    box-shadow: 0 0 20px -5px hsla(270 95% 65% / 0.3);
+    box-shadow: 0 0 20px -5px rgba(215, 153, 33, 0.3);
   }
 
   .glow-md {
-    box-shadow: 0 0 40px -10px hsla(270 95% 65% / 0.4);
+    box-shadow: 0 0 40px -10px rgba(215, 153, 33, 0.4);
   }
 
   .glow-accent {
-    box-shadow: 0 0 30px -8px hsla(190 100% 50% / 0.4);
+    box-shadow: 0 0 30px -8px rgba(254, 128, 25, 0.4);
+  }
+
+  /* Gruvbox decorative border */
+  .vintage-border {
+    border: 2px solid rgba(215, 153, 33, 0.3);
+    box-shadow: inset 0 0 0 1px rgba(215, 153, 33, 0.1);
+  }
+
+  .vintage-frame {
+    position: relative;
+  }
+
+  .vintage-frame::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border: 1px solid rgba(215, 153, 33, 0.2);
+    border-radius: inherit;
+    pointer-events: none;
   }
 
   /* Twitter/X embed styling */
@@ -208,4 +346,492 @@
   .tweet-embed-container>iframe {
     border: none !important;
   }
+}
+
+/* Bookmark Card Animation Styles */
+@layer components {
+  .bookmark-card {
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.4);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .bookmark-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5), 0 0 20px rgba(215, 153, 33, 0.1);
+  }
+
+  /* Slide-up card style (Style 1 from example) */
+  .bookmark-card-slideup .card-data {
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .bookmark-card-slideup:hover .card-data {
+    transform: translateY(0) !important;
+  }
+
+  .bookmark-card-slideup .card-content {
+    border-radius: 12px 12px 0 0;
+  }
+
+  /* Overlay card style (Style 2 from example) */
+  .bookmark-card-overlay .card-data {
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .bookmark-card-overlay:hover .card-data {
+    transform: translateY(0) !important;
+  }
+
+  /* Menu dots button styling - like the example */
+  .menu-dots-btn {
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+
+  .menu-dots-btn:hover {
+    opacity: 1;
+  }
+
+  .menu-dots-btn span {
+    color: var(--gruvbox-fg-muted, #a89984);
+  }
+
+  /* Card text fade effect on hidden state */
+  .bookmark-card .card-text {
+    opacity: 0;
+    transition: opacity 0.3s ease 0.1s;
+  }
+
+  .bookmark-card:hover .card-text {
+    opacity: 1;
+  }
+
+  /* Enhanced shadow for cards with thumbnails */
+  .bookmark-card-slideup,
+  .bookmark-card-overlay {
+    box-shadow:
+      0 15px 35px -10px rgba(0, 0, 0, 0.5),
+      0 5px 15px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  .bookmark-card-slideup:hover,
+  .bookmark-card-overlay:hover {
+    box-shadow:
+      0 25px 50px -15px rgba(0, 0, 0, 0.6),
+      0 10px 25px -10px rgba(0, 0, 0, 0.4),
+      0 0 30px rgba(215, 153, 33, 0.08);
+  }
+
+  /* ========================================
+     UNIVERSAL PILL/BUTTON STYLES
+     Consistent interactive pill behavior across the entire site
+     ======================================== */
+
+  /* Base pill - muted state */
+  .pill-interactive {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background-color: rgba(60, 56, 54, 0.8);
+    color: #a89984;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    text-decoration: none;
+  }
+
+  /* Hover state - yellow highlight (THE key interaction) */
+  .pill-interactive:hover {
+    background-color: #fabd2f;
+    color: #1d2021;
+  }
+
+  /* Active/pressed state */
+  .pill-interactive:active {
+    transform: scale(0.97);
+  }
+
+  /* Variant: transparent background (for use on images) - INTERACTIVE */
+  .pill-interactive-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background-color: rgba(29, 32, 33, 0.7);
+    backdrop-filter: blur(8px);
+    color: rgba(235, 219, 178, 0.9);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    text-decoration: none;
+  }
+
+  .pill-interactive-ghost:hover {
+    background-color: #fabd2f;
+    color: #1d2021;
+  }
+
+  .pill-interactive-ghost:active {
+    transform: scale(0.97);
+  }
+
+  /* ========================================
+     STATIC PILL STYLES (for category labels on cards)
+     These only change on DIRECT hover, not parent hover
+     ======================================== */
+
+  /* Static pill - solid background */
+  .pill-static {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background-color: rgba(60, 56, 54, 0.8);
+    color: #a89984;
+    cursor: default;
+    transition: all 0.2s ease;
+    border: none;
+  }
+
+  /* Only highlight on DIRECT hover of the pill itself */
+  .pill-static:hover {
+    background-color: #fabd2f;
+    color: #1d2021;
+    cursor: pointer;
+  }
+
+  /* Static pill - ghost/transparent variant (for use on images) */
+  .pill-static-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background-color: rgba(29, 32, 33, 0.7);
+    backdrop-filter: blur(8px);
+    color: rgba(235, 219, 178, 0.9);
+    cursor: default;
+    transition: all 0.2s ease;
+    border: none;
+  }
+
+  /* Only highlight on DIRECT hover of the pill itself */
+  .pill-static-ghost:hover {
+    background-color: #fabd2f;
+    color: #1d2021;
+    cursor: pointer;
+  }
+
+  /* ========================================
+     CATEGORY PILL (in card content area)
+     Inline with domain, highlights only on direct hover
+     ======================================== */
+  .category-pill {
+    /* Base state - inherits from inline styles but this ensures isolation */
+    isolation: isolate;
+  }
+
+  /* Ensure parent hover doesn't affect this - CSS specificity override */
+  .group:hover .category-pill {
+    /* Don't change on parent hover - keep base styles */
+  }
+
+  /* Only change on DIRECT hover */
+  .category-pill:hover {
+    background-color: #fabd2f !important;
+    color: #1d2021 !important;
+  }
+
+  /* ========================================
+     FOLDER TABS - Gruvbox Themed
+     Subtle shade variations, no colored borders
+     ======================================== */
+
+  .folder-container {
+    padding: 0 0.5rem;
+  }
+
+  .folder-tabs {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .folder-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .folder-tab {
+    filter: drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.2));
+    white-space: nowrap;
+  }
+
+  /* Tab hover effect - subtle lift */
+  .folder-tab:not(.z-50):hover {
+    transform: translateY(-2px);
+    filter: drop-shadow(0px 4px 8px rgba(0, 0, 0, 0.25));
+  }
+
+  /* Active tab - slightly elevated */
+  .folder-tab.z-50 {
+    filter: drop-shadow(0px 4px 8px rgba(0, 0, 0, 0.3));
+  }
+
+  /* Content area styling */
+  .folder-content {
+    filter: drop-shadow(0px 4px 20px rgba(0, 0, 0, 0.25));
+  }
+
+  .folder-content-inner {
+    border: 1px solid rgba(80, 73, 69, 0.5);
+  }
+
+  /* Page styling - clean Gruvbox background */
+  .folder-page {
+    background-color: #3c3836;
+  }
+
+  /* Smooth tab transitions */
+  .folder-tab,
+  .folder-tab-bg,
+  .folder-tab span {
+    transition: all 0.2s ease-out;
+  }
+
+  /* ========================================
+     COLLECTION CARDS - Movie Poster Style
+     Selection animation with staggered fade
+     ======================================== */
+
+  .collection-cards-grid {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding: 1rem 0;
+  }
+
+  .collection-card {
+    width: clamp(140px, 15vw, 200px);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition-delay: var(--stagger-delay, 0s);
+  }
+
+  /* Card hover effect */
+  .collection-card:hover {
+    transform: translateY(-8px) scale(1.02);
+  }
+
+  .collection-card:hover .group {
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Hidden state - when another card is selected */
+  .collection-card--hidden {
+    opacity: 0;
+    width: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transition:
+      opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      width 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+      margin 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+    transition-delay: var(--stagger-delay, 0s);
+  }
+
+  /* Selected card - expanded view */
+  .collection-card--selected {
+    width: clamp(200px, 25vw, 300px);
+  }
+
+  /* Grid when selection is active */
+  .collection-cards-grid--has-selection {
+    justify-content: flex-start;
+  }
+
+  /* Card inner styling */
+  .collection-card .group {
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    transition: box-shadow 0.3s ease;
+  }
+
+  /* Dashed border for selected card */
+  .collection-card--selected .group {
+    box-shadow:
+      0 15px 40px rgba(0, 0, 0, 0.4),
+      0 0 0 2px var(--card-color, #d79921);
+  }
+
+  /* ========================================
+     SIDES - "Pick a Movie" Animation Style
+     Side cards with selection collapse animation
+     Matches original: 0.3s calc(var(--n) * 0.2s) all
+     ======================================== */
+
+  .sides-container {
+    width: 100%;
+  }
+
+  /* Side cards grid - horizontal row */
+  .sides-grid {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    padding: 1rem 0;
+    min-height: 280px;
+  }
+
+  /* Keep centered even when selection is active */
+  .sides-grid--has-selection {
+    justify-content: center;
+  }
+
+  /* Individual side card - default state */
+  .side-card {
+    --n: 1;
+    width: 15vw;
+    min-width: 140px;
+    max-width: 200px;
+    cursor: pointer;
+    contain: layout;
+    box-sizing: border-box;
+    transition: all 0.3s ease;
+  }
+
+  .side-card:hover {
+    transform: translateY(-8px) scale(1.02);
+  }
+
+  /* Hidden state - matches original: opacity 0, width 0, with staggered delay */
+  .side-card--hidden {
+    opacity: 0;
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+    pointer-events: none;
+    /* Original timing: 0.3s duration, delay = n * 0.2s */
+    transition: 0.3s calc(var(--n, 1) * 0.2s) all;
+  }
+
+  /* Selected card state - dashed border like original */
+  .side-card--selected {
+    width: 15vw;
+    min-width: 140px;
+    max-width: 200px;
+  }
+
+  .side-card--selected .side-card-inner {
+    border: 2px dashed var(--card-color, #888);
+    box-shadow:
+      0 0 20px var(--card-color, #d79921),
+      0 10px 30px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Card inner container - the actual visual card */
+  .side-card-inner {
+    position: relative;
+    aspect-ratio: 3/4.2;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #282828;
+    box-shadow:
+      0 0 10px rgba(235, 236, 239, 0.1),
+      inset 0 0 10px rgba(238, 238, 238, 0.05);
+    box-sizing: border-box;
+    transition: box-shadow 0.3s ease, border 0.3s ease;
+  }
+
+  .side-card:hover .side-card-inner {
+    box-shadow:
+      0 0 20px rgba(235, 236, 239, 0.15),
+      inset 0 0 15px rgba(238, 238, 238, 0.08);
+  }
+
+  /* Divider line between sides and bookmarks */
+  .sides-divider {
+    height: 0;
+    overflow: hidden;
+    opacity: 0;
+    margin: 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sides-divider--visible {
+    height: auto;
+    opacity: 1;
+    margin: 2rem 0;
+  }
+
+  .sides-divider-line {
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--divider-color, #d79921) 20%,
+      var(--divider-color, #d79921) 80%,
+      transparent 100%
+    );
+    border-radius: 1px;
+    box-shadow: 0 0 20px var(--divider-color, #d79921);
+  }
+
+  /* Bookmarks section below */
+  .sides-bookmarks {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transform: translateY(-20px);
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sides-bookmarks--visible {
+    opacity: 1;
+    max-height: none;
+    overflow: visible;
+    transform: translateY(0);
+  }
+
+  /* Bookmarks grid inside sides view */
+  .sides-bookmarks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+  }
+
+  /* Individual bookmark item with staggered animation */
+  .sides-bookmark-item {
+    opacity: 0;
+    transform: translateY(30px);
+    animation: slideInBookmark 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation-delay: calc(var(--bookmark-index, 0) * 0.06s + 0.2s);
+  }
+
+  @keyframes slideInBookmark {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* When bookmarks section is not visible, reset animation */
+  .sides-bookmarks:not(.sides-bookmarks--visible) .sides-bookmark-item {
+    animation: none;
+    opacity: 0;
+  }
+
 }

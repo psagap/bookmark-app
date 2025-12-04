@@ -8,6 +8,11 @@
     --primary3: hsl(var(--hue) 90% 75%);
     --primary5: hsl(var(--hue) 90% 55%);
     --primary6: hsl(var(--hue) 90% 45%);
+    /* Gruvbox colors for themed variant */
+    --gruvbox-yellow: #fabd2f;
+    --gruvbox-yellow-dark: #d79921;
+    --gruvbox-orange: #fe8019;
+    --gruvbox-bg-darkest: #1d2021;
     --trans-dur: 0.3s;
 }
 
@@ -125,4 +130,36 @@
         animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
         height: 0;
     }
+}
+
+/* Gruvbox-themed variant */
+.creepy-btn-small .creepy-btn {
+    font-size: 1.1rem;
+    min-width: 8em;
+}
+
+.creepy-btn-small .creepy-btn__cover {
+    background-color: var(--gruvbox-yellow);
+    color: var(--gruvbox-bg-darkest);
+    padding: 0.5em 1em;
+}
+
+.creepy-btn-small .creepy-btn:hover .creepy-btn__cover {
+    background-color: var(--gruvbox-orange);
+}
+
+.creepy-btn-small .creepy-btn__eyes {
+    right: 0.8em;
+    bottom: 0.4em;
+    height: 0.65em;
+    gap: 0.3em;
+}
+
+.creepy-btn-small .creepy-btn__eye {
+    width: 0.65em;
+    height: 0.65em;
+}
+
+.creepy-btn-small .creepy-btn__pupil {
+    width: 0.32em;
 }
