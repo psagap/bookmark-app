@@ -1,7 +1,109 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Home, FolderTree, Tag, FolderOpen } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Home, FolderTree, Tag, FolderOpen, Check, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getTagColors } from '@/utils/tagColors';
+import { getTagColors, getTagColor, getAllTagColors, setTagColor } from '@/utils/tagColors';
+
+// Color picker dropdown for tags - appears on right-click
+const NavColorPicker = ({ tagName, currentColor, position, onSelect, onClose }) => {
+    const dropdownRef = useRef(null);
+    const colors = getAllTagColors();
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+                onClose();
+            }
+        };
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') onClose();
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, [onClose]);
+
+    // Adjust position to stay in viewport
+    const adjustedPosition = { ...position };
+    if (typeof window !== 'undefined') {
+        const dropdownWidth = 200;
+        const dropdownHeight = 140;
+        if (position.left + dropdownWidth > window.innerWidth - 16) {
+            adjustedPosition.left = window.innerWidth - dropdownWidth - 16;
+        }
+        if (position.top + dropdownHeight > window.innerHeight - 16) {
+            adjustedPosition.top = position.top - dropdownHeight - 8;
+        }
+    }
+
+    return createPortal(
+        <div
+            ref={dropdownRef}
+            className="fixed z-[10000] animate-in fade-in zoom-in-95 duration-150"
+            style={{ top: adjustedPosition.top, left: adjustedPosition.left }}
+        >
+            <div className="rounded-xl shadow-2xl overflow-hidden bg-gruvbox-bg-light/95 backdrop-blur-xl border border-gruvbox-yellow/20">
+                {/* Header */}
+                <div className="px-3 py-2 border-b border-gruvbox-bg-lighter/30">
+                    <div className="flex items-center gap-2 text-xs text-gruvbox-fg-muted">
+                        <Palette className="w-3 h-3" />
+                        <span>Color for</span>
+                        <span className="font-medium text-gruvbox-fg">#{tagName}</span>
+                    </div>
+                </div>
+
+                {/* Color Grid */}
+                <div className="p-3">
+                    <div className="grid grid-cols-4 gap-2">
+                        {colors.map((color) => (
+                            <button
+                                key={color.id}
+                                onClick={() => {
+                                    setTagColor(tagName, color.id);
+                                    onSelect(color.id);
+                                    onClose();
+                                }}
+                                className={cn(
+                                    "relative w-7 h-7 rounded-lg transition-all duration-150 flex items-center justify-center",
+                                    "hover:scale-110 hover:ring-2 ring-offset-1 ring-offset-gruvbox-bg-dark",
+                                    currentColor.id === color.id && "ring-2"
+                                )}
+                                style={{
+                                    backgroundColor: color.hover,
+                                    ringColor: color.text,
+                                }}
+                                title={color.name}
+                            >
+                                {currentColor.id === color.id && (
+                                    <Check className="w-4 h-4 text-gruvbox-bg-darkest" strokeWidth={3} />
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Reset option */}
+                <div className="px-3 pb-3">
+                    <button
+                        onClick={() => {
+                            setTagColor(tagName, null);
+                            onSelect(null);
+                            onClose();
+                        }}
+                        className="w-full text-xs text-gruvbox-fg-muted hover:text-gruvbox-fg py-1.5 rounded-md hover:bg-gruvbox-bg-lighter/30 transition-colors"
+                    >
+                        Reset to default
+                    </button>
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+};
 
 // Tag columns panel with vertical columns, blur effect, and swipe support
 const TagColumnsPanel = ({
@@ -16,6 +118,9 @@ const TagColumnsPanel = ({
 }) => {
     const scrollContainerRef = useRef(null);
     const [scrollPosition, setScrollPosition] = useState(0);
+    const [colorPickerTag, setColorPickerTag] = useState(null);
+    const [colorPickerPosition, setColorPickerPosition] = useState({ top: 0, left: 0 });
+    const [, forceUpdate] = useState(0); // For re-rendering after color change
 
     // Get colors for all tags (avoiding adjacent duplicates)
     const tagColorMap = useMemo(() => {
@@ -26,6 +131,14 @@ const TagColumnsPanel = ({
         });
         return map;
     }, [tags]);
+
+    // Handle right-click on tag to open color picker
+    const handleTagContextMenu = (e, tag) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setColorPickerPosition({ top: e.clientY + 8, left: e.clientX });
+        setColorPickerTag(tag);
+    };
 
     // Split tags into columns of max 3 each
     const TAGS_PER_COLUMN = 3;
@@ -79,18 +192,8 @@ const TagColumnsPanel = ({
             onMouseEnter={() => onPanelHover(true)}
             onMouseLeave={() => onPanelHover(false)}
         >
-            {/* Glass panel container - matches site design */}
-            <div
-                className="relative rounded-2xl"
-                style={{
-                    background: 'linear-gradient(180deg, rgba(60, 56, 54, 0.7) 0%, rgba(29, 32, 33, 0.8) 100%)',
-                    backdropFilter: 'blur(16px)',
-                    WebkitBackdropFilter: 'blur(16px)',
-                    border: '1px solid rgba(215, 153, 33, 0.12)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.03) inset',
-                    padding: '14px',
-                }}
-            >
+            {/* Glass panel container - theme-aware */}
+            <div className="relative rounded-2xl bg-gruvbox-bg-light/70 backdrop-blur-xl border border-gruvbox-yellow/10 shadow-2xl p-3.5">
                 {/* Scrollable container with extra padding for hover effects */}
                 <div
                     ref={scrollContainerRef}
@@ -130,8 +233,10 @@ const TagColumnsPanel = ({
                                     <button
                                         key={tag}
                                         onClick={() => onTagClick(tag)}
+                                        onContextMenu={(e) => handleTagContextMenu(e, tag)}
                                         onMouseEnter={() => onTagHover(tag)}
                                         onMouseLeave={onTagLeave}
+                                        title="Right-click to change color"
                                         className={cn(
                                             "relative px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-200 ease-out whitespace-nowrap",
                                             "border backdrop-blur-sm"
@@ -139,11 +244,11 @@ const TagColumnsPanel = ({
                                         style={{
                                             backgroundColor: showTagHighlight
                                                 ? tagColor.hover
-                                                : 'rgba(40, 40, 40, 0.6)',
+                                                : 'var(--theme-bg-dark)',
                                             color: showTagHighlight ? tagColor.hoverText : tagColor.text,
                                             borderColor: showTagHighlight
                                                 ? tagColor.text
-                                                : 'rgba(255, 255, 255, 0.06)',
+                                                : 'var(--theme-bg-lighter)',
                                             transitionDelay: showTagPanel ? `${globalIdx * 25}ms` : '0ms',
                                             opacity: showTagPanel ? 1 : 0,
                                             transform: showTagPanel
@@ -165,18 +270,9 @@ const TagColumnsPanel = ({
                     ))}
                 </div>
 
-                {/* Subtle overlay on right edge - much lighter */}
+                {/* Subtle overlay on right edge */}
                 {hasMoreColumns && (
-                    <div
-                        className="absolute right-3 top-3 bottom-3 w-10 pointer-events-none rounded-r-xl"
-                        style={{
-                            background: `linear-gradient(to right,
-                                transparent 0%,
-                                rgba(45, 42, 40, 0.15) 50%,
-                                rgba(45, 42, 40, 0.4) 100%
-                            )`,
-                        }}
-                    />
+                    <div className="absolute right-3 top-3 bottom-3 w-10 pointer-events-none rounded-r-xl bg-gradient-to-r from-transparent to-gruvbox-bg-light/40" />
                 )}
 
                 {/* Scroll indicator dots with hover area */}
@@ -218,6 +314,17 @@ const TagColumnsPanel = ({
                     </div>
                 )}
             </div>
+
+            {/* Color picker dropdown - shown on right-click */}
+            {colorPickerTag && (
+                <NavColorPicker
+                    tagName={colorPickerTag}
+                    currentColor={getTagColor(colorPickerTag)}
+                    position={colorPickerPosition}
+                    onSelect={() => forceUpdate(n => n + 1)}
+                    onClose={() => setColorPickerTag(null)}
+                />
+            )}
         </div>
     );
 };
@@ -311,11 +418,11 @@ const ExpandableNav = ({
             <div
                 ref={navRef}
                 className="relative flex items-center"
-                onMouseEnter={() => setIsExpanded(true)}
                 onMouseLeave={() => {
                     setIsExpanded(false);
                     setHoveredItem(null);
                     handleTagHover(false);
+                    handleCollectionsHover(false);
                 }}
             >
                 {/* Main Nav Container */}
@@ -343,12 +450,16 @@ const ExpandableNav = ({
                                     "transition-all duration-300 ease-out",
                                     isVisible
                                         ? "opacity-100 scale-100 w-12"
-                                        : "opacity-0 scale-75 w-0 overflow-hidden"
+                                        : "opacity-0 scale-75 w-0 overflow-hidden pointer-events-none"
                                 )}
                                 style={{
                                     transitionDelay: isExpanded ? `${index * 50}ms` : '0ms'
                                 }}
                                 onMouseEnter={() => {
+                                    // Only expand when hovering over a visible icon
+                                    if (isVisible) {
+                                        setIsExpanded(true);
+                                    }
                                     setHoveredItem(item.id);
                                     if (item.id === 'tags') {
                                         handleTagHover(true);
@@ -448,7 +559,7 @@ const ExpandableNav = ({
                                                 : `${collection.color}20`,
                                             borderColor: `${collection.color}60`,
                                             color: showCollectionHighlight
-                                                ? '#1d2021'
+                                                ? 'var(--theme-bg-darkest)'
                                                 : collection.color,
                                             transitionDelay: showCollectionsPanel ? `${index * 40}ms` : '0ms',
                                             opacity: showCollectionsPanel ? 1 : 0,
@@ -462,7 +573,7 @@ const ExpandableNav = ({
                                             className="w-2 h-2 rounded-full flex-shrink-0"
                                             style={{
                                                 backgroundColor: showCollectionHighlight
-                                                    ? '#1d2021'
+                                                    ? 'var(--theme-bg-darkest)'
                                                     : collection.color
                                             }}
                                         />
@@ -470,7 +581,7 @@ const ExpandableNav = ({
                                         <span
                                             className="text-xs opacity-70"
                                             style={{
-                                                color: showCollectionHighlight ? '#1d2021' : collection.color
+                                                color: showCollectionHighlight ? 'var(--theme-bg-darkest)' : collection.color
                                             }}
                                         >
                                             {collection.bookmarkCount || 0}

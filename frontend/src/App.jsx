@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { LayoutGroup } from 'framer-motion'
 import Header from '@/components/Header'
 import BookmarkCard from '@/components/BookmarkCard'
 import BookmarkDetail from '@/components/BookmarkDetail'
@@ -8,16 +9,21 @@ import CollectionBar from '@/components/CollectionBar'
 import CollectionCards from '@/components/CollectionCards'
 import FolderTabs from '@/components/FolderTabs'
 import FerrisWheelLoader from '@/components/FerrisWheelLoader'
+import QuickNoteModal from '@/components/QuickNoteModal'
+import NoteEditorModal from '@/components/NoteEditorModal'
+import SettingsPage from '@/components/SettingsPage'
 import { useBookmarks } from '@/hooks/useBookmarks'
 import { useCollections } from '@/hooks/useCollections'
-import { getTagColors } from '@/utils/tagColors'
+import { getTagColors, getTagColor } from '@/utils/tagColors';
+import { TagPill } from '@/components/TagColorPicker';
 import { Plus, FileText, File, Tag, X } from 'lucide-react'
+import AddDropzoneCard from '@/components/AddDropzoneCard'
 
 const AddCard = ({ onAddNote, onAddFile }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="break-inside-avoid mb-6">
+    <div className="break-inside-avoid mb-4">
       <div className="relative">
         <div
           onClick={() => setIsOpen(!isOpen)}
@@ -67,20 +73,91 @@ const AddCard = ({ onAddNote, onAddFile }) => {
   );
 };
 
+// Helper to read state from URL
+const getInitialStateFromURL = () => {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    tab: params.get('tab') || 'lounge',
+    collection: params.get('collection') || null,
+    tags: params.get('tags') ? params.get('tags').split(',') : [],
+  };
+};
+
+// Helper to update URL without reload
+const updateURL = (tab, collection, tags) => {
+  const params = new URLSearchParams();
+  if (tab && tab !== 'lounge') params.set('tab', tab);
+  if (collection) params.set('collection', collection);
+  if (tags && tags.length > 0) params.set('tags', tags.join(','));
+
+  const newURL = params.toString()
+    ? `${window.location.pathname}?${params.toString()}`
+    : window.location.pathname;
+
+  window.history.replaceState({}, '', newURL);
+};
+
 function App() {
-  const { bookmarks, loading, error, refetch } = useBookmarks();
+  const { bookmarks, loading, error, refetch, updateBookmark, removeBookmark } = useBookmarks();
   const { collections, createCollection, addToCollection, refetch: refetchCollections } = useCollections();
   const [selectedBookmark, setSelectedBookmark] = useState(null);
+  const [autoPlayOnOpen, setAutoPlayOnOpen] = useState(false);
   const [activePage, setActivePage] = useState('home');
-  const [activeTags, setActiveTags] = useState([]); // Array for multiple tag filtering
-  const [activeCollection, setActiveCollection] = useState(null);
-  const [mainTab, setMainTab] = useState('lounge'); // Folder tabs: 'lounge' or 'collections'
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Initialize state from URL
+  const initialState = getInitialStateFromURL();
+  const [activeTags, setActiveTags] = useState(initialState.tags);
+  const [activeCollection, setActiveCollection] = useState(initialState.collection);
+  const [mainTab, setMainTab] = useState(initialState.tab);
+
+  // Update URL when navigation state changes
+  useEffect(() => {
+    updateURL(mainTab, activeCollection, activeTags);
+  }, [mainTab, activeCollection, activeTags]);
+
+  // Handle tab changes - keep states independent
+  const handleTabChange = (newTab) => {
+    setMainTab(newTab);
+    // Don't clear collection selection - user can go back to it
+    // Clear selection mode when changing tabs
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  // Handle going back from a selected collection to folders view
+  const handleBackToFolders = () => {
+    setActiveCollection(null);
+  };
 
   // Selection state
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showCollectionModal, setShowCollectionModal] = useState(false);
   const [singleBookmarkToAdd, setSingleBookmarkToAdd] = useState(null); // For adding single bookmark via menu
+  const [showQuickNoteModal, setShowQuickNoteModal] = useState(false);
+  const [noteToEdit, setNoteToEdit] = useState(null); // For expanded note editor modal
+
+  // Keyboard shortcuts for selection mode
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Escape to exit selection mode
+      if (e.key === 'Escape' && selectionMode) {
+        setSelectionMode(false);
+        setSelectedIds(new Set());
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectionMode]);
+
+  // Power Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTypes, setActiveTypes] = useState([]);
+  const [activeSearchCollections, setActiveSearchCollections] = useState([]);
+  const [filterChain, setFilterChain] = useState([]); // Ordered filter chain for hierarchical filtering
+  const [dateFilter, setDateFilter] = useState(null); // Date preset filter (today, week, month, etc.)
 
   // Extract unique tags from bookmarks
   const allTags = [...new Set(bookmarks.flatMap(b => b.tags || []))];
@@ -230,6 +307,25 @@ function App() {
     }
   };
 
+  // Save bookmark (for note cards)
+  const handleSaveBookmark = async (bookmark) => {
+    // Optimistic update - update local state immediately to preserve scroll position
+    updateBookmark(bookmark);
+
+    try {
+      await fetch(`http://127.0.0.1:3000/api/bookmarks/${bookmark.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bookmark)
+      });
+      // No refetch needed - local state already updated
+    } catch (error) {
+      console.error('Error saving bookmark:', error);
+      // On error, refetch to restore correct state
+      refetch();
+    }
+  };
+
   const handleCreateSide = (bookmark) => {
     // Open the collection modal for this single bookmark
     setSingleBookmarkToAdd(bookmark);
@@ -259,12 +355,31 @@ function App() {
     bookmarkCount: bookmarks.filter(b => b.collectionId === collection.id).length
   }));
 
-  // Filter by collection and/or tags
+  // Helper function to determine bookmark type
+  const getBookmarkType = (bookmark) => {
+    const url = bookmark.url || '';
+    if (bookmark.type === 'note' || url.startsWith('note://') || (!url && (bookmark.notes || bookmark.title))) {
+      return 'note';
+    }
+    if (url.includes('twitter.com') || url.includes('x.com')) {
+      return 'tweet';
+    }
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      return 'youtube';
+    }
+    // Check for images
+    if (bookmark.type === 'image' || /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url)) {
+      return 'image';
+    }
+    return 'article';
+  };
+
+  // Filter bookmarks based on current view + power search
   const filteredBookmarks = (() => {
     let filtered = bookmarks;
 
-    // Filter by collection if viewing a collection
-    if (activeCollection) {
+    // Only filter by collection when on collections tab AND a collection is selected
+    if (mainTab === 'collections' && activeCollection) {
       filtered = filtered.filter(b => b.collectionId === activeCollection);
     }
 
@@ -273,6 +388,60 @@ function App() {
       filtered = filtered.filter(b =>
         activeTags.every(tag => b.tags?.includes(tag))
       );
+    }
+
+    // Power Search filters
+    // Filter by type
+    if (activeTypes.length > 0) {
+      filtered = filtered.filter(b => activeTypes.includes(getBookmarkType(b)));
+    }
+
+    // Filter by search collections (from power search)
+    if (activeSearchCollections.length > 0) {
+      filtered = filtered.filter(b => activeSearchCollections.includes(b.collectionId));
+    }
+
+    // Filter by text search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(b => {
+        const title = (b.title || '').toLowerCase();
+        const notes = (b.notes || '').toLowerCase();
+        const url = (b.url || '').toLowerCase();
+        const tags = (b.tags || []).join(' ').toLowerCase();
+        const description = (b.description || '').toLowerCase();
+        return title.includes(query) ||
+          notes.includes(query) ||
+          url.includes(query) ||
+          tags.includes(query) ||
+          description.includes(query);
+      });
+    }
+
+    // Filter by date preset
+    if (dateFilter) {
+      const presets = {
+        today: 0,
+        yesterday: 1,
+        week: 7,
+        month: 30,
+        quarter: 90,
+        year: 365,
+      };
+      const days = presets[dateFilter];
+      if (days !== undefined) {
+        const filterDate = new Date();
+        if (days === 0) {
+          filterDate.setHours(0, 0, 0, 0);
+        } else {
+          filterDate.setDate(filterDate.getDate() - days);
+          filterDate.setHours(0, 0, 0, 0);
+        }
+        filtered = filtered.filter(b => {
+          const itemDate = new Date(b.createdAt);
+          return itemDate >= filterDate;
+        });
+      }
     }
 
     return filtered;
@@ -291,9 +460,15 @@ function App() {
     { id: 'collections', label: 'Sides' },
   ];
 
+  // Show settings page if active
+  if (showSettings) {
+    return <SettingsPage onBack={() => setShowSettings(false)} />;
+  }
+
   return (
     <div className="min-h-screen gruvbox-mesh-bg text-gruvbox-fg flex relative overflow-x-hidden">
-      <main className="flex-1 min-h-screen relative overflow-x-hidden">
+      <main className="flex-1 min-h-screen relative w-full max-w-full">
+        <LayoutGroup>
         <Header
           activePage={activePage}
           onNavigate={handleNavigate}
@@ -306,6 +481,14 @@ function App() {
             setSelectionMode(!selectionMode);
             if (selectionMode) setSelectedIds(new Set());
           }}
+          onQuickNote={() => setShowQuickNoteModal(true)}
+          onAddUrl={() => console.log('Add URL - TODO: implement URL modal')}
+          onOpenSettings={() => setShowSettings(true)}
+          // Search props
+          bookmarks={bookmarks}
+          onResultSelect={(bookmark) => setSelectedBookmark(bookmark)}
+          onFilterChange={(types) => setActiveTypes(types)}
+          activeFilters={activeTypes}
         />
 
         {/* Selection Toolbar */}
@@ -321,75 +504,103 @@ function App() {
         )}
 
         {/* Folder Tabs Navigation */}
-        <div className="px-2 pt-1">
+        <div className="px-3">
           <FolderTabs
             tabs={mainTabs}
             activeTab={mainTab}
-            onTabChange={setMainTab}
+            onTabChange={handleTabChange}
+            activeFilters={activeTypes}
+            activePillsInSearch={activeTypes}
+            onFilterToggle={(typeId) => {
+              setActiveTypes(prev =>
+                prev.includes(typeId)
+                  ? prev.filter(t => t !== typeId)
+                  : [...prev, typeId]
+              );
+            }}
           >
             {/* Lounge Tab Content - All Bookmarks */}
             {mainTab === 'lounge' && (
               <div>
                 {/* Active Filter Indicator - matches nav bar tag style, supports multiple tags */}
-                {activeTags.length > 0 && (() => {
-                  const tagColors = getTagColors(activeTags);
-                  return (
-                    <div className="mb-6 flex flex-wrap items-center gap-2">
-                      {activeTags.map((tag, idx) => {
-                        const color = tagColors[idx];
-                        return (
+                {activeTags.length > 0 && (
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
+                    {activeTags.map((tag) => {
+                      const color = getTagColor(tag);
+                      return (
+                        <div
+                          key={tag}
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border backdrop-blur-sm transition-all duration-200 hover:scale-[1.02] group cursor-pointer"
+                          style={{
+                            backgroundColor: color.bg,
+                            color: color.text,
+                            borderColor: color.border,
+                          }}
+                        >
+                          <Tag className="w-3.5 h-3.5 opacity-80" />
+                          <TagPill
+                            tag={tag}
+                            color={color}
+                            size="default"
+                            showColorPicker={true}
+                            className="!bg-transparent !p-0 !rounded-none"
+                          />
                           <button
-                            key={tag}
                             onClick={() => handleRemoveTag(tag)}
-                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border backdrop-blur-sm transition-all duration-200 hover:scale-[1.02] group"
-                            style={{
-                              backgroundColor: color.bg,
-                              color: color.text,
-                              borderColor: color.border,
-                            }}
+                            className="ml-1 opacity-60 group-hover:opacity-100 transition-opacity hover:text-gruvbox-red"
                           >
-                            <Tag className="w-3.5 h-3.5 opacity-80" />
-                            <span>{tag}</span>
-                            <X className="w-3.5 h-3.5 ml-1 opacity-60 group-hover:opacity-100 transition-opacity" />
+                            <X className="w-3.5 h-3.5" />
                           </button>
-                        );
-                      })}
-                      <span className="text-sm text-gruvbox-fg-muted ml-1">
-                        {sortedBookmarks.length} bookmark{sortedBookmarks.length !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  );
-                })()}
+                        </div>
+                      );
+                    })}
+                    <span className="text-sm text-gruvbox-fg-muted ml-1">
+                      {sortedBookmarks.length} bookmark{sortedBookmarks.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
 
                 {/* Masonry Grid */}
-                <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 gap-4 space-y-4">
-                  {/* Add Card - hide in selection mode */}
+                <div className="w-full columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 [column-gap:1rem]">
+                  {/* Add Dropzone Card - hide in selection mode */}
                   {!selectionMode && (
-                    <AddCard
-                      onAddNote={() => console.log('Add note')}
-                      onAddFile={() => console.log('Add file')}
+                    <AddDropzoneCard
+                      onAddNote={() => setShowQuickNoteModal(true)}
                     />
                   )}
 
                   {/* Bookmarks */}
                   {loading ? (
-                    <div className="col-span-full flex items-center justify-center" style={{ minHeight: '50vh' }}>
-                      <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
-                        <FerrisWheelLoader label="Loading Bookmarks" subtitle="GATHERING YOUR COLLECTION" />
+                    <div className="col-span-full flex items-center justify-center animate-in fade-in duration-300" style={{ minHeight: '50vh' }}>
+                      <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl">
+                        <FerrisWheelLoader label="Loading Bookmarks" subtitle="GATHERING YOUR COLLECTION" size="md" />
                       </div>
                     </div>
                   ) : (
                     sortedBookmarks.map(bookmark => (
                       <div
                         key={bookmark.id}
-                        onClick={() => {
-                          if (selectionMode) {
+                        onClick={(e) => {
+                          // Shift+Click to enter selection mode and select this card
+                          if (e.shiftKey && !selectionMode) {
+                            e.preventDefault();
+                            setSelectionMode(true);
+                            setSelectedIds(new Set([bookmark.id]));
+                          } else if (selectionMode) {
+                            e.preventDefault();
+                            e.stopPropagation();
                             handleToggleSelect(bookmark.id);
                           } else {
                             setSelectedBookmark(bookmark);
                           }
                         }}
-                        className="cursor-pointer"
+                        onMouseDown={(e) => {
+                          // Prevent text selection when Shift is held
+                          if (e.shiftKey) {
+                            e.preventDefault();
+                          }
+                        }}
+                        className={`cursor-pointer ${selectionMode ? 'select-none' : ''}`}
                       >
                         <BookmarkCard
                           bookmark={bookmark}
@@ -397,10 +608,13 @@ function App() {
                           onPin={handlePin}
                           onCreateSide={handleCreateSide}
                           onRefresh={handleRefreshBookmark}
+                          onUpdate={handleSaveBookmark}
                           selectionMode={selectionMode}
                           isSelected={selectedIds.has(bookmark.id)}
                           onToggleSelect={() => handleToggleSelect(bookmark.id)}
                           collection={collections.find(c => c.id === bookmark.collectionId)}
+                          onCardClick={(bm, autoPlay) => { setSelectedBookmark(bm); setAutoPlayOnOpen(autoPlay || false); }}
+                          onOpenEditor={(bm) => setNoteToEdit(bm)}
                         />
                       </div>
                     ))
@@ -416,22 +630,32 @@ function App() {
                 bookmarks={bookmarks}
                 selectedCollection={activeCollection}
                 onSelectCollection={setActiveCollection}
+                onBackToFolders={handleBackToFolders}
                 onCreateCollection={() => setShowCollectionModal(true)}
                 onBookmarkClick={setSelectedBookmark}
                 onDeleteBookmark={handleDelete}
                 onPinBookmark={handlePin}
                 onRefreshBookmark={handleRefreshBookmark}
+                onSaveBookmark={handleSaveBookmark}
                 onCreateSide={handleCreateSide}
               />
             )}
           </FolderTabs>
         </div>
+        </LayoutGroup>
 
         <BookmarkDetail
           bookmark={selectedBookmark}
           open={!!selectedBookmark}
-          onOpenChange={(open) => !open && setSelectedBookmark(null)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedBookmark(null);
+              setAutoPlayOnOpen(false);
+            }
+          }}
           onSave={() => refetch()}
+          allTags={allTags}
+          autoPlay={autoPlayOnOpen}
         />
 
         {/* Collection Modal */}
@@ -444,6 +668,32 @@ function App() {
           collections={collections}
           onSelectCollection={handleCollectionSelect}
           onCreateCollection={handleCreateCollection}
+        />
+
+        {/* Quick Note Modal */}
+        <QuickNoteModal
+          open={showQuickNoteModal}
+          onClose={() => setShowQuickNoteModal(false)}
+          onSave={() => {
+            refetch();
+            setShowQuickNoteModal(false);
+          }}
+          allTags={allTags}
+        />
+
+        {/* Note Editor Modal - for expanded note editing */}
+        <NoteEditorModal
+          isOpen={!!noteToEdit}
+          onClose={() => setNoteToEdit(null)}
+          bookmark={noteToEdit}
+          onSave={(updatedBookmark) => {
+            handleSaveBookmark(updatedBookmark);
+            setNoteToEdit(null);
+          }}
+          onDelete={(bm) => {
+            handleDelete(bm);
+            setNoteToEdit(null);
+          }}
         />
       </main>
     </div>

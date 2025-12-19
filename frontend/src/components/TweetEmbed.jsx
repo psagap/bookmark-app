@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { ExternalLink, RefreshCw } from 'lucide-react';
-import FerrisWheelLoader from './FerrisWheelLoader';
+import GruvboxLoader from './GruvboxLoader';
 
 /**
  * TweetEmbed Component - Using X's oEmbed API
@@ -293,22 +293,36 @@ const TweetEmbed = ({ tweetUrl }) => {
 
     return (
         <div className="relative rounded-xl overflow-hidden" style={{ background: '#000' }}>
-            {/* Loading overlay - matches parent black background */}
+            {/* Loading overlay - fixed height to prevent vertical movement */}
             {isLoading && (
-                <div className="absolute inset-0 z-10">
-                    <FerrisWheelLoader
+                <div
+                    className="absolute inset-x-0 top-0 z-10 flex items-center justify-center"
+                    style={{ background: '#000', height: '300px' }}
+                >
+                    <GruvboxLoader
+                        variant="spinner"
+                        size="lg"
                         label={loading ? "Loading Tweet" : "Rendering"}
-                        subtitle={loading ? "FETCHING FROM X" : "PREPARING TWEET"}
-                        background="black"
                     />
                 </div>
             )}
-            {/* Tweet container - always rendered so hydration can happen */}
+            {/* Tweet container - hidden while loading, fades in when ready */}
             <div
                 ref={containerRef}
-                className="tweet-embed-container w-full flex justify-center rounded-xl overflow-hidden"
-                style={{ background: '#000' }}
+                className={`tweet-embed-container w-full flex justify-center rounded-xl transition-opacity duration-300 ${isLoading ? 'opacity-0 min-h-[300px]' : 'opacity-100'}`}
+                style={{
+                    background: '#000',
+                }}
             />
+            {/* Style override to ensure tweet iframe fits properly */}
+            <style>{`
+                .tweet-embed-container iframe {
+                    max-width: 100% !important;
+                }
+                .tweet-embed-container .twitter-tweet {
+                    margin: 0 !important;
+                }
+            `}</style>
         </div>
     );
 };

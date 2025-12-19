@@ -1,4 +1,5 @@
 // Simple Express server for bookmark management
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -43,6 +44,167 @@ const cleanTitle = (title) => {
   return title.replace(/^\(\d+\)\s*/, '').trim();
 };
 
+// Helper to extract YouTube video ID from URL
+const extractYouTubeVideoId = (url) => {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+};
+
+// Fetch YouTube video description by scraping the page
+const fetchYouTubeDescription = async (videoId) => {
+  try {
+    const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+    });
+
+    if (!response.ok) {
+      console.warn(`YouTube fetch failed with status ${response.status}`);
+      return null;
+    }
+
+    const html = await response.text();
+
+    // Method 1: Look for og:description meta tag
+    const ogMatch = html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i) ||
+                    html.match(/<meta\s+content="([^"]*)"\s+property="og:description"/i);
+    if (ogMatch && ogMatch[1]) {
+      // Decode HTML entities
+      return ogMatch[1]
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\\n/g, '\n');
+    }
+
+    // Method 2: Look for description in ytInitialPlayerResponse JSON
+    const jsonMatch = html.match(/var\s+ytInitialPlayerResponse\s*=\s*({[\s\S]*?});/);
+    if (jsonMatch && jsonMatch[1]) {
+      try {
+        // This JSON can be huge, so we extract just what we need
+        const shortDescMatch = jsonMatch[1].match(/"shortDescription"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+        if (shortDescMatch && shortDescMatch[1]) {
+          return shortDescMatch[1]
+            .replace(/\\n/g, '\n')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\');
+        }
+      } catch (parseError) {
+        console.warn('Failed to parse ytInitialPlayerResponse:', parseError.message);
+      }
+    }
+
+    // Method 3: Look in meta description
+    const metaDescMatch = html.match(/<meta\s+name="description"\s+content="([^"]*)"/i);
+    if (metaDescMatch && metaDescMatch[1]) {
+      return metaDescMatch[1]
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch YouTube description:', error.message);
+    return null;
+  }
+};
+
+// Fetch YouTube video details via YouTube Data API (more reliable than scraping)
+const fetchYouTubeVideoDetailsAPI = async (videoId) => {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) {
+    console.log('No YOUTUBE_API_KEY found, falling back to scrape method');
+    return null;
+  }
+
+  try {
+    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}&key=${apiKey}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      console.warn(`YouTube Data API returned ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    if (!data.items || data.items.length === 0) {
+      console.warn(`No video found for ID: ${videoId}`);
+      return null;
+    }
+
+    const video = data.items[0];
+    const snippet = video.snippet || {};
+    const contentDetails = video.contentDetails || {};
+    const statistics = video.statistics || {};
+
+    // Parse ISO 8601 duration (e.g., PT4M13S -> "4:13")
+    const parseDuration = (isoDuration) => {
+      if (!isoDuration) return null;
+      const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+      if (!match) return null;
+      const hours = parseInt(match[1] || 0);
+      const minutes = parseInt(match[2] || 0);
+      const seconds = parseInt(match[3] || 0);
+      if (hours > 0) {
+        return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      }
+      return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    };
+
+    return {
+      videoId,
+      videoDescription: snippet.description || '',
+      channelTitle: snippet.channelTitle || '',
+      channelId: snippet.channelId || '',
+      publishedAt: snippet.publishedAt || '',
+      thumbnails: snippet.thumbnails || {},
+      duration: parseDuration(contentDetails.duration),
+      durationRaw: contentDetails.duration || '',
+      viewCount: statistics.viewCount || '',
+      likeCount: statistics.likeCount || '',
+      commentCount: statistics.commentCount || '',
+      tags: snippet.tags || [],
+      categoryId: snippet.categoryId || '',
+      fetchedAt: Date.now(),
+      source: 'youtube-api'
+    };
+  } catch (error) {
+    console.error('YouTube Data API error:', error.message);
+    return null;
+  }
+};
+
+// Combined YouTube metadata fetch - tries API first, falls back to scrape
+const fetchYouTubeMetadata = async (videoId) => {
+  // Try YouTube Data API first (more reliable, richer data)
+  const apiData = await fetchYouTubeVideoDetailsAPI(videoId);
+  if (apiData) {
+    return apiData;
+  }
+
+  // Fallback to scraping
+  const scrapedDescription = await fetchYouTubeDescription(videoId);
+  if (scrapedDescription) {
+    return {
+      videoId,
+      videoDescription: scrapedDescription,
+      fetchedAt: Date.now(),
+      source: 'scrape'
+    };
+  }
+
+  return null;
+};
+
 // Routes
 
 // GET all bookmarks with filters
@@ -82,12 +244,51 @@ app.get('/api/bookmarks/:id', (req, res) => {
 });
 
 // POST new bookmark
-app.post('/api/bookmarks', (req, res) => {
+app.post('/api/bookmarks', async (req, res) => {
   const bookmarks = loadBookmarks();
+  const url = req.body.url || '';
+
+  // Initialize metadata
+  let metadata = req.body.metadata || {};
+
+  // If it's a YouTube URL, fetch video metadata (API first, then scrape fallback)
+  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    const videoId = extractYouTubeVideoId(url);
+    if (videoId) {
+      console.log(`Fetching YouTube metadata for video: ${videoId}`);
+      const youtubeData = await fetchYouTubeMetadata(videoId);
+      if (youtubeData) {
+        metadata = {
+          ...metadata,
+          ...youtubeData
+        };
+        console.log(`YouTube metadata fetched (${youtubeData.source}): ${(youtubeData.videoDescription || '').slice(0, 100)}...`);
+      }
+    }
+  }
+  // For article URLs (not YouTube, Twitter, or Wikipedia), extract metadata
+  else if (!url.includes('twitter.com') && !url.includes('x.com') && !url.includes('wikipedia.org')) {
+    try {
+      console.log(`Extracting article metadata for: ${url}`);
+      const articleData = await extractArticleMetadata(url);
+      if (articleData) {
+        metadata = {
+          ...metadata,
+          siteName: articleData.siteName,
+          author: articleData.author,
+          publishedDate: articleData.publishedDate
+        };
+        console.log(`Article metadata extracted: site=${articleData.siteName}, author=${articleData.author}`);
+      }
+    } catch (err) {
+      console.log('Article metadata extraction skipped:', err.message);
+    }
+  }
+
   const newBookmark = {
     id: req.body.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     userId: 'local-user',
-    url: req.body.url,
+    url: url,
     title: cleanTitle(req.body.title),
     thumbnail: req.body.thumbnail || req.body.ogImage || '',
     createdAt: req.body.createdAt || Date.now(),
@@ -95,7 +296,7 @@ app.post('/api/bookmarks', (req, res) => {
     category: req.body.category,
     subCategory: req.body.subcategory || req.body.subCategory,
     tags: req.body.tags || [],
-    metadata: req.body.metadata || {},
+    metadata: metadata,
     notes: req.body.notes || '',
     archived: req.body.archived || false,
   };
@@ -244,6 +445,54 @@ app.post('/api/bookmarks/:id/refresh', async (req, res) => {
       }
     }
 
+    // If YouTube URL, refresh video metadata
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      try {
+        const videoId = extractYouTubeVideoId(url);
+        if (videoId) {
+          console.log(`Refreshing YouTube metadata for video: ${videoId}`);
+          const youtubeData = await fetchYouTubeMetadata(videoId);
+          if (youtubeData) {
+            // Merge YouTube data into metadata
+            updatedMetadata = {
+              ...updatedMetadata,
+              ...youtubeData
+            };
+            // Update thumbnail to high-quality YouTube thumbnail
+            if (youtubeData.thumbnails?.maxres?.url) {
+              thumbnail = youtubeData.thumbnails.maxres.url;
+            } else if (youtubeData.thumbnails?.high?.url) {
+              thumbnail = youtubeData.thumbnails.high.url;
+            }
+            console.log(`YouTube metadata refreshed (${youtubeData.source})`);
+          }
+        }
+      } catch (ytError) {
+        console.warn('YouTube refresh failed:', ytError);
+      }
+    }
+
+    // For article URLs (not YouTube, Twitter, or Wikipedia), refresh article metadata
+    if (!url.includes('youtube.com') && !url.includes('youtu.be') &&
+        !url.includes('twitter.com') && !url.includes('x.com') &&
+        !url.includes('wikipedia.org')) {
+      try {
+        console.log(`Refreshing article metadata for: ${url}`);
+        const articleData = await extractArticleMetadata(url);
+        if (articleData) {
+          updatedMetadata = {
+            ...updatedMetadata,
+            siteName: articleData.siteName,
+            author: articleData.author,
+            publishedDate: articleData.publishedDate
+          };
+          console.log(`Article metadata refreshed: site=${articleData.siteName}, author=${articleData.author}`);
+        }
+      } catch (articleError) {
+        console.warn('Article refresh failed:', articleError);
+      }
+    }
+
     // Update bookmark
     const updated = {
       ...bookmark,
@@ -258,6 +507,186 @@ app.post('/api/bookmarks/:id/refresh', async (req, res) => {
     res.json(updated);
   } catch (error) {
     console.error('Error refreshing bookmark:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST backfill YouTube metadata for existing bookmarks missing videoDescription
+app.post('/api/youtube/backfill', async (req, res) => {
+  try {
+    let bookmarks = loadBookmarks();
+    
+    // Find YouTube bookmarks missing or with generic videoDescription
+    const genericYouTubeDesc = "Enjoy the videos and music you love, upload original content, and share it all with friends, family, and the world on YouTube.";
+    const youtubeBookmarks = bookmarks.filter(b => {
+      const url = b.url || '';
+      const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+      const videoDesc = b.metadata?.videoDescription;
+      // Process if missing, empty, or equals the generic YouTube description
+      const needsUpdate = !videoDesc ||
+        videoDesc === '' ||
+        videoDesc === genericYouTubeDesc ||
+        videoDesc === b.metadata?.ogDescription;
+      return isYouTube && needsUpdate;
+    });
+
+    if (youtubeBookmarks.length === 0) {
+      return res.json({ 
+        message: 'No YouTube bookmarks need backfilling',
+        processed: 0,
+        total: bookmarks.filter(b => (b.url || '').includes('youtube') || (b.url || '').includes('youtu.be')).length
+      });
+    }
+
+    console.log(`Backfilling ${youtubeBookmarks.length} YouTube bookmarks...`);
+    
+    let processed = 0;
+    let failed = 0;
+    const results = [];
+
+    for (const bookmark of youtubeBookmarks) {
+      const videoId = extractYouTubeVideoId(bookmark.url);
+      if (!videoId) {
+        failed++;
+        results.push({ id: bookmark.id, status: 'failed', reason: 'Could not extract video ID' });
+        continue;
+      }
+
+      try {
+        const youtubeData = await fetchYouTubeMetadata(videoId);
+        if (youtubeData) {
+          // Find and update the bookmark in the array
+          const index = bookmarks.findIndex(b => b.id === bookmark.id);
+          if (index !== -1) {
+            bookmarks[index] = {
+              ...bookmarks[index],
+              metadata: {
+                ...bookmarks[index].metadata,
+                ...youtubeData
+              },
+              updatedAt: Date.now()
+            };
+            // Update thumbnail if we got a better one
+            if (youtubeData.thumbnails?.maxres?.url) {
+              bookmarks[index].thumbnail = youtubeData.thumbnails.maxres.url;
+            } else if (youtubeData.thumbnails?.high?.url) {
+              bookmarks[index].thumbnail = youtubeData.thumbnails.high.url;
+            }
+            processed++;
+            results.push({ 
+              id: bookmark.id, 
+              title: bookmark.title,
+              status: 'success', 
+              source: youtubeData.source 
+            });
+          }
+        } else {
+          failed++;
+          results.push({ id: bookmark.id, status: 'failed', reason: 'No data returned' });
+        }
+      } catch (err) {
+        failed++;
+        results.push({ id: bookmark.id, status: 'failed', reason: err.message });
+      }
+
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+
+    // Save all updated bookmarks
+    saveBookmarks(bookmarks);
+
+    res.json({
+      message: `Backfill complete`,
+      processed,
+      failed,
+      total: youtubeBookmarks.length,
+      results
+    });
+  } catch (error) {
+    console.error('YouTube backfill error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST backfill article metadata for existing bookmarks missing siteName/author
+app.post('/api/article/backfill', async (req, res) => {
+  try {
+    let bookmarks = loadBookmarks();
+
+    // Find article bookmarks (not YouTube, Twitter, Wikipedia) missing metadata
+    const articleBookmarks = bookmarks.filter(b => {
+      const url = b.url || '';
+      const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+      const isTwitter = url.includes('twitter.com') || url.includes('x.com');
+      const isWikipedia = url.includes('wikipedia.org');
+      const missingMetadata = !b.metadata?.siteName && !b.metadata?.author;
+      return !isYouTube && !isTwitter && !isWikipedia && missingMetadata && url;
+    });
+
+    if (articleBookmarks.length === 0) {
+      return res.json({
+        message: 'No article bookmarks need backfilling',
+        processed: 0,
+        total: 0
+      });
+    }
+
+    console.log(`Backfilling ${articleBookmarks.length} article bookmarks...`);
+
+    let processed = 0;
+    let failed = 0;
+    const results = [];
+
+    for (const bookmark of articleBookmarks) {
+      try {
+        const articleData = await extractArticleMetadata(bookmark.url);
+        if (articleData) {
+          const index = bookmarks.findIndex(b => b.id === bookmark.id);
+          if (index !== -1) {
+            bookmarks[index] = {
+              ...bookmarks[index],
+              metadata: {
+                ...bookmarks[index].metadata,
+                siteName: articleData.siteName,
+                author: articleData.author,
+                publishedDate: articleData.publishedDate
+              },
+              updatedAt: Date.now()
+            };
+            processed++;
+            results.push({
+              id: bookmark.id,
+              title: bookmark.title,
+              status: 'success',
+              siteName: articleData.siteName,
+              author: articleData.author
+            });
+          }
+        } else {
+          failed++;
+          results.push({ id: bookmark.id, status: 'failed', reason: 'No metadata found' });
+        }
+      } catch (err) {
+        failed++;
+        results.push({ id: bookmark.id, status: 'failed', reason: err.message });
+      }
+
+      // Small delay between requests
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    saveBookmarks(bookmarks);
+
+    res.json({
+      message: 'Article backfill complete',
+      processed,
+      failed,
+      total: articleBookmarks.length,
+      results
+    });
+  } catch (error) {
+    console.error('Article backfill error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -299,7 +728,13 @@ app.get('/api/twitter/oembed', async (req, res) => {
     const oembedUrl = `https://publish.twitter.com/oembed?${params.toString()}`;
     console.log('Fetching oEmbed:', oembedUrl);
 
-    const response = await fetch(oembedUrl);
+    const response = await fetch(oembedUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+      }
+    });
 
     if (!response.ok) {
       throw new Error(`oEmbed API returned ${response.status}`);
@@ -670,6 +1105,50 @@ app.get('/api/wikipedia/article', async (req, res) => {
 
 // In-memory cache for article content
 const articleCache = new Map();
+
+// Helper function to extract article metadata (author, date, site name)
+const extractArticleMetadata = async (url) => {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      signal: AbortSignal.timeout(10000) // 10 second timeout
+    });
+
+    if (!response.ok) return null;
+
+    const html = await response.text();
+
+    // Extract author
+    const authorMatch = html.match(/<meta[^>]*name="author"[^>]*content="([^"]*)"[^>]*>/i) ||
+                        html.match(/<meta[^>]*property="article:author"[^>]*content="([^"]*)"[^>]*>/i) ||
+                        html.match(/<meta[^>]*content="([^"]*)"[^>]*name="author"[^>]*>/i);
+
+    // Extract published date
+    const dateMatch = html.match(/<meta[^>]*property="article:published_time"[^>]*content="([^"]*)"[^>]*>/i) ||
+                      html.match(/<meta[^>]*content="([^"]*)"[^>]*property="article:published_time"[^>]*>/i) ||
+                      html.match(/<time[^>]*datetime="([^"]*)"[^>]*>/i);
+
+    // Extract site name
+    const siteNameMatch = html.match(/<meta[^>]*property="og:site_name"[^>]*content="([^"]*)"[^>]*>/i) ||
+                          html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:site_name"[^>]*>/i);
+
+    const siteName = siteNameMatch?.[1] || new URL(url).hostname.replace('www.', '');
+    const author = authorMatch?.[1] || '';
+    const publishedDate = dateMatch?.[1] || '';
+
+    // Only return if we found at least some useful data
+    if (siteName || author || publishedDate) {
+      return { siteName, author, publishedDate };
+    }
+    return null;
+  } catch (err) {
+    console.log('Article metadata extraction failed:', err.message);
+    return null;
+  }
+};
 
 // GET article content extraction
 app.get('/api/article/extract', async (req, res) => {
@@ -1135,6 +1614,490 @@ app.delete('/api/collections/:id/bookmarks', (req, res) => {
 });
 
 // ==================== END COLLECTIONS API ====================
+
+// ==================== POWER SEARCH API ====================
+
+// In-memory Fuse.js instance for fuzzy search
+let fuseInstance = null;
+let fuseDataHash = null;
+
+// Simple hash function to detect data changes
+const hashData = (data) => {
+  return JSON.stringify(data).length + '_' + data.length;
+};
+
+// Initialize or update Fuse.js instance
+const getFuseInstance = (bookmarks) => {
+  const currentHash = hashData(bookmarks);
+
+  if (!fuseInstance || fuseDataHash !== currentHash) {
+    // Fuse.js configuration
+    const Fuse = require('fuse.js');
+
+    fuseInstance = new Fuse(bookmarks, {
+      keys: [
+        { name: 'title', weight: 0.4 },
+        { name: 'notes', weight: 0.25 },
+        { name: 'description', weight: 0.15 },
+        { name: 'tags', weight: 0.15 },
+        { name: 'metadata.ocrText', weight: 0.05 },
+      ],
+      threshold: 0.4,
+      distance: 100,
+      ignoreLocation: true,
+      includeScore: true,
+      includeMatches: true,
+      minMatchCharLength: 2,
+      useExtendedSearch: true,
+    });
+
+    fuseDataHash = currentHash;
+  }
+
+  return fuseInstance;
+};
+
+// Helper to determine bookmark type
+const getBookmarkType = (bookmark) => {
+  const url = bookmark.url || '';
+  if (bookmark.type === 'note' || url.startsWith('note://') || (!url && (bookmark.notes || bookmark.title))) {
+    return 'note';
+  }
+  if (url.includes('twitter.com') || url.includes('x.com')) {
+    return 'tweet';
+  }
+  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    return 'youtube';
+  }
+  return 'link';
+};
+
+// Date preset calculations
+const getDateFromPreset = (presetId) => {
+  const presets = {
+    today: 0,
+    yesterday: 1,
+    week: 7,
+    month: 30,
+    quarter: 90,
+    year: 365,
+  };
+
+  const days = presets[presetId];
+  if (days === undefined) return null;
+
+  const date = new Date();
+  if (days === 0) {
+    date.setHours(0, 0, 0, 0);
+  } else {
+    date.setDate(date.getDate() - days);
+    date.setHours(0, 0, 0, 0);
+  }
+  return date;
+};
+
+// POST /api/search - Advanced search endpoint
+app.post('/api/search', (req, res) => {
+  const {
+    query = '',
+    filters = {},
+    page = 1,
+    limit = 20,
+    sortBy = 'relevance',
+  } = req.body;
+
+  let bookmarks = loadBookmarks();
+
+  // Add type to each bookmark
+  bookmarks = bookmarks.map(b => ({
+    ...b,
+    type: getBookmarkType(b),
+  }));
+
+  const fuse = getFuseInstance(bookmarks);
+
+  // Start with all bookmarks or fuzzy search results
+  let results;
+  if (query && query.trim()) {
+    results = fuse.search(query.trim()).map(r => ({
+      item: r.item,
+      score: r.score,
+      matches: r.matches,
+    }));
+  } else {
+    results = bookmarks.map(item => ({
+      item,
+      score: 0,
+      matches: [],
+    }));
+  }
+
+  // Apply type filter
+  if (filters.types && filters.types.length > 0) {
+    results = results.filter(r => filters.types.includes(r.item.type));
+  }
+
+  // Apply collection filter
+  if (filters.collections && filters.collections.length > 0) {
+    results = results.filter(r => filters.collections.includes(r.item.collectionId));
+  }
+
+  // Apply tag filter (OR logic - item has at least one of the tags)
+  if (filters.tags && filters.tags.length > 0) {
+    results = results.filter(r =>
+      filters.tags.some(tag => r.item.tags?.includes(tag))
+    );
+  }
+
+  // Apply date filter
+  if (filters.datePreset) {
+    const filterDate = getDateFromPreset(filters.datePreset);
+    if (filterDate) {
+      results = results.filter(r => {
+        const itemDate = new Date(r.item.createdAt);
+        return itemDate >= filterDate;
+      });
+    }
+  } else if (filters.dateFrom || filters.dateTo) {
+    results = results.filter(r => {
+      const itemDate = new Date(r.item.createdAt);
+      if (filters.dateFrom && itemDate < new Date(filters.dateFrom)) return false;
+      if (filters.dateTo && itemDate > new Date(filters.dateTo)) return false;
+      return true;
+    });
+  }
+
+  // Apply source filter (appSource in metadata)
+  if (filters.sources && filters.sources.length > 0) {
+    results = results.filter(r =>
+      filters.sources.includes(r.item.metadata?.appSource)
+    );
+  }
+
+  // Sort results
+  if (sortBy === 'date') {
+    results.sort((a, b) => (b.item.createdAt || 0) - (a.item.createdAt || 0));
+  } else if (sortBy === 'title') {
+    results.sort((a, b) => (a.item.title || '').localeCompare(b.item.title || ''));
+  }
+  // 'relevance' is default from Fuse.js
+
+  // Pagination
+  const total = results.length;
+  const totalPages = Math.ceil(total / limit);
+  const startIndex = (page - 1) * limit;
+  const paginatedResults = results.slice(startIndex, startIndex + limit);
+
+  // Generate suggestions based on results
+  const tagCounts = {};
+  results.forEach(r => {
+    r.item.tags?.forEach(tag => {
+      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+    });
+  });
+
+  const suggestions = Object.entries(tagCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([tag]) => `#${tag}`);
+
+  res.json({
+    results: paginatedResults,
+    total,
+    page,
+    totalPages,
+    suggestions,
+    query,
+    filters,
+  });
+});
+
+// POST /api/ocr - Extract text from image (server-side OCR)
+app.post('/api/ocr', async (req, res) => {
+  const { imageUrl } = req.body;
+
+  if (!imageUrl) {
+    return res.status(400).json({ error: 'imageUrl is required' });
+  }
+
+  try {
+    // Note: For production, integrate with Google Cloud Vision or AWS Textract
+    // This is a placeholder that returns mock OCR text based on image URL
+
+    // Simulate OCR processing time
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // In a real implementation, you would:
+    // 1. Download the image
+    // 2. Send to OCR service (Google Vision, AWS Textract, Tesseract)
+    // 3. Return extracted text
+
+    // For demo, return mock text based on URL hash
+    const hash = imageUrl.split('/').pop() || 'default';
+    const mockTexts = {
+      'arch1': 'API Gateway Load Balancer User Service Auth Service Database Cluster',
+      'wire1': 'Dashboard Home Analytics Settings Profile Logout Navigation Menu',
+      'err1': 'TypeError Cannot read property map of undefined at UserList component line 45',
+      'db1': 'Users Table id email password Roles Table id name Permissions Table id action resource',
+      'app1': 'Shop Now Add to Cart Checkout Payment Method Shipping Address Order Confirmation',
+      'default': 'Sample extracted text from image',
+    };
+
+    const text = mockTexts[hash] || mockTexts.default;
+
+    res.json({ text, confidence: 0.95 });
+  } catch (error) {
+    console.error('OCR error:', error);
+    res.status(500).json({ error: 'OCR processing failed' });
+  }
+});
+
+// GET /api/search/suggestions - Get search suggestions
+app.get('/api/search/suggestions', (req, res) => {
+  const { q = '' } = req.query;
+  const bookmarks = loadBookmarks();
+
+  // Collect all unique tags
+  const tagSet = new Set();
+  bookmarks.forEach(b => {
+    b.tags?.forEach(tag => tagSet.add(tag));
+  });
+
+  // Filter suggestions based on query
+  const query = q.toLowerCase();
+  const suggestions = [];
+
+  // Add matching tags
+  Array.from(tagSet)
+    .filter(tag => tag.toLowerCase().includes(query))
+    .slice(0, 5)
+    .forEach(tag => {
+      suggestions.push({ type: 'tag', value: tag, label: `#${tag}` });
+    });
+
+  // Add type suggestions
+  ['note', 'link', 'tweet', 'youtube'].forEach(type => {
+    if (type.includes(query)) {
+      suggestions.push({ type: 'type', value: type, label: `type:${type}` });
+    }
+  });
+
+  // Add date suggestions
+  ['today', 'week', 'month', 'year'].forEach(preset => {
+    if (preset.includes(query)) {
+      suggestions.push({ type: 'date', value: preset, label: `date:${preset}` });
+    }
+  });
+
+  res.json({ suggestions: suggestions.slice(0, 10) });
+});
+
+// ==================== SEMANTIC SEARCH API ====================
+
+// In-memory cache for embeddings
+const embeddingsCache = new Map();
+let openaiClient = null;
+
+// Initialize OpenAI client if API key is available
+const getOpenAIClient = () => {
+  if (openaiClient) return openaiClient;
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.log('No OpenAI API key found, semantic search will use fallback similarity');
+    return null;
+  }
+
+  try {
+    const OpenAI = require('openai');
+    openaiClient = new OpenAI({ apiKey });
+    console.log('OpenAI client initialized for semantic search');
+    return openaiClient;
+  } catch (error) {
+    console.warn('Failed to initialize OpenAI:', error.message);
+    return null;
+  }
+};
+
+// Generate embedding using OpenAI or fallback
+const getEmbedding = async (text) => {
+  const cacheKey = text.slice(0, 100); // Use first 100 chars as cache key
+  if (embeddingsCache.has(cacheKey)) {
+    return embeddingsCache.get(cacheKey);
+  }
+
+  const openai = getOpenAIClient();
+
+  if (openai) {
+    try {
+      const response = await openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: text.slice(0, 8000), // Limit input length
+      });
+      const embedding = response.data[0].embedding;
+      embeddingsCache.set(cacheKey, embedding);
+      return embedding;
+    } catch (error) {
+      console.warn('OpenAI embedding failed, using fallback:', error.message);
+    }
+  }
+
+  // Fallback: Simple TF-IDF-like vector based on word frequencies
+  const words = text.toLowerCase().split(/\W+/).filter(w => w.length > 2);
+  const wordCounts = {};
+  words.forEach(w => {
+    wordCounts[w] = (wordCounts[w] || 0) + 1;
+  });
+
+  // Create a simple 384-dimension vector (matches OpenAI small model)
+  const vector = new Array(384).fill(0);
+  Object.entries(wordCounts).forEach(([word, count], idx) => {
+    const hash = word.split('').reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0), 0);
+    const position = Math.abs(hash) % 384;
+    vector[position] += count / words.length;
+  });
+
+  // Normalize
+  const magnitude = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0)) || 1;
+  const normalized = vector.map(v => v / magnitude);
+
+  embeddingsCache.set(cacheKey, normalized);
+  return normalized;
+};
+
+// Cosine similarity between two vectors
+const cosineSimilarity = (vecA, vecB) => {
+  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
+
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB) || 1);
+};
+
+// POST /api/semantic-search - Semantic search with embeddings
+app.post('/api/semantic-search', async (req, res) => {
+  const {
+    query = '',
+    filters = {},
+    limit = 20,
+    threshold = 0.3, // Minimum similarity score
+  } = req.body;
+
+  if (!query.trim()) {
+    return res.status(400).json({ error: 'Query is required' });
+  }
+
+  try {
+    let bookmarks = loadBookmarks();
+
+    // Add type to each bookmark
+    bookmarks = bookmarks.map(b => ({
+      ...b,
+      type: getBookmarkType(b),
+    }));
+
+    // Apply pre-filters (same as regular search)
+    if (filters.types && filters.types.length > 0) {
+      bookmarks = bookmarks.filter(b => filters.types.includes(b.type));
+    }
+    if (filters.collections && filters.collections.length > 0) {
+      bookmarks = bookmarks.filter(b => filters.collections.includes(b.collectionId));
+    }
+    if (filters.tags && filters.tags.length > 0) {
+      bookmarks = bookmarks.filter(b =>
+        filters.tags.some(tag => b.tags?.includes(tag))
+      );
+    }
+
+    // Get query embedding
+    const queryEmbedding = await getEmbedding(query);
+
+    // Calculate similarity for each bookmark
+    const results = await Promise.all(
+      bookmarks.map(async (bookmark) => {
+        // Create searchable text from bookmark
+        const searchText = [
+          bookmark.title || '',
+          bookmark.notes || '',
+          bookmark.description || '',
+          (bookmark.tags || []).join(' '),
+          bookmark.metadata?.ocrText || '',
+        ].join(' ').trim();
+
+        if (!searchText) {
+          return { item: bookmark, score: 0, similarity: 0 };
+        }
+
+        const bookmarkEmbedding = await getEmbedding(searchText);
+        const similarity = cosineSimilarity(queryEmbedding, bookmarkEmbedding);
+
+        return {
+          item: bookmark,
+          score: 1 - similarity, // Invert for consistency with Fuse (lower is better)
+          similarity,
+        };
+      })
+    );
+
+    // Filter by threshold and sort by similarity
+    const filteredResults = results
+      .filter(r => r.similarity >= threshold)
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, limit);
+
+    res.json({
+      results: filteredResults,
+      total: filteredResults.length,
+      query,
+      method: getOpenAIClient() ? 'openai' : 'fallback',
+    });
+  } catch (error) {
+    console.error('Semantic search error:', error);
+    res.status(500).json({ error: 'Semantic search failed' });
+  }
+});
+
+// POST /api/embeddings/generate - Pre-generate embeddings for all bookmarks
+app.post('/api/embeddings/generate', async (req, res) => {
+  try {
+    const bookmarks = loadBookmarks();
+    let processed = 0;
+
+    for (const bookmark of bookmarks) {
+      const searchText = [
+        bookmark.title || '',
+        bookmark.notes || '',
+        (bookmark.tags || []).join(' '),
+      ].join(' ').trim();
+
+      if (searchText) {
+        await getEmbedding(searchText);
+        processed++;
+      }
+    }
+
+    res.json({
+      processed,
+      total: bookmarks.length,
+      cacheSize: embeddingsCache.size,
+    });
+  } catch (error) {
+    console.error('Embedding generation error:', error);
+    res.status(500).json({ error: 'Failed to generate embeddings' });
+  }
+});
+
+// ==================== END SEMANTIC SEARCH API ====================
+
+// ==================== END POWER SEARCH API ====================
 
 // GET statistics
 app.get('/api/stats', (req, res) => {

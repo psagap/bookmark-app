@@ -1,0 +1,2 @@
+- use bun for running this project from now on
+- when long prompts are given make sure to plan before executing and use the skills you have to accomplish the request to the best of your abilities. as if you care for someone that is lets say your child. you want to be the best for them

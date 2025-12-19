@@ -51,61 +51,94 @@ module.exports = {
                     DEFAULT: "hsl(var(--card))",
                     foreground: "hsl(var(--card-foreground))",
                 },
-                // Gruvbox-inspired palette
+                // Theme-aware Gruvbox palette - NOW USING CSS VARIABLES
                 gruvbox: {
                     bg: {
-                        darkest: '#1d2021',
-                        dark: '#282828',
-                        DEFAULT: '#32302f',
-                        light: '#3c3836',
-                        lighter: '#504945',
+                        darkest: 'var(--theme-bg-darkest)',
+                        dark: 'var(--theme-bg-dark)',
+                        DEFAULT: 'var(--theme-bg)',
+                        light: 'var(--theme-bg-light)',
+                        lighter: 'var(--theme-bg-lighter)',
                     },
                     fg: {
-                        DEFAULT: '#ebdbb2',
-                        light: '#fbf1c7',
-                        muted: '#a89984',
+                        DEFAULT: 'var(--theme-fg)',
+                        light: 'var(--theme-fg-light)',
+                        muted: 'var(--theme-fg-muted)',
                     },
                     red: {
-                        DEFAULT: '#cc241d',
-                        light: '#fb4934',
+                        DEFAULT: 'var(--theme-accent-1)',
+                        light: 'var(--theme-accent-1)',
                     },
                     orange: {
-                        DEFAULT: '#d65d0e',
-                        light: '#fe8019',
+                        DEFAULT: 'var(--theme-secondary)',
+                        light: 'var(--theme-secondary-light)',
                     },
                     yellow: {
-                        DEFAULT: '#d79921',
-                        light: '#fabd2f',
+                        DEFAULT: 'var(--theme-primary)',
+                        light: 'var(--theme-primary-light)',
                     },
                     aqua: {
-                        DEFAULT: '#689d6a',
-                        light: '#8ec07c',
+                        DEFAULT: 'var(--theme-accent-2)',
+                        light: 'var(--theme-accent-2)',
                     },
                     purple: {
-                        DEFAULT: '#b16286',
-                        light: '#d3869b',
+                        DEFAULT: 'var(--theme-accent-3)',
+                        light: 'var(--theme-accent-3)',
+                    },
+                    blue: {
+                        DEFAULT: 'var(--theme-accent-4)',
+                        light: 'var(--theme-accent-4)',
                     },
                 },
-                // Legacy vintage colors (keeping for compatibility)
+                // Legacy vintage colors - also using CSS variables
                 vintage: {
                     navy: {
-                        darkest: '#1d2021',
-                        dark: '#282828',
-                        DEFAULT: '#32302f',
-                        light: '#3c3836',
-                        lighter: '#504945',
+                        darkest: 'var(--theme-bg-darkest)',
+                        dark: 'var(--theme-bg-dark)',
+                        DEFAULT: 'var(--theme-bg)',
+                        light: 'var(--theme-bg-light)',
+                        lighter: 'var(--theme-bg-lighter)',
                     },
                     amber: {
-                        DEFAULT: '#d79921',
-                        light: '#fabd2f',
-                        lighter: '#fbf1c7',
-                        dark: '#d65d0e',
-                        darker: '#af3a03',
+                        DEFAULT: 'var(--theme-primary)',
+                        light: 'var(--theme-primary-light)',
+                        lighter: 'var(--theme-fg-light)',
+                        dark: 'var(--theme-secondary)',
+                        darker: 'var(--theme-accent-1)',
                     },
-                    cream: '#ebdbb2',
-                    gold: '#fabd2f',
-                    copper: '#fe8019',
-                    rust: '#cc241d',
+                    cream: 'var(--theme-fg)',
+                    gold: 'var(--theme-primary-light)',
+                    copper: 'var(--theme-secondary-light)',
+                    rust: 'var(--theme-accent-1)',
+                },
+                // Direct theme color access
+                theme: {
+                    bg: {
+                        darkest: 'var(--theme-bg-darkest)',
+                        dark: 'var(--theme-bg-dark)',
+                        DEFAULT: 'var(--theme-bg)',
+                        light: 'var(--theme-bg-light)',
+                        lighter: 'var(--theme-bg-lighter)',
+                    },
+                    fg: {
+                        DEFAULT: 'var(--theme-fg)',
+                        light: 'var(--theme-fg-light)',
+                        muted: 'var(--theme-fg-muted)',
+                    },
+                    primary: {
+                        DEFAULT: 'var(--theme-primary)',
+                        light: 'var(--theme-primary-light)',
+                    },
+                    secondary: {
+                        DEFAULT: 'var(--theme-secondary)',
+                        light: 'var(--theme-secondary-light)',
+                    },
+                    accent: {
+                        1: 'var(--theme-accent-1)',
+                        2: 'var(--theme-accent-2)',
+                        3: 'var(--theme-accent-3)',
+                        4: 'var(--theme-accent-4)',
+                    },
                 },
             },
             borderRadius: {
@@ -126,6 +159,11 @@ module.exports = {
             animation: {
                 "accordion-down": "accordion-down 0.2s ease-out",
                 "accordion-up": "accordion-up 0.2s ease-out",
+            },
+            fontFamily: {
+                display: 'var(--font-display)',
+                body: 'var(--font-body)',
+                mono: 'var(--font-mono)',
             },
         },
     },

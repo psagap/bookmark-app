@@ -31,5 +31,18 @@ export function useBookmarks() {
         fetchBookmarks();
     }, [fetchBookmarks]);
 
-    return { bookmarks, loading, error, refetch };
+    // Optimistic update - updates local state without refetching
+    // This preserves scroll position and provides instant feedback
+    const updateBookmark = useCallback((updatedBookmark) => {
+        setBookmarks(prev => prev.map(b =>
+            b.id === updatedBookmark.id ? { ...b, ...updatedBookmark } : b
+        ));
+    }, []);
+
+    // Remove a bookmark from local state
+    const removeBookmark = useCallback((bookmarkId) => {
+        setBookmarks(prev => prev.filter(b => b.id !== bookmarkId));
+    }, []);
+
+    return { bookmarks, loading, error, refetch, updateBookmark, removeBookmark };
 }

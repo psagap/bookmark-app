@@ -8,7 +8,21 @@
       "WebSearch",
       "Bash(node --version)",
       "WebFetch(domain:en.wikipedia.org)",
-      "WebFetch(domain:www.mediawiki.org)"
+      "WebFetch(domain:www.mediawiki.org)",
+      "WebFetch(domain:dribbble.com)",
+      "Bash(lsof:*)",
+      "WebFetch(domain:www.notion.com)",
+      "WebFetch(domain:moderncss.dev)",
+      "WebFetch(domain:konstantin.digital)",
+      "Bash(mdfind:*)",
+      "Bash(export PATH:*)",
+      "Bash(\"/Users/psagap/Library/Application Support/com.raycast.macos/NodeJS/runtime/22.14.0/bin/node\" node_modules/.bin/vite)",
+      "Bash(bun run dev)",
+      "Bash(xargs kill -9)",
+      "Bash(bun add:*)",
+      "Bash(npx tsc:*)",
+      "Bash(bun run build:*)",
+      "Bash(node -e:*)"
     ],
     "deny": [],
     "ask": []
