@@ -1,8 +1,12 @@
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
+import { motion } from "framer-motion"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+
+// Create a motion-wrapped version of DialogPrimitive.Content
+const MotionDialogPrimitiveContent = motion(DialogPrimitive.Content)
 
 const Dialog = DialogPrimitive.Root
 
@@ -43,6 +47,46 @@ const DialogContent = React.forwardRef(({ className, children, ...props }, ref) 
   </DialogPortal>
 ))
 DialogContent.displayName = DialogPrimitive.Content.displayName
+
+// Motion-enabled DialogContent that supports spring animations
+const MotionDialogContent = React.forwardRef(({ className, children, repelOffset = { x: 0, y: 0 }, hideCloseButton = false, ...props }, ref) => (
+  <DialogPortal>
+    <DialogOverlay />
+    <DialogPrimitive.Content
+      className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] border-0 bg-transparent p-0 shadow-none outline-none"
+      style={{ background: 'transparent', border: 'none', boxShadow: 'none' }}
+      {...props}>
+      {/* Inner motion div handles the spring animation AND all visual styling */}
+      <motion.div
+        ref={ref}
+        className={cn(
+          "border bg-background shadow-lg sm:rounded-lg overflow-hidden",
+          className
+        )}
+        animate={{
+          x: repelOffset.x,
+          y: repelOffset.y,
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 300,
+          damping: 20,
+          mass: 0.8,
+        }}
+      >
+        {children}
+        {!hideCloseButton && (
+          <DialogPrimitive.Close
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        )}
+      </motion.div>
+    </DialogPrimitive.Content>
+  </DialogPortal>
+))
+MotionDialogContent.displayName = "MotionDialogContent"
 
 const DialogHeader = ({
   className,
@@ -87,6 +131,7 @@ export {
   DialogClose,
   DialogTrigger,
   DialogContent,
+  MotionDialogContent,
   DialogHeader,
   DialogFooter,
   DialogTitle,

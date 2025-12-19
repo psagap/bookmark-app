@@ -1,168 +1,124 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { FolderOpen, Plus, ArrowLeft } from 'lucide-react';
+import { FolderOpen, Plus, ArrowLeft, Folder, X, FolderInput, Tag, Check } from 'lucide-react';
 import BookmarkCard from './BookmarkCard';
 
 /**
  * CollectionCards Component
- * Displays sides (collections) as visual cards with "Pick a Movie" style animation
- * When a side is selected, others collapse away, a divider appears, and bookmarks show below
+ * Displays sides (collections) as Pixie Folder cards
+ * Documents peek out from behind and rise on hover
  */
 
-// Placeholder images for side covers
-const PLACEHOLDER_COVERS = [
-  'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=600&fit=crop',
-  'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=400&h=600&fit=crop',
-  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=600&fit=crop',
-  'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=600&fit=crop',
-  'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&h=600&fit=crop',
-  'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400&h=600&fit=crop',
+// Pixie Folders color palette and image mapping
+const PIXIE_FOLDERS = [
+  { name: 'yellow', color: '#F9B846', image: '/folders/folder-yellow.png' },
+  { name: 'aqua', color: '#2BC4C4', image: '/folders/folder-aqua.png' },
+  { name: 'blue', color: '#7B7EED', image: '/folders/folder-blue.png' },
+  { name: 'purple', color: '#B687D6', image: '/folders/folder-purple.png' },
+  { name: 'pink', color: '#F6639B', image: '/folders/folder-pink.png' },
+  { name: 'salmon', color: '#F87171', image: '/folders/folder-salmon.png' },
+  { name: 'black', color: '#2D2D2D', image: '/folders/folder-black.png' },
 ];
+
+// Get consistent folder based on collection ID (not array position)
+const getFolderForCollection = (collectionId) => {
+  const str = String(collectionId);
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return PIXIE_FOLDERS[Math.abs(hash) % PIXIE_FOLDERS.length];
+};
+
+// Legacy color array for backward compatibility
+const FOLDER_COLORS = PIXIE_FOLDERS.map(f => f.color);
 
 const SideCard = ({
   collection,
   index,
   totalCount,
   isSelected,
-  selectedIndex,
+  isMultiSelected,
   hasSelection,
   onSelect,
+  onShiftSelect,
   bookmarkPreviews = [],
 }) => {
-  const [currentPreview, setCurrentPreview] = useState(0);
-  const [isHovering, setIsHovering] = useState(false);
+  // Get documents with thumbnails (up to 3 for visual effect)
+  const documentPreviews = bookmarkPreviews.filter(p => p?.thumbnail).slice(0, 3);
+  const hasDocuments = documentPreviews.length > 0;
 
-  // Calculate stagger delay based on position relative to selected card
-  // Matches "Pick a Movie" animation: n * 0.2s delay
-  const getStaggerIndex = () => {
-    if (!hasSelection || isSelected) return 0;
+  // Get Pixie Folder based on collection ID (consistent regardless of array position)
+  const pixieFolder = getFolderForCollection(collection.id);
+  const folderImage = pixieFolder.image;
+  const folderColor = pixieFolder.color;
 
-    if (selectedIndex === -1) return index + 1;
-
-    // Cards AFTER selected: --n = totalCount - index + 1 (furthest animates first)
-    if (index > selectedIndex) {
-      return totalCount - index + 1;
+  const handleClick = (e) => {
+    if (e.shiftKey) {
+      // Shift+click for multi-select
+      onShiftSelect(collection.id);
+    } else {
+      // Normal click to open folder
+      onSelect(isSelected ? null : collection.id);
     }
-    // Cards BEFORE selected: --n = index + 1 (starts from beginning)
-    return index + 1;
   };
-
-  // Slide through bookmark previews on hover
-  useEffect(() => {
-    if (!isHovering || bookmarkPreviews.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentPreview((prev) => (prev + 1) % bookmarkPreviews.length);
-    }, 800);
-    return () => clearInterval(interval);
-  }, [isHovering, bookmarkPreviews.length]);
-
-  // Reset preview when not hovering
-  useEffect(() => {
-    if (!isHovering) setCurrentPreview(0);
-  }, [isHovering]);
-
-  const coverImage = bookmarkPreviews[currentPreview]?.thumbnail ||
-    PLACEHOLDER_COVERS[index % PLACEHOLDER_COVERS.length];
 
   return (
     <div
       className={cn(
-        "side-card",
+        "side-card pixie-folder",
         hasSelection && !isSelected && "side-card--hidden",
-        isSelected && "side-card--selected"
+        isSelected && "side-card--selected",
+        isMultiSelected && "side-card--multi-selected"
       )}
       style={{
-        '--n': getStaggerIndex(),
-        '--card-color': collection.color,
+        '--card-color': folderColor,
         '--card-index': index,
       }}
-      onClick={() => onSelect(isSelected ? null : collection.id)}
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
+      onClick={handleClick}
     >
-      {/* Card Container */}
-      <div className="side-card-inner">
-        {/* Background Image */}
-        <div className="absolute inset-0">
-          {bookmarkPreviews.length > 0 ? (
-            <div className="relative w-full h-full">
-              {bookmarkPreviews.map((preview, idx) => (
+      <div className="pixie-folder-wrapper">
+        {/* Multi-select checkmark */}
+        {isMultiSelected && (
+          <div className="pixie-folder-check">
+            <Check className="w-4 h-4" />
+          </div>
+        )}
+        {/* Pixie Folder Image with documents inside */}
+        <div className="pixie-folder-image">
+          <img
+            src={folderImage}
+            alt={collection.name}
+            draggable="false"
+          />
+          {/* Documents inside the folder's white paper area */}
+          {hasDocuments && (
+            <div className="pixie-documents">
+              {documentPreviews.map((preview, idx) => (
                 <div
                   key={idx}
-                  className={cn(
-                    "absolute inset-0 transition-opacity duration-300",
-                    idx === currentPreview ? "opacity-100" : "opacity-0"
-                  )}
+                  className="pixie-document"
+                  style={{ '--doc-index': idx }}
                 >
                   <img
-                    src={preview.thumbnail || PLACEHOLDER_COVERS[idx % PLACEHOLDER_COVERS.length]}
+                    src={preview.thumbnail}
                     alt=""
-                    className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                 </div>
               ))}
             </div>
-          ) : (
-            <div
-              className="w-full h-full flex items-center justify-center"
-              style={{ backgroundColor: `${collection.color}30` }}
-            >
-              <FolderOpen
-                className="w-12 h-12 opacity-40"
-                style={{ color: collection.color }}
-              />
-            </div>
           )}
         </div>
+      </div>
 
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
-        {/* Hover Glow */}
-        <div
-          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-          style={{
-            boxShadow: `inset 0 0 30px ${collection.color}40, 0 0 40px ${collection.color}30`,
-          }}
-        />
-
-        {/* Preview Dots */}
-        {isHovering && bookmarkPreviews.length > 1 && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-            {bookmarkPreviews.slice(0, 5).map((_, idx) => (
-              <div
-                key={idx}
-                className={cn(
-                  "w-1.5 h-1.5 rounded-full transition-all duration-200",
-                  idx === currentPreview ? "bg-white w-4" : "bg-white/50"
-                )}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Side Info */}
-        <div className="absolute bottom-0 left-0 right-0 p-4">
-          <div
-            className="w-3 h-3 rounded-full mb-2"
-            style={{ backgroundColor: collection.color }}
-          />
-          <h3 className="text-white font-semibold text-lg leading-tight mb-1">
-            {collection.name}
-          </h3>
-          <p className="text-white/60 text-sm">
-            {collection.bookmarkCount || 0} item{collection.bookmarkCount !== 1 ? 's' : ''}
-          </p>
-        </div>
-
-        {/* Hidden checkbox for accessibility */}
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={() => onSelect(isSelected ? null : collection.id)}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-          aria-label={`Select ${collection.name} side`}
-        />
+      {/* Folder Info - below the folder */}
+      <div className="pixie-folder-info">
+        <h3>{collection.name}</h3>
+        <span className="pixie-folder-count">
+          {collection.bookmarkCount || 0} {collection.bookmarkCount === 1 ? 'file' : 'files'}
+        </span>
       </div>
     </div>
   );
@@ -173,15 +129,35 @@ const CollectionCards = ({
   bookmarks = [],
   selectedCollection = null,
   onSelectCollection,
+  onBackToFolders,
   onCreateCollection,
   onBookmarkClick,
   onDeleteBookmark,
   onPinBookmark,
   onRefreshBookmark,
+  onSaveBookmark,
   onCreateSide,
+  onMoveToFolder,
+  onAddTags,
+  allCollections = [],
 }) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
+  const [multiSelectedIds, setMultiSelectedIds] = useState(new Set());
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
+  const [showTagInput, setShowTagInput] = useState(false);
+  const [tagInput, setTagInput] = useState('');
+
+  // Sync showBookmarks with selectedCollection from parent
+  useEffect(() => {
+    if (selectedCollection) {
+      // Delay showing bookmarks for animation
+      const timer = setTimeout(() => setShowBookmarks(true), 100);
+      return () => clearTimeout(timer);
+    } else {
+      setShowBookmarks(false);
+    }
+  }, [selectedCollection]);
 
   // Get bookmark previews for each collection (for card covers)
   const getBookmarkPreviews = (collectionId) => {
@@ -190,36 +166,87 @@ const CollectionCards = ({
       .slice(0, 5);
   };
 
-  // Get all bookmarks for selected collection
+  // Get all bookmarks for selected collection (handle string/number ID comparison)
   const getCollectionBookmarks = (collectionId) => {
-    return bookmarks.filter(b => b.collectionId === collectionId);
+    return bookmarks.filter(b => String(b.collectionId) === String(collectionId));
   };
 
-  const selectedIndex = collections.findIndex(c => c.id === selectedCollection);
-  const hasSelection = selectedCollection !== null;
-  const selectedSide = collections.find(c => c.id === selectedCollection);
+  // Find the selected collection
+  const selectedSide = collections.find(c => String(c.id) === String(selectedCollection));
+
+  const hasSelection = selectedCollection !== null && selectedSide !== null;
   const collectionBookmarks = hasSelection ? getCollectionBookmarks(selectedCollection) : [];
 
-  // Handle selection with animation timing
+  // Get the correct Pixie Folder - uses same function as SideCard for consistency
+  const selectedPixieFolder = selectedSide ? getFolderForCollection(selectedSide.id) : PIXIE_FOLDERS[0];
+  const selectedFolderColor = selectedPixieFolder.color;
+
+  // Handle selection with fluid animation
+  // Selected folder glows while others fade, then combined view appears
   const handleSelect = (id) => {
+    // Clear multi-selection when opening a folder
+    if (multiSelectedIds.size > 0) {
+      setMultiSelectedIds(new Set());
+    }
+
     if (id === selectedCollection) {
-      // Deselecting - hide bookmarks first, then animate cards back
+      // Deselecting - fade out combined view, then show all cards
       setShowBookmarks(false);
       setIsAnimating(true);
       setTimeout(() => {
         onSelectCollection(null);
         setIsAnimating(false);
-      }, 300);
+      }, 400);
     } else {
-      // Selecting - animate cards out first, then show bookmarks after collapse completes
-      setShowBookmarks(false);
+      // Selecting - selected card glows while others fade
+      // Then combined view slides in
       onSelectCollection(id);
-      // Calculate max delay: max n value * 0.2s + 0.3s duration + small buffer
-      const maxDelay = (collections.length) * 200 + 300 + 100;
+      setIsAnimating(true);
+
+      // Show combined view after cards fade (0.4s)
       setTimeout(() => {
         setShowBookmarks(true);
-      }, maxDelay);
+        setIsAnimating(false);
+      }, 450);
     }
+  };
+
+  // Handle shift+click multi-select
+  const handleShiftSelect = (id) => {
+    setMultiSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  // Clear multi-selection
+  const clearMultiSelection = () => {
+    setMultiSelectedIds(new Set());
+    setShowMoveMenu(false);
+    setShowTagInput(false);
+    setTagInput('');
+  };
+
+  // Handle move to folder
+  const handleMoveToFolder = (targetFolderId) => {
+    if (onMoveToFolder && multiSelectedIds.size > 0) {
+      onMoveToFolder(Array.from(multiSelectedIds), targetFolderId);
+    }
+    clearMultiSelection();
+  };
+
+  // Handle add tags
+  const handleAddTags = () => {
+    if (onAddTags && multiSelectedIds.size > 0 && tagInput.trim()) {
+      const tags = tagInput.split(',').map(t => t.trim()).filter(Boolean);
+      onAddTags(Array.from(multiSelectedIds), tags);
+    }
+    clearMultiSelection();
   };
 
   if (collections.length === 0) {
@@ -241,28 +268,62 @@ const CollectionCards = ({
     );
   }
 
+  // Handle back navigation - use parent handler if provided
+  const handleBack = () => {
+    if (onBackToFolders) {
+      onBackToFolders();
+    } else {
+      handleSelect(null);
+    }
+  };
+
   return (
     <div className="sides-container">
-      {/* Header */}
+      {/* Header with Breadcrumb Navigation */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gruvbox-fg">
-          {hasSelection ? selectedSide?.name : 'Your Sides'}
-        </h2>
-        {hasSelection && (
+        {hasSelection ? (
+          // Breadcrumb when inside a folder
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBack}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gruvbox-fg-muted hover:text-gruvbox-yellow hover:bg-gruvbox-bg-light/50 transition-all"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-sm font-medium">Sides</span>
+            </button>
+            <div className="flex items-center gap-2">
+              <img
+                src={selectedPixieFolder.image}
+                alt=""
+                className="w-6 h-6 object-contain"
+              />
+              <h2 className="text-xl font-semibold text-gruvbox-fg">
+                {selectedSide?.name}
+              </h2>
+            </div>
+          </div>
+        ) : (
+          // Default header when viewing all folders
+          <h2 className="text-xl font-semibold text-gruvbox-fg">Your Sides</h2>
+        )}
+
+        {/* Create new side button */}
+        {!hasSelection && (
           <button
-            onClick={() => handleSelect(null)}
-            className="flex items-center gap-2 text-sm text-gruvbox-fg-muted hover:text-gruvbox-yellow transition-colors"
+            onClick={onCreateCollection}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-gruvbox-fg-muted hover:text-gruvbox-yellow hover:bg-gruvbox-bg-light/50 transition-all"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back to all sides
+            <Plus className="w-4 h-4" />
+            New Side
           </button>
         )}
       </div>
 
-      {/* Side Cards Row */}
+      {/* Side Cards Grid - shown when no selection */}
       <div className={cn(
         "sides-grid",
-        hasSelection && "sides-grid--has-selection"
+        hasSelection && "sides-grid--has-selection",
+        isAnimating && "sides-grid--animating"
       )}>
         {collections.map((collection, index) => (
           <SideCard
@@ -270,60 +331,151 @@ const CollectionCards = ({
             collection={collection}
             index={index}
             totalCount={collections.length}
-            isSelected={selectedCollection === collection.id}
-            selectedIndex={selectedIndex}
+            isSelected={String(selectedCollection) === String(collection.id)}
+            isMultiSelected={multiSelectedIds.has(collection.id)}
             hasSelection={hasSelection}
             onSelect={handleSelect}
+            onShiftSelect={handleShiftSelect}
             bookmarkPreviews={getBookmarkPreviews(collection.id)}
           />
         ))}
       </div>
 
-      {/* Divider Line - appears after collapse animation completes */}
-      <div className={cn(
-        "sides-divider",
-        showBookmarks && "sides-divider--visible"
-      )}>
-        <div
-          className="sides-divider-line"
-          style={{ '--divider-color': selectedSide?.color || '#d79921' }}
-        />
-      </div>
+      {/* Bookmarks Grid - shown when a folder is selected */}
+      {hasSelection && (
+        <div className={cn(
+          "sides-selected-view relative",
+          showBookmarks && "sides-selected-view--visible"
+        )}>
+          {/* Bookmark Cards - masonry grid */}
+          {collectionBookmarks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <FolderOpen className="w-16 h-16 text-gruvbox-fg-muted/30 mb-4" />
+              <p className="text-gruvbox-fg-muted text-lg">No bookmarks in this side yet</p>
+              <p className="text-sm text-gruvbox-fg-muted/60 mt-2">
+                Add bookmarks using the three-dot menu on any card in the Lounge
+              </p>
+            </div>
+          ) : (
+            <div className="w-full columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 [column-gap:1rem] pb-12">
+              {collectionBookmarks.map((bookmark, index) => (
+                <div
+                  key={bookmark.id}
+                  className="sides-combined-bookmark break-inside-avoid"
+                  style={{ '--bookmark-index': index }}
+                >
+                  <div onClick={() => onBookmarkClick?.(bookmark)} className="cursor-pointer">
+                    <BookmarkCard
+                      bookmark={bookmark}
+                      onDelete={onDeleteBookmark}
+                      onPin={onPinBookmark}
+                      onCreateSide={onCreateSide}
+                      onRefresh={onRefreshBookmark}
+                      onSave={onSaveBookmark}
+                      collection={selectedSide}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
-      {/* Bookmarks Grid - appears below after collapse animation */}
-      <div className={cn(
-        "sides-bookmarks",
-        showBookmarks && "sides-bookmarks--visible"
-      )}>
-        {collectionBookmarks.length === 0 && hasSelection ? (
-          <div className="text-center py-12">
-            <p className="text-gruvbox-fg-muted">No bookmarks in this side yet</p>
-            <p className="text-sm text-gruvbox-fg-muted/60 mt-1">
-              Add bookmarks using the three-dot menu on any card
-            </p>
+          {/* File count - bottom right */}
+          <div className="fixed bottom-6 right-6 px-4 py-2 rounded-xl bg-gruvbox-bg-dark/80 backdrop-blur-sm border border-gruvbox-bg-light/30 text-gruvbox-fg-muted text-sm">
+            {collectionBookmarks.length} {collectionBookmarks.length === 1 ? 'file' : 'files'}
           </div>
-        ) : (
-          <div className="sides-bookmarks-grid">
-            {collectionBookmarks.map((bookmark, index) => (
-              <div
-                key={bookmark.id}
-                className="sides-bookmark-item"
-                style={{ '--bookmark-index': index }}
-                onClick={() => onBookmarkClick?.(bookmark)}
+        </div>
+      )}
+
+      {/* Multi-selection action bar */}
+      {multiSelectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-gruvbox-bg-dark/95 backdrop-blur-md border border-gruvbox-bg-light/30 shadow-xl">
+            {/* Selection count */}
+            <div className="flex items-center gap-2 pr-3 border-r border-gruvbox-bg-light/30">
+              <span className="text-gruvbox-yellow font-semibold">{multiSelectedIds.size}</span>
+              <span className="text-gruvbox-fg-muted text-sm">selected</span>
+            </div>
+
+            {/* Move to folder button */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setShowMoveMenu(!showMoveMenu);
+                  setShowTagInput(false);
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gruvbox-fg-muted hover:text-gruvbox-yellow hover:bg-gruvbox-bg-light/50 transition-all"
               >
-                <BookmarkCard
-                  bookmark={bookmark}
-                  onDelete={onDeleteBookmark}
-                  onPin={onPinBookmark}
-                  onCreateSide={onCreateSide}
-                  onRefresh={onRefreshBookmark}
-                  collection={selectedSide}
-                />
-              </div>
-            ))}
+                <FolderInput className="w-4 h-4" />
+                <span className="text-sm">Move</span>
+              </button>
+
+              {/* Folder dropdown */}
+              {showMoveMenu && (
+                <div className="absolute bottom-full left-0 mb-2 w-48 py-2 rounded-xl bg-gruvbox-bg-dark border border-gruvbox-bg-light/30 shadow-xl max-h-64 overflow-y-auto">
+                  {(allCollections.length > 0 ? allCollections : collections).map(folder => (
+                    <button
+                      key={folder.id}
+                      onClick={() => handleMoveToFolder(folder.id)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-gruvbox-fg hover:bg-gruvbox-bg-light/50 transition-colors"
+                    >
+                      <img
+                        src={getFolderForCollection(folder.id).image}
+                        alt=""
+                        className="w-5 h-5 object-contain"
+                      />
+                      <span className="truncate">{folder.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add tags button */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setShowTagInput(!showTagInput);
+                  setShowMoveMenu(false);
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gruvbox-fg-muted hover:text-gruvbox-aqua hover:bg-gruvbox-bg-light/50 transition-all"
+              >
+                <Tag className="w-4 h-4" />
+                <span className="text-sm">Tag</span>
+              </button>
+
+              {/* Tag input dropdown */}
+              {showTagInput && (
+                <div className="absolute bottom-full left-0 mb-2 w-64 p-3 rounded-xl bg-gruvbox-bg-dark border border-gruvbox-bg-light/30 shadow-xl">
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddTags()}
+                    placeholder="Enter tags (comma separated)"
+                    className="w-full px-3 py-2 rounded-lg bg-gruvbox-bg text-gruvbox-fg text-sm border border-gruvbox-bg-light/30 focus:border-gruvbox-aqua focus:outline-none"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleAddTags}
+                    className="mt-2 w-full px-3 py-1.5 rounded-lg bg-gruvbox-aqua text-gruvbox-bg-darkest text-sm font-medium hover:bg-gruvbox-aqua/80 transition-colors"
+                  >
+                    Add Tags
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Clear selection */}
+            <button
+              onClick={clearMultiSelection}
+              className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-gruvbox-fg-muted hover:text-gruvbox-red hover:bg-gruvbox-bg-light/50 transition-all ml-2"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

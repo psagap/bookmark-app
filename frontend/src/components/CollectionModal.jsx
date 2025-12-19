@@ -1,24 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, FolderOpen, Sparkles } from 'lucide-react';
+import { X, Plus, FolderOpen, Sparkles, Check } from 'lucide-react';
 
-// Gruvbox-inspired collection colors
+// Curated color palette - fewer, more distinct colors
 const COLLECTION_COLORS = [
-  { name: 'Red', value: '#fb4934' },
-  { name: 'Orange', value: '#fe8019' },
-  { name: 'Yellow', value: '#fabd2f' },
-  { name: 'Green', value: '#b8bb26' },
-  { name: 'Aqua', value: '#8ec07c' },
-  { name: 'Blue', value: '#83a598' },
-  { name: 'Purple', value: '#d3869b' },
-  { name: 'Gray', value: '#928374' },
-  { name: 'Red Dark', value: '#cc241d' },
-  { name: 'Orange Dark', value: '#d65d0e' },
-  { name: 'Yellow Dark', value: '#d79921' },
-  { name: 'Green Dark', value: '#98971a' },
-  { name: 'Aqua Dark', value: '#689d6a' },
-  { name: 'Blue Dark', value: '#458588' },
-  { name: 'Purple Dark', value: '#b16286' },
-  { name: 'Gray Dark', value: '#7c6f64' },
+  { name: 'Coral', value: '#fb4934' },
+  { name: 'Amber', value: '#fe8019' },
+  { name: 'Gold', value: '#fabd2f' },
+  { name: 'Lime', value: '#b8bb26' },
+  { name: 'Mint', value: '#8ec07c' },
+  { name: 'Sky', value: '#83a598' },
+  { name: 'Lavender', value: '#d3869b' },
+  { name: 'Slate', value: '#928374' },
 ];
 
 const CollectionModal = ({
@@ -61,6 +53,9 @@ const CollectionModal = ({
     }, 200);
   };
 
+  // Get the selected color object
+  const selectedColorObj = COLLECTION_COLORS.find(c => c.value === selectedColor) || COLLECTION_COLORS[0];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
@@ -99,48 +94,63 @@ const CollectionModal = ({
           <div className="p-6">
             {isCreating ? (
               <div className="space-y-5">
-                {/* Name input */}
+                {/* Name input with color preview */}
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-gruvbox-fg-muted mb-2.5">Side Name</label>
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    placeholder="Enter side name..."
-                    className="w-full px-4 py-3 bg-gruvbox-bg/60 border border-gruvbox-bg-lighter/80 rounded-xl text-gruvbox-fg placeholder:text-gruvbox-fg-muted/50 focus:outline-none focus:border-gruvbox-yellow/40 focus:bg-gruvbox-bg/80 transition-all duration-200"
-                    autoFocus
-                  />
+                  <div className="relative">
+                    <div
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full transition-colors duration-200"
+                      style={{ backgroundColor: selectedColor }}
+                    />
+                    <input
+                      type="text"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      placeholder="Enter side name..."
+                      className="w-full pl-9 pr-4 py-3 bg-gruvbox-bg/60 border border-gruvbox-bg-lighter/80 rounded-xl text-gruvbox-fg placeholder:text-gruvbox-fg-muted/50 focus:outline-none focus:border-gruvbox-yellow/40 focus:bg-gruvbox-bg/80 transition-all duration-200"
+                      autoFocus
+                    />
+                  </div>
                 </div>
 
-                {/* Color picker */}
+                {/* Color picker - horizontal strip */}
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-gruvbox-fg-muted mb-2.5">Color</label>
-                  <div className="grid grid-cols-8 gap-2.5">
+                  <label className="block text-xs uppercase tracking-wider text-gruvbox-fg-muted mb-3">Choose Color</label>
+                  <div className="flex items-center gap-2 p-2 bg-gruvbox-bg/40 rounded-xl">
                     {COLLECTION_COLORS.map((color) => (
                       <button
                         key={color.value}
                         onClick={() => setSelectedColor(color.value)}
-                        className={`relative w-8 h-8 rounded-full transition-all duration-200 ${
-                          selectedColor === color.value
-                            ? 'scale-110'
-                            : 'hover:scale-105'
-                        }`}
+                        className="group relative flex-1 aspect-square rounded-lg transition-all duration-200 hover:scale-105"
                         style={{ backgroundColor: color.value }}
                         title={color.name}
                       >
+                        {/* Selection indicator */}
                         {selectedColor === color.value && (
-                          <>
-                            <div className="absolute inset-0 rounded-full ring-2 ring-offset-2 ring-offset-gruvbox-bg-light ring-gruvbox-fg/80" />
-                            <div className="absolute -inset-1 rounded-full blur-md opacity-50" style={{ backgroundColor: color.value }} />
-                          </>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-5 h-5 rounded-md bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                              <Check className="w-3.5 h-3.5 text-white drop-shadow-sm" strokeWidth={3} />
+                            </div>
+                          </div>
+                        )}
+                        {/* Glow on selection */}
+                        {selectedColor === color.value && (
+                          <div
+                            className="absolute -inset-0.5 rounded-lg opacity-60 blur-sm -z-10"
+                            style={{ backgroundColor: color.value }}
+                          />
                         )}
                       </button>
                     ))}
                   </div>
+                  {/* Selected color name */}
+                  <p className="text-xs text-gruvbox-fg-muted/60 mt-2 text-center">
+                    {selectedColorObj.name}
+                  </p>
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-3 pt-3">
+                <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setIsCreating(false)}
                     className="relative flex-1 px-4 py-3 rounded-xl overflow-hidden group"
@@ -153,9 +163,11 @@ const CollectionModal = ({
                     disabled={!newName.trim()}
                     className="relative flex-1 px-4 py-3 rounded-xl overflow-hidden group disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-gruvbox-yellow to-gruvbox-orange transition-all duration-300 group-hover:scale-105 group-disabled:group-hover:scale-100" />
-                    <div className="absolute inset-0 bg-gradient-to-r from-gruvbox-yellow-light to-gruvbox-orange-light opacity-0 group-hover:opacity-100 group-disabled:group-hover:opacity-0 transition-opacity duration-300" />
-                    <span className="relative font-medium text-gruvbox-bg-darkest">Create</span>
+                    <div
+                      className="absolute inset-0 transition-all duration-300 group-hover:brightness-110 group-disabled:group-hover:brightness-100"
+                      style={{ backgroundColor: selectedColor }}
+                    />
+                    <span className="relative font-medium text-white drop-shadow-sm">Create Side</span>
                   </button>
                 </div>
               </div>

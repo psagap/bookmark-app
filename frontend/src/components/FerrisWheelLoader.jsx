@@ -8,13 +8,22 @@ import React, { useMemo } from 'react';
  * @param {string} subtitle - Optional subtitle text
  * @param {string} className - Additional CSS classes for the container
  * @param {string} background - Background color (default: uses Gruvbox gradient, use "transparent" for no bg)
+ * @param {string} size - Size variant: "sm" (200px), "md" (300px), "lg" (400px)
  */
 const FerrisWheelLoader = ({
     label = "Loading",
     subtitle = "VINTAGE READER",
     className = "",
-    background = "gruvbox"
+    background = "gruvbox",
+    size = "md"
 }) => {
+    // Size configurations for consistent dimensions
+    const sizeConfig = {
+        sm: { container: 'h-[200px]', wheel: 'w-32 h-32', text: 'text-sm' },
+        md: { container: 'h-[300px]', wheel: 'w-48 h-48', text: 'text-lg' },
+        lg: { container: 'h-[400px]', wheel: 'w-56 h-56', text: 'text-xl' },
+    };
+    const sizes = sizeConfig[size] || sizeConfig.md;
     // Generate stable random positions for stars using useMemo
     const stars = useMemo(() => {
         return [...Array(20)].map((_, i) => ({
@@ -44,7 +53,7 @@ const FerrisWheelLoader = ({
 
     return (
         <div
-            className={`h-full min-h-[300px] flex flex-col items-center justify-center relative overflow-hidden ${className}`}
+            className={`${sizes.container} w-full flex flex-col items-center justify-center relative overflow-hidden animate-in fade-in duration-300 ${className}`}
             style={bgStyle || undefined}
         >
             {/* Vintage grain overlay */}
@@ -85,7 +94,7 @@ const FerrisWheelLoader = ({
 
             {/* Ferris Wheel */}
             <div
-                className="relative w-48 h-48 mb-8"
+                className={`relative ${sizes.wheel} mb-6`}
                 style={{ animation: 'ferris-rotate 8s linear infinite' }}
             >
                 {/* Wheel rim with vintage glow */}
@@ -165,9 +174,9 @@ const FerrisWheelLoader = ({
             </div>
 
             {/* Vintage text - Gruvbox themed */}
-            <div className="mt-8 text-center relative z-10">
+            <div className="mt-6 text-center relative z-10">
                 <p
-                    className="text-lg tracking-[0.3em] uppercase"
+                    className={`${sizes.text} tracking-[0.3em] uppercase`}
                     style={{
                         fontFamily: 'Georgia, serif',
                         background: 'linear-gradient(135deg, #fabd2f 0%, #fe8019 100%)',

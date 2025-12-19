@@ -1,15 +1,149 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CreepyButton } from './CreepyButton';
 import TweetEmbed from './TweetEmbed';
-import FerrisWheelLoader from './FerrisWheelLoader';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import GruvboxLoader from './GruvboxLoader';
+import NotionEditor from './NotionEditor';
+import BookmarkMetadataPanel from './BookmarkMetadataPanel';
+import { Dialog, DialogContent, MotionDialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Play, ExternalLink, ChevronUp, X, Plus, Link2, MoreHorizontal } from "lucide-react";
+import { Play, ExternalLink, X, Plus, Link2, MoreHorizontal, StickyNote } from "lucide-react";
 import { getTagColor, getTagColors, getAllTagColors, setTagColor } from '@/utils/tagColors';
+import { motion } from 'framer-motion';
+
+// Helper component to render YouTube descriptions with auto-linked URLs, @mentions, #hashtags, and timestamps
+const YouTubeLinkedText = ({ text, videoUrl = '', className = '' }) => {
+    if (!text) return null;
+
+    // Convert timestamp string (MM:SS or HH:MM:SS) to seconds
+    const timestampToSeconds = (match) => {
+        const parts = match.split(':').map(Number);
+        if (parts.length === 2) {
+            return parts[0] * 60 + parts[1];
+        } else if (parts.length === 3) {
+            return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+        return 0;
+    };
+
+    // Get video URL with timestamp parameter
+    const getTimestampUrl = (timestamp) => {
+        const seconds = timestampToSeconds(timestamp);
+        if (!videoUrl) return '#';
+        // Remove any existing time parameter and add new one
+        const baseUrl = videoUrl.split('?')[0].split('&t=')[0];
+        const urlParams = videoUrl.includes('?') ? videoUrl.split('?')[1].replace(/&?t=\d+/, '') : '';
+        const separator = urlParams ? '&' : '';
+        return `${baseUrl}?${urlParams}${separator}t=${seconds}`;
+    };
+
+    // Combined regex that captures all link types in order
+    // Groups: (1) URL, (2) @mention, (3) #hashtag, (4) timestamp
+    const combinedPattern = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])|(@[a-zA-Z0-9_]+)|(#[a-zA-Z0-9_]+)|(\b\d{1,2}:\d{2}(?::\d{2})?\b)/g;
+
+    const linkClass = "text-gruvbox-aqua hover:text-gruvbox-aqua-light underline underline-offset-2 cursor-pointer";
+
+    // Process the text and create elements
+    const elements = [];
+    let lastIndex = 0;
+    let match;
+
+    // Reset regex
+    combinedPattern.lastIndex = 0;
+
+    while ((match = combinedPattern.exec(text)) !== null) {
+        // Add text before this match
+        if (match.index > lastIndex) {
+            const beforeText = text.slice(lastIndex, match.index);
+            // Split by newlines and add line breaks
+            beforeText.split('\n').forEach((line, i, arr) => {
+                if (line) elements.push(<React.Fragment key={`text-${lastIndex}-${i}`}>{line}</React.Fragment>);
+                if (i < arr.length - 1) elements.push(<br key={`br-${lastIndex}-${i}`} />);
+            });
+        }
+
+        const [fullMatch, url, mention, hashtag, timestamp] = match;
+
+        if (url) {
+            // URL link
+            elements.push(
+                <a
+                    key={`url-${match.index}`}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${linkClass} break-all`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {url}
+                </a>
+            );
+        } else if (mention) {
+            // @mention link to YouTube channel
+            const username = mention.slice(1); // Remove @
+            elements.push(
+                <a
+                    key={`mention-${match.index}`}
+                    href={`https://youtube.com/@${username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={linkClass}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {mention}
+                </a>
+            );
+        } else if (hashtag) {
+            // #hashtag link to YouTube hashtag search
+            const tag = hashtag.slice(1); // Remove #
+            elements.push(
+                <a
+                    key={`hashtag-${match.index}`}
+                    href={`https://youtube.com/hashtag/${tag}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={linkClass}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {hashtag}
+                </a>
+            );
+        } else if (timestamp) {
+            // Timestamp link to video position
+            elements.push(
+                <a
+                    key={`timestamp-${match.index}`}
+                    href={getTimestampUrl(timestamp)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={linkClass}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {timestamp}
+                </a>
+            );
+        }
+
+        lastIndex = match.index + fullMatch.length;
+    }
+
+    // Add remaining text after last match
+    if (lastIndex < text.length) {
+        const remainingText = text.slice(lastIndex);
+        remainingText.split('\n').forEach((line, i, arr) => {
+            if (line) elements.push(<React.Fragment key={`text-end-${i}`}>{line}</React.Fragment>);
+            if (i < arr.length - 1) elements.push(<br key={`br-end-${i}`} />);
+        });
+    }
+
+    return <span className={className}>{elements}</span>;
+};
+
+// Alias for backward compatibility
+const LinkedText = YouTubeLinkedText;
 
 // Color picker dropdown for tags - opens on click of ellipsis menu
 const TagColorDropdown = ({ tag, currentColor, onSelect, onClose, position }) => {
@@ -44,81 +178,55 @@ const TagColorDropdown = ({ tag, currentColor, onSelect, onClose, position }) =>
                 top: position === 'above' ? 'auto' : '100%',
                 bottom: position === 'above' ? '100%' : 'auto',
                 right: 0,
-                marginTop: position === 'above' ? 0 : '8px',
-                marginBottom: position === 'above' ? '8px' : 0,
+                marginTop: position === 'above' ? 0 : '6px',
+                marginBottom: position === 'above' ? '6px' : 0,
             }}
         >
-            {/* Dropdown card */}
+            {/* Compact color picker - 2 columns, 4 rows */}
             <div
-                className="rounded-xl overflow-hidden"
+                className="grid grid-cols-2 gap-1.5 p-2 rounded-lg"
                 style={{
-                    background: 'linear-gradient(145deg, rgba(50, 48, 47, 0.98), rgba(40, 40, 40, 0.98))',
-                    backdropFilter: 'blur(16px)',
-                    border: '1px solid rgba(102, 92, 84, 0.4)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)',
+                    background: 'rgba(29, 32, 33, 0.95)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(102, 92, 84, 0.3)',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
                 }}
             >
-                {/* Header */}
-                <div
-                    className="px-3 py-2 border-b"
-                    style={{
-                        borderColor: 'rgba(102, 92, 84, 0.3)',
-                        background: 'rgba(0, 0, 0, 0.15)',
-                    }}
-                >
-                    <span className="text-xs font-medium uppercase tracking-wider text-gruvbox-fg-muted">
-                        Colors
-                    </span>
-                </div>
-
-                {/* Color grid */}
-                <div className="p-3">
-                    <div className="grid grid-cols-4 gap-2">
-                        {allColors.map((color) => {
-                            const isSelected = currentColor.id === color.id;
-                            return (
-                                <button
-                                    key={color.id}
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setTagColor(tag, color.id);
-                                        onSelect(color.id);
-                                        onClose();
-                                    }}
-                                    className="group relative w-8 h-8 rounded-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/30"
-                                    style={{
-                                        backgroundColor: color.text,
-                                        boxShadow: isSelected
-                                            ? `0 0 0 2px #1d2021, 0 0 0 4px ${color.text}, 0 4px 12px rgba(0,0,0,0.4)`
-                                            : '0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15)',
-                                    }}
-                                    title={color.name}
+                {allColors.map((color) => {
+                    const isSelected = currentColor.id === color.id;
+                    return (
+                        <button
+                            key={color.id}
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setTagColor(tag, color.id);
+                                onSelect(color.id);
+                                onClose();
+                            }}
+                            className="relative w-5 h-5 rounded-full transition-all duration-150 hover:scale-110 focus:outline-none"
+                            style={{
+                                backgroundColor: color.text,
+                                boxShadow: isSelected
+                                    ? `0 0 0 2px #1d2021, 0 0 0 3px ${color.text}`
+                                    : 'none',
+                            }}
+                            title={color.name}
+                        >
+                            {isSelected && (
+                                <svg
+                                    className="absolute inset-0 m-auto w-2.5 h-2.5 text-gruvbox-bg-darkest"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={4}
                                 >
-                                    {/* Checkmark for selected */}
-                                    {isSelected && (
-                                        <svg
-                                            className="absolute inset-0 m-auto w-4 h-4 text-gruvbox-bg-darkest"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                            strokeWidth={3}
-                                        >
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    )}
-                                    {/* Hover glow */}
-                                    <div
-                                        className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                                        style={{
-                                            boxShadow: `0 0 12px ${color.text}`,
-                                        }}
-                                    />
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                            )}
+                        </button>
+                    );
+                })}
             </div>
         </div>
     );
@@ -309,8 +417,8 @@ const TweetPreview = ({ bookmark }) => {
     return (
         <div className="flex flex-col h-full bg-black text-white relative overflow-hidden">
             {/* Scrollable container for the tweet embed */}
-            <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
-                <div className="w-full max-w-[550px]">
+            <div className="flex-1 overflow-y-auto p-6">
+                <div className="w-full max-w-[550px] mx-auto">
                     {/* Twitter/X Embed Widget */}
                     <TweetEmbed tweetUrl={bookmark.url} />
                 </div>
@@ -319,8 +427,9 @@ const TweetPreview = ({ bookmark }) => {
     );
 };
 
-const VideoPreview = ({ bookmark }) => {
-    const [isPlaying, setIsPlaying] = useState(false);
+const VideoPreview = ({ bookmark, autoPlay = false }) => {
+    // Initialize with autoPlay value so video starts immediately when prop is true
+    const [isPlaying, setIsPlaying] = useState(autoPlay);
 
     // Extract YouTube video ID from URL
     const getYoutubeVideoId = (url) => {
@@ -383,13 +492,15 @@ const VideoPreview = ({ bookmark }) => {
             {/* Gradient overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
 
-            {/* Play button */}
+            {/* YouTube-style play button */}
             <div
                 className="absolute inset-0 flex items-center justify-center cursor-pointer"
                 onClick={() => isYoutube && setIsPlaying(true)}
             >
-                <div className="w-20 h-20 rounded-full bg-red-600 flex items-center justify-center border-4 border-white/90 transition-all group-hover:scale-110 group-hover:bg-red-500 shadow-2xl">
-                    <Play className="w-8 h-8 text-white fill-white ml-1" />
+                <div className="w-[88px] h-[62px] rounded-2xl bg-black/80 hover:bg-[#ff0000] flex items-center justify-center transition-all duration-200 hover:scale-105 shadow-xl">
+                    <svg className="w-8 h-8 text-white ml-1" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                    </svg>
                 </div>
             </div>
 
@@ -408,7 +519,7 @@ const VideoPreview = ({ bookmark }) => {
                 </a>
                 <div className="flex items-center gap-2 text-white/70">
                     <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
                     </svg>
                     <span className="text-sm font-medium">YouTube</span>
                     {isYoutube && (
@@ -455,7 +566,11 @@ const ArticlePreview = ({ bookmark }) => {
     }, [bookmark.url]);
 
     if (loading) {
-        return <FerrisWheelLoader label="Loading Article" subtitle="FETCHING CONTENT" />;
+        return (
+            <div className="h-full min-h-[300px] flex items-center justify-center bg-gruvbox-bg-dark">
+                <GruvboxLoader variant="orbit" size="lg" label="Loading Article" />
+            </div>
+        );
     }
 
     if (error || !article) {
@@ -480,9 +595,9 @@ const ArticlePreview = ({ bookmark }) => {
         <div className="h-full bg-[#1a1a2e] text-neutral-100 relative flex flex-col overflow-hidden">
             {/* Vintage film grain overlay */}
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none z-50"
-                 style={{
-                     backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-                 }}
+                style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+                }}
             />
 
             {/* Reveal animation curtain */}
@@ -692,7 +807,7 @@ const ArticlePreview = ({ bookmark }) => {
                 </div>
             </div>
 
-            {/* Read more button - vintage styled */}
+            {/* Read more link - subtle bottom left */}
             <div
                 className="absolute bottom-6 left-6 z-20 transition-all duration-700 delay-500"
                 style={{
@@ -704,14 +819,10 @@ const ArticlePreview = ({ bookmark }) => {
                     href={bookmark.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-700 to-amber-600 text-amber-100 rounded transition-all hover:from-amber-600 hover:to-amber-500 hover:scale-105"
-                    style={{
-                        boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3), inset 0 1px 0 rgba(255,255,255,0.2)',
-                        fontFamily: 'Georgia, serif',
-                    }}
+                    className="inline-flex items-center gap-1.5 text-sm text-gruvbox-fg-muted hover:text-gruvbox-teal transition-colors"
                 >
-                    <span className="text-sm font-medium tracking-wide">Read on {article.siteName}</span>
-                    <ExternalLink className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                    <span>Continue on {article.siteName}</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
                 </a>
             </div>
 
@@ -738,6 +849,132 @@ const DefaultPreview = ({ bookmark }) => (
         </div>
     </div>
 );
+
+// Note Preview - Distraction-free writing space
+const NotePreview = ({ bookmark, notes, onNotesChange, title, onTitleChange, onSave, saving, availableTags = [], onClose }) => {
+    const [isFocused, setIsFocused] = useState(false);
+
+    return (
+        <div className="h-full bg-gruvbox-bg-darkest flex flex-col overflow-hidden relative">
+            {/* Subtle ambient background */}
+            <div className="absolute inset-0 opacity-30 pointer-events-none">
+                <div className="absolute top-0 left-1/4 w-96 h-96 bg-gruvbox-yellow/5 rounded-full blur-3xl" />
+                <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-gruvbox-aqua/5 rounded-full blur-3xl" />
+            </div>
+
+            {/* Back button - top left with bounce animation */}
+            <motion.button
+                onClick={onClose}
+                className="absolute top-6 left-6 z-20 flex items-center gap-2 px-3 py-2 rounded-full text-gruvbox-fg-muted/60 hover:text-gruvbox-fg bg-gruvbox-bg-light/30 hover:bg-gruvbox-bg-light/60 backdrop-blur-sm border border-gruvbox-bg-lighter/20 hover:border-gruvbox-bg-lighter/40 transition-colors"
+                whileHover={{
+                    scale: 1.05,
+                    x: -3,
+                }}
+                whileTap={{ scale: 0.95 }}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{
+                    opacity: 1,
+                    x: 0,
+                    transition: {
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 25,
+                        delay: 0.2
+                    }
+                }}
+            >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span className="text-xs font-medium">Back</span>
+            </motion.button>
+
+            {/* Minimal header - just title */}
+            <motion.div
+                className="flex-shrink-0 pt-20 pb-8 px-8 relative z-10"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+            >
+                <div className="max-w-2xl mx-auto">
+                    <input
+                        type="text"
+                        value={title}
+                        onChange={(e) => onTitleChange?.(e.target.value)}
+                        placeholder="Untitled"
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => setIsFocused(false)}
+                        className="w-full bg-transparent text-3xl font-light text-gruvbox-fg placeholder:text-gruvbox-fg-muted/30 focus:outline-none tracking-wide"
+                        style={{ caretColor: '#fabd2f' }}
+                    />
+                    {/* Subtle underline that appears on focus */}
+                    <motion.div
+                        className="h-px bg-gradient-to-r from-gruvbox-yellow/50 via-gruvbox-yellow/20 to-transparent mt-3"
+                        initial={{ scaleX: 0, opacity: 0 }}
+                        animate={{
+                            scaleX: isFocused ? 1 : 0.3,
+                            opacity: isFocused ? 1 : 0.3
+                        }}
+                        style={{ originX: 0 }}
+                        transition={{ duration: 0.3 }}
+                    />
+                </div>
+            </motion.div>
+
+            {/* Writing area - clean and spacious */}
+            <motion.div
+                className="flex-1 overflow-y-auto px-8 relative z-10"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+            >
+                <div className="max-w-2xl mx-auto pb-32">
+                    <NotionEditor
+                        value={notes}
+                        onChange={onNotesChange}
+                        minHeight={500}
+                        availableTags={availableTags}
+                        className="note-distraction-free"
+                        placeholder="Start writing..."
+                    />
+                </div>
+            </motion.div>
+
+            {/* Minimal floating save button */}
+            <motion.div
+                className="absolute bottom-6 right-6 z-20"
+                initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                animate={{
+                    opacity: 1,
+                    scale: 1,
+                    y: 0,
+                    transition: {
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 25,
+                        delay: 0.3
+                    }
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+            >
+                <button
+                    onClick={onSave}
+                    disabled={saving}
+                    className="px-5 py-2.5 rounded-full text-sm font-medium bg-gruvbox-yellow text-gruvbox-bg-darkest hover:bg-gruvbox-yellow-light transition-colors shadow-lg shadow-gruvbox-yellow/20 disabled:opacity-50"
+                >
+                    {saving ? 'Saving...' : 'Save'}
+                </button>
+            </motion.div>
+
+            {/* Keyboard hints - very subtle, bottom left */}
+            <div className="absolute bottom-6 left-6 z-10 flex items-center gap-3 text-[10px] text-gruvbox-fg-muted/30">
+                <span><kbd className="px-1 py-0.5 rounded bg-gruvbox-bg-dark/50 border border-gruvbox-bg-lighter/20">/</kbd> cmds</span>
+                <span><kbd className="px-1 py-0.5 rounded bg-gruvbox-bg-dark/50 border border-gruvbox-bg-lighter/20">esc</kbd> close</span>
+            </div>
+        </div>
+    );
+};
 
 // Helper component to render Wikipedia HTML content with clickable links and images
 const WikiContent = ({ html, lang, skipMainImage = false }) => {
@@ -930,7 +1167,11 @@ const WikiPreview = ({ bookmark }) => {
     }, [bookmark.url]);
 
     if (loading) {
-        return <FerrisWheelLoader label="Loading Wikipedia" subtitle="FETCHING KNOWLEDGE" />;
+        return (
+            <div className="h-full min-h-[300px] flex items-center justify-center bg-gruvbox-bg-dark">
+                <GruvboxLoader variant="orbit" size="lg" label="Loading Wikipedia" />
+            </div>
+        );
     }
 
     const mainImage = wikiData?.mainImage || bookmark.thumbnail;
@@ -944,9 +1185,9 @@ const WikiPreview = ({ bookmark }) => {
         <div className="h-full bg-gruvbox-bg-darkest text-gruvbox-fg relative flex flex-col overflow-hidden">
             {/* Subtle film grain overlay */}
             <div className="absolute inset-0 opacity-[0.02] pointer-events-none z-50"
-                 style={{
-                     backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-                 }}
+                style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+                }}
             />
 
             {/* Reveal animation curtain */}
@@ -967,27 +1208,22 @@ const WikiPreview = ({ bookmark }) => {
                 </div>
             </div>
 
-            {/* Wikipedia-style Header */}
-            <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-gruvbox-bg-light bg-gruvbox-bg/90 backdrop-blur-sm relative z-10">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-gruvbox-teal/20 flex items-center justify-center border border-gruvbox-teal/30">
-                        <span className="text-gruvbox-teal text-sm font-bold" style={{ fontFamily: 'Linux Libertine, Georgia, serif' }}>W</span>
-                    </div>
-                    <div>
-                        <span className="text-lg font-medium text-gruvbox-fg" style={{ fontFamily: 'Linux Libertine, Georgia, serif' }}>Wikipedia</span>
-                        <span className="text-xs text-gruvbox-fg-muted ml-2">The Free Encyclopedia</span>
-                    </div>
+            {/* Wikipedia-style Header - clickable link */}
+            <a
+                href={bookmark.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 flex items-center gap-3 px-6 py-3 border-b border-gruvbox-bg-light bg-gruvbox-bg/90 backdrop-blur-sm relative z-10 group hover:bg-gruvbox-bg-light/50 transition-colors"
+            >
+                <div className="w-8 h-8 rounded bg-gruvbox-teal/20 flex items-center justify-center border border-gruvbox-teal/30 group-hover:bg-gruvbox-teal/30 transition-colors">
+                    <span className="text-gruvbox-teal text-sm font-bold" style={{ fontFamily: 'Linux Libertine, Georgia, serif' }}>W</span>
                 </div>
-                <a
-                    href={bookmark.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gruvbox-teal hover:text-gruvbox-teal-light border border-gruvbox-teal/40 rounded hover:bg-gruvbox-teal/10 transition-all"
-                >
-                    <ExternalLink className="w-3 h-3" />
-                    <span>Open in Wikipedia</span>
-                </a>
-            </div>
+                <div className="flex-1">
+                    <span className="text-lg font-medium text-gruvbox-fg group-hover:text-gruvbox-teal transition-colors" style={{ fontFamily: 'Linux Libertine, Georgia, serif' }}>Wikipedia</span>
+                    <span className="text-xs text-gruvbox-fg-muted ml-2">The Free Encyclopedia</span>
+                </div>
+                <ExternalLink className="w-4 h-4 text-gruvbox-fg-muted group-hover:text-gruvbox-teal transition-colors" />
+            </a>
 
             {/* Scrollable Content - Wikipedia Layout */}
             <div className="flex-1 min-h-0 overflow-y-auto relative z-10">
@@ -1112,9 +1348,8 @@ const WikiPreview = ({ bookmark }) => {
                                 >
                                     {section.title && (
                                         <h2
-                                            className={`font-normal text-amber-200 border-b border-amber-800/30 pb-1 mb-3 clear-both ${
-                                                section.level <= 2 ? 'text-2xl' : 'text-xl'
-                                            }`}
+                                            className={`font-normal text-amber-200 border-b border-amber-800/30 pb-1 mb-3 clear-both ${section.level <= 2 ? 'text-2xl' : 'text-xl'
+                                                }`}
                                             style={{ fontFamily: 'Linux Libertine, Georgia, serif' }}
                                         >
                                             {section.title}
@@ -1392,7 +1627,7 @@ const getRandomPlaceholder = () => {
     return TITLE_PLACEHOLDERS[Math.floor(Math.random() * TITLE_PLACEHOLDERS.length)];
 };
 
-const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave }) => {
+const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave, allTags = [], autoPlay = false }) => {
     const [formData, setFormData] = useState({
         title: '',
         category: '',
@@ -1401,13 +1636,25 @@ const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave }) => {
     });
     const [titlePlaceholder, setTitlePlaceholder] = useState(getRandomPlaceholder());
     const [saving, setSaving] = useState(false);
-    const [showCloseHint, setShowCloseHint] = useState(false);
-    const [offset, setOffset] = useState({ x: 0, y: 0 });
+    const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+    const [repelOffset, setRepelOffset] = useState({ x: 0, y: 0 });
+    const [showHint, setShowHint] = useState(false);
     const contentRef = useRef(null);
-    const isInDangerZone = useRef(false);
     const notesTextareaRef = useRef(null);
     const formContainerRef = useRef(null);
     const notesContainerRef = useRef(null);
+
+    // Detect prefers-reduced-motion
+    useEffect(() => {
+        const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+        setPrefersReducedMotion(mq.matches);
+        const handler = (e) => setPrefersReducedMotion(e.matches);
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+    }, []);
+
+    // Check if this is a YouTube bookmark (needed for conditional rendering)
+    const isYoutube = bookmark?.url?.includes('youtube.com') || bookmark?.url?.includes('youtu.be');
 
     // Auto-resize notes textarea to expand as user types, up to the save button
     const autoResizeNotes = useCallback(() => {
@@ -1463,19 +1710,18 @@ const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave }) => {
         }
     }, [bookmark]);
 
-    // Show close hint briefly when dialog opens and get new random placeholder
+    // Reset state when dialog opens/closes
     useEffect(() => {
         if (open) {
-            setShowCloseHint(true);
-            setOffset({ x: 0, y: 0 });
+            setRepelOffset({ x: 0, y: 0 });
+            setShowHint(false);
             setTitlePlaceholder(getRandomPlaceholder());
-            const timer = setTimeout(() => setShowCloseHint(false), 3000);
             // Trigger auto-resize after dialog opens (with delay for layout to settle)
             const resizeTimer = setTimeout(autoResizeNotes, 150);
-            return () => {
-                clearTimeout(timer);
-                clearTimeout(resizeTimer);
-            };
+            return () => clearTimeout(resizeTimer);
+        } else {
+            setRepelOffset({ x: 0, y: 0 });
+            setShowHint(false);
         }
     }, [open, autoResizeNotes]);
 
@@ -1487,6 +1733,9 @@ const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave }) => {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, [open, autoResizeNotes]);
+
+    // Auto-save removed - was causing performance issues
+    // Users should click Save to save changes
 
     const handleSave = async () => {
         if (!bookmark) return;
@@ -1518,106 +1767,115 @@ const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave }) => {
         }
     };
 
-    // Handle mouse movement to create the "dodge" effect
-    const handleMouseMove = (e) => {
-        if (!contentRef.current || !open) return;
-
-        const rect = contentRef.current.getBoundingClientRect();
-        const dangerZoneSize = 80; // pixels around the card that trigger the dodge
-        const maxOffset = 12; // maximum dodge distance in pixels
-
-        const mouseX = e.clientX;
-        const mouseY = e.clientY;
-
-        // Check if mouse is over the card itself
-        const isOverCard = (
-            mouseX >= rect.left &&
-            mouseX <= rect.right &&
-            mouseY >= rect.top &&
-            mouseY <= rect.bottom
-        );
-
-        if (isOverCard) {
-            // Mouse is over the card, return to center
-            if (isInDangerZone.current) {
-                isInDangerZone.current = false;
-                setOffset({ x: 0, y: 0 });
-            }
+    // Window-level mouse tracking for repulsion effect
+    useEffect(() => {
+        if (!open) {
+            setRepelOffset({ x: 0, y: 0 });
+            setShowHint(false);
             return;
         }
 
-        // Check if mouse is in the "danger zone" (close to the card edges)
-        const isNearTop = mouseY < rect.top && mouseY > rect.top - dangerZoneSize;
-        const isNearBottom = mouseY > rect.bottom && mouseY < rect.bottom + dangerZoneSize;
-        const isNearLeft = mouseX < rect.left && mouseX > rect.left - dangerZoneSize;
-        const isNearRight = mouseX > rect.right && mouseX < rect.right + dangerZoneSize;
+        const handleMouseMove = (e) => {
+            if (!contentRef.current) return;
 
-        // Also check vertical/horizontal alignment for corner cases
-        const isVerticallyAligned = mouseY >= rect.top - dangerZoneSize && mouseY <= rect.bottom + dangerZoneSize;
-        const isHorizontallyAligned = mouseX >= rect.left - dangerZoneSize && mouseX <= rect.right + dangerZoneSize;
+            // Skip for reduced motion
+            if (prefersReducedMotion) {
+                setRepelOffset({ x: 0, y: 0 });
+                return;
+            }
 
-        let newOffsetX = 0;
-        let newOffsetY = 0;
+            const rect = contentRef.current.getBoundingClientRect();
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
 
-        // Calculate dodge based on which edge the mouse is near
-        if (isNearTop && isHorizontallyAligned) {
-            // Mouse approaching from top - card slides down
-            const proximity = 1 - (rect.top - mouseY) / dangerZoneSize;
-            newOffsetY = maxOffset * Math.min(1, proximity);
-            setShowCloseHint(true);
-        }
-        if (isNearBottom && isHorizontallyAligned) {
-            // Mouse approaching from bottom - card slides up
-            const proximity = 1 - (mouseY - rect.bottom) / dangerZoneSize;
-            newOffsetY = -maxOffset * Math.min(1, proximity);
-            setShowCloseHint(true);
-        }
-        if (isNearLeft && isVerticallyAligned) {
-            // Mouse approaching from left - card slides right
-            const proximity = 1 - (rect.left - mouseX) / dangerZoneSize;
-            newOffsetX = maxOffset * Math.min(1, proximity);
-            setShowCloseHint(true);
-        }
-        if (isNearRight && isVerticallyAligned) {
-            // Mouse approaching from right - card slides left
-            const proximity = 1 - (mouseX - rect.right) / dangerZoneSize;
-            newOffsetX = -maxOffset * Math.min(1, proximity);
-            setShowCloseHint(true);
-        }
+            // Check if mouse is inside the modal
+            const isInside = (
+                mouseX >= rect.left &&
+                mouseX <= rect.right &&
+                mouseY >= rect.top &&
+                mouseY <= rect.bottom
+            );
 
-        const inDangerZone = (isNearTop || isNearBottom || isNearLeft || isNearRight) &&
-            (isVerticallyAligned || isHorizontallyAligned);
+            if (isInside) {
+                setRepelOffset({ x: 0, y: 0 });
+                setShowHint(false);
+                return;
+            }
 
-        if (inDangerZone) {
-            isInDangerZone.current = true;
-            setOffset({ x: newOffsetX, y: newOffsetY });
-        } else if (isInDangerZone.current) {
-            // Mouse left the danger zone, return to center
-            isInDangerZone.current = false;
-            setOffset({ x: 0, y: 0 });
-            setTimeout(() => setShowCloseHint(false), 1000);
-        }
-    };
+            // Mouse is OUTSIDE - calculate repulsion
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
 
-    // Reset offset when mouse leaves the window
-    const handleMouseLeave = () => {
-        isInDangerZone.current = false;
-        setOffset({ x: 0, y: 0 });
-    };
+            // Vector from cursor to card center
+            const dx = mouseX - centerX;
+            const dy = mouseY - centerY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Repulsion direction (opposite of cursor direction)
+            const repulseX = -(dx / distance);
+            const repulseY = -(dy / distance);
+
+            // Fixed offset - same effect anywhere outside the card
+            const maxOffset = 12;
+            const offsetX = repulseX * maxOffset;
+            const offsetY = repulseY * maxOffset;
+
+            setRepelOffset({ x: offsetX, y: offsetY });
+            setShowHint(true);
+        };
+
+        const handleMouseLeave = () => {
+            setRepelOffset({ x: 0, y: 0 });
+            setShowHint(false);
+        };
+
+        // Add listeners
+        window.addEventListener('mousemove', handleMouseMove);
+        document.documentElement.addEventListener('mouseleave', handleMouseLeave);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            document.documentElement.removeEventListener('mouseleave', handleMouseLeave);
+        };
+    }, [open, prefersReducedMotion]);
 
     if (!bookmark) return null;
+
+    // Check if this is a note-type bookmark (match BookmarkCard logic)
+    const isNote = bookmark.type === 'note' ||
+                   bookmark.url?.startsWith('note://') ||
+                   bookmark.category === 'Note' ||
+                   (!bookmark.url && (bookmark.notes || bookmark.title));
 
     const isWiki = bookmark.url?.includes('wikipedia.org');
 
     const isArticle = bookmark.category === 'Article' ||
-                      bookmark.subCategory === 'article' ||
-                      bookmark.subCategory === 'webpage' ||
-                      (!bookmark.url?.includes('x.com') &&
-                       !bookmark.url?.includes('twitter.com') &&
-                       !bookmark.url?.includes('youtube') &&
-                       !bookmark.url?.includes('wikipedia.org'));
+        bookmark.subCategory === 'article' ||
+        bookmark.subCategory === 'webpage' ||
+        (!bookmark.url?.includes('x.com') &&
+            !bookmark.url?.includes('twitter.com') &&
+            !bookmark.url?.includes('youtube') &&
+            !bookmark.url?.includes('wikipedia.org') &&
+            !isNote);
 
     const renderPreview = () => {
+        // Note-type bookmarks get the NotePreview (full-width, no sidebar)
+        if (isNote) {
+            return (
+                <NotePreview
+                    bookmark={bookmark}
+                    notes={formData.notes}
+                    onNotesChange={(newNotes) => setFormData(prev => ({ ...prev, notes: newNotes }))}
+                    title={formData.title}
+                    onTitleChange={(newTitle) => setFormData(prev => ({ ...prev, title: newTitle }))}
+                    onSave={handleSave}
+                    saving={saving}
+                    availableTags={allTags}
+                    onClose={() => onOpenChange(false)}
+                />
+            );
+        }
+
         const type = bookmark.subCategory || bookmark.category;
         if (isWiki) {
             return <WikiPreview bookmark={bookmark} />;
@@ -1626,7 +1884,7 @@ const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave }) => {
             return <TweetPreview bookmark={bookmark} />;
         }
         if (type?.includes('video') || bookmark.url?.includes('youtube')) {
-            return <VideoPreview bookmark={bookmark} />;
+            return <VideoPreview bookmark={bookmark} autoPlay={autoPlay} />;
         }
         // Use ArticlePreview for articles/webpages
         if (isArticle) {
@@ -1637,196 +1895,215 @@ const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave }) => {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            {/* Custom overlay with mouse tracking */}
-            <div
-                className="fixed inset-0 z-50 bg-black/80"
-                onMouseMove={handleMouseMove}
-                onMouseLeave={handleMouseLeave}
-                style={{ display: open ? 'block' : 'none' }}
-            />
-
-            {/* Close hint indicator */}
-            <div
-                className={`fixed top-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white/70 text-sm transition-all duration-500 ${
-                    showCloseHint ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
-                }`}
-                style={{ display: open ? 'flex' : 'none' }}
-            >
-                <ChevronUp className="w-4 h-4 animate-bounce" />
-                <span>Click outside to close</span>
-            </div>
-
-            <DialogContent
-                ref={contentRef}
-                className="max-w-none w-[92vw] h-[90vh] max-h-[950px] p-0 overflow-hidden bg-background border-border rounded-2xl"
+            {/* Close hint - subtle text above the modal */}
+            <motion.span
+                className="fixed left-1/2 -translate-x-1/2 z-[60] text-white/40 text-[11px] tracking-[0.2em] uppercase pointer-events-none select-none"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: showHint ? 1 : 0 }}
+                transition={{ duration: 0.2 }}
                 style={{
-                    transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
-                    transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                    top: 'calc(5vh - 16px)',
+                    display: open ? 'block' : 'none',
                 }}
             >
+                click outside to close
+            </motion.span>
 
-                <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] h-full overflow-hidden">
+            <MotionDialogContent
+                ref={contentRef}
+                repelOffset={repelOffset}
+                hideCloseButton={true}
+                className="max-w-none w-[92vw] h-[90vh] max-h-[950px] p-0 overflow-hidden bg-background border-border rounded-2xl"
+            >
+                {/* For notes: full width, no sidebar. For others: split view */}
+                <div className={`h-full overflow-hidden ${isNote ? '' : 'grid grid-cols-1 md:grid-cols-[2fr_1fr]'}`}>
 
-                    {/* Left: Preview */}
+                    {/* Preview - Full width for notes, left side for others */}
                     <div className="h-full overflow-hidden flex flex-col">
                         <div className="flex-1 overflow-y-auto min-h-0">
                             {renderPreview()}
                         </div>
                     </div>
 
-                    {/* Right: Edit Form */}
-                    <div ref={formContainerRef} className="p-6 flex flex-col h-full overflow-hidden bg-gruvbox-bg-light/50">
-                        <div className="space-y-4 flex-1 flex flex-col min-h-0">
-                            {/* Title Input with Link Button */}
-                            <div className="relative">
-                                <div className="flex items-start gap-3">
-                                    <input
-                                        id="title"
-                                        type="text"
-                                        value={formData.title}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                                        placeholder={titlePlaceholder}
-                                        autoComplete="off"
-                                        spellCheck="false"
-                                        className="flex-1"
-                                        style={{
-                                            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
-                                            fontStyle: 'normal',
-                                            fontSize: '1.25rem',
-                                            fontWeight: 500,
-                                            color: '#ebdbb2',
-                                            caretColor: '#fabd2f',
-                                            background: 'none',
-                                            border: 'none',
-                                            borderRadius: 0,
-                                            outline: 'none',
-                                            boxShadow: 'none',
-                                            padding: 0,
-                                            margin: 0,
-                                            width: '100%',
-                                            WebkitAppearance: 'none',
-                                            MozAppearance: 'none',
-                                            appearance: 'none'
+                    {/* Right: Edit Form - Hidden for notes */}
+                    {!isNote && (
+                        <div ref={formContainerRef} className="p-6 flex flex-col h-full overflow-hidden bg-gruvbox-bg-light/50">
+                            <div className="space-y-4 flex-1 flex flex-col min-h-0">
+                                {/* Title Input with Link Button */}
+                                <div className="relative">
+                                    <div className="flex items-start gap-3">
+                                        <input
+                                            id="title"
+                                            type="text"
+                                            value={formData.title}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                                            placeholder={titlePlaceholder}
+                                            autoComplete="off"
+                                            spellCheck="false"
+                                            className="flex-1"
+                                            style={{
+                                                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+                                                fontStyle: 'normal',
+                                                fontSize: '1.25rem',
+                                                fontWeight: 500,
+                                                color: '#ebdbb2',
+                                                caretColor: '#fabd2f',
+                                                background: 'none',
+                                                border: 'none',
+                                                borderRadius: 0,
+                                                outline: 'none',
+                                                boxShadow: 'none',
+                                                padding: 0,
+                                                margin: 0,
+                                                width: '100%',
+                                                WebkitAppearance: 'none',
+                                                MozAppearance: 'none',
+                                                appearance: 'none'
+                                            }}
+                                        />
+                                    </div>
+                                    {/* Creation date + source link - subtle inline (hide link for notes) */}
+                                    <p className="text-xs text-gruvbox-fg-muted mt-3 flex items-center gap-2">
+                                        <span>Added {new Date(bookmark.createdAt).toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                        {bookmark.url && !bookmark.url.startsWith('note://') && (
+                                            <>
+                                                <span className="text-gruvbox-bg-lighter">·</span>
+                                                {isYoutube ? (
+                                                    <a
+                                                        href={bookmark.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-white text-[11px] font-medium transition-all hover:shadow-[0_0_12px_rgba(239,68,68,0.5)]"
+                                                        style={{ backgroundColor: 'rgb(239, 68, 68)' }}
+                                                    >
+                                                        YouTube
+                                                        <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                                    </a>
+                                                ) : (
+                                                    <a
+                                                        href={bookmark.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 text-gruvbox-fg-muted hover:text-gruvbox-teal transition-colors"
+                                                    >
+                                                        <span className="truncate max-w-[150px]">
+                                                            {new URL(bookmark.url).hostname.replace('www.', '')}
+                                                        </span>
+                                                        <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                                    </a>
+                                                )}
+                                            </>
+                                        )}
+                                    </p>
+                                </div>
+
+                                {/* Metadata Panel removed - stats change daily and won't be dynamic */}
+
+                                {/* Category dropdown - hidden for notes */}
+                                {!isNote && (
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="category" className="text-gruvbox-fg-muted text-xs uppercase tracking-wider">Category</Label>
+                                        <Select
+                                            value={formData.category}
+                                            onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                                        >
+                                            <SelectTrigger className="bg-gruvbox-bg/60 border-gruvbox-bg-lighter/60 text-gruvbox-fg">
+                                                <SelectValue placeholder="Select category" />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-gruvbox-bg border-gruvbox-bg-lighter">
+                                                <SelectItem value="X">X (Tweet/Thread)</SelectItem>
+                                                <SelectItem value="Instagram">Instagram</SelectItem>
+                                                <SelectItem value="Substack">Substack</SelectItem>
+                                                <SelectItem value="YouTube">YouTube</SelectItem>
+                                                <SelectItem value="Wikipedia">Wikipedia</SelectItem>
+                                                <SelectItem value="GitHub">GitHub</SelectItem>
+                                                <SelectItem value="Reddit">Reddit</SelectItem>
+                                                <SelectItem value="Medium">Medium</SelectItem>
+                                                <SelectItem value="LinkedIn">LinkedIn</SelectItem>
+                                                <SelectItem value="TikTok">TikTok</SelectItem>
+                                                <SelectItem value="Article">Article/Webpage</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+
+                                {/* YouTube Video Description (read-only) - with auto-linked URLs */}
+                                {isYoutube && (bookmark.metadata?.videoDescription || bookmark.metadata?.ogDescription) && (
+                                    <div className="space-y-1.5">
+                                        <Label className="text-gruvbox-fg-muted text-xs uppercase tracking-wider flex items-center gap-2">
+                                            Video Description
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gruvbox-bg-lighter/50 text-gruvbox-fg-muted/70 font-normal normal-case">
+                                                from YouTube
+                                            </span>
+                                        </Label>
+                                        <div className="p-3 rounded-lg bg-gruvbox-bg/40 border border-gruvbox-bg-lighter/40 text-gruvbox-fg-muted text-sm max-h-48 overflow-y-auto">
+                                            <YouTubeLinkedText
+                                                text={bookmark.metadata.videoDescription || bookmark.metadata.ogDescription}
+                                                videoUrl={bookmark.url}
+                                                className="leading-relaxed"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <Label className="text-gruvbox-fg-muted text-xs uppercase tracking-wider">Tags</Label>
+                                    {/* Tag columns with horizontal scroll */}
+                                    <TagColumnsContainer
+                                        tags={formData.tags}
+                                        onRemoveTag={(idx) => {
+                                            const tagsList = formData.tags.split(',').map(t => t.trim()).filter(t => t);
+                                            const filtered = tagsList.filter((_, i) => i !== idx);
+                                            setFormData(prev => ({ ...prev, tags: filtered.join(', ') }));
+                                        }}
+                                        onAddTag={(newTag) => {
+                                            const currentTags = formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(t => t) : [];
+                                            if (!currentTags.includes(newTag)) {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    tags: [...currentTags, newTag].join(', ')
+                                                }));
+                                            }
                                         }}
                                     />
                                 </div>
-                                {/* Creation date underneath title */}
-                                <p className="text-xs text-gruvbox-fg-muted mt-3">
-                                    Added {new Date(bookmark.createdAt).toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })}
-                                </p>
 
-                                {/* Visit Original Link Button - Prominent */}
-                                <a
-                                    href={bookmark.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="group flex items-center gap-3 mt-4 px-4 py-3 rounded-xl bg-gradient-to-r from-gruvbox-teal/10 to-gruvbox-aqua/10 border border-gruvbox-teal/30 hover:border-gruvbox-teal/60 hover:from-gruvbox-teal/20 hover:to-gruvbox-aqua/20 transition-all duration-300"
+                                {/* Notes section - hidden for note-type bookmarks since note content is shown in preview */}
+                                {!isNote && (
+                                    <div ref={notesContainerRef} className="space-y-1.5 flex-1 flex flex-col min-h-0">
+                                        <Label htmlFor="notes" className="text-gruvbox-fg-muted text-xs uppercase tracking-wider flex-shrink-0">Notes</Label>
+                                        <div className="flex-1 min-h-[120px] w-full rounded-lg border border-gruvbox-bg-lighter/60 bg-gruvbox-bg/60 px-4 py-3 text-sm focus-within:border-gruvbox-yellow/40 transition-colors overflow-auto">
+                                            <NotionEditor
+                                                value={formData.notes}
+                                                onChange={(newNotes) => setFormData(prev => ({ ...prev, notes: newNotes }))}
+                                                placeholder="Add notes about this bookmark... Type '/' for commands"
+                                                minHeight={100}
+                                                availableTags={allTags}
+                                                className="notion-notes-editor"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="pt-4 flex justify-end gap-3 border-t border-gruvbox-bg-lighter/40 mt-auto flex-shrink-0">
+                                <button
+                                    className="px-4 py-2 text-sm font-medium text-gruvbox-fg-muted hover:text-gruvbox-fg transition-colors"
+                                    onClick={() => onOpenChange(false)}
                                 >
-                                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gruvbox-teal/20 flex items-center justify-center group-hover:bg-gruvbox-teal/30 transition-colors">
-                                        <ExternalLink className="w-5 h-5 text-gruvbox-teal" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gruvbox-fg group-hover:text-gruvbox-teal-light transition-colors">
-                                            Visit Original
-                                        </p>
-                                        <p className="text-xs text-gruvbox-fg-muted truncate">
-                                            {bookmark.url ? new URL(bookmark.url).hostname.replace('www.', '') : ''}
-                                        </p>
-                                    </div>
-                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gruvbox-teal/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">
-                                        <svg className="w-4 h-4 text-gruvbox-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                        </svg>
-                                    </div>
-                                </a>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label htmlFor="category" className="text-gruvbox-fg-muted text-xs uppercase tracking-wider">Category</Label>
-                                <Select
-                                    value={formData.category}
-                                    onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-                                >
-                                    <SelectTrigger className="bg-gruvbox-bg/60 border-gruvbox-bg-lighter/60 text-gruvbox-fg">
-                                        <SelectValue placeholder="Select category" />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-gruvbox-bg border-gruvbox-bg-lighter">
-                                        <SelectItem value="X">X (Tweet/Thread)</SelectItem>
-                                        <SelectItem value="Instagram">Instagram</SelectItem>
-                                        <SelectItem value="Substack">Substack</SelectItem>
-                                        <SelectItem value="YouTube">YouTube</SelectItem>
-                                        <SelectItem value="Wikipedia">Wikipedia</SelectItem>
-                                        <SelectItem value="GitHub">GitHub</SelectItem>
-                                        <SelectItem value="Reddit">Reddit</SelectItem>
-                                        <SelectItem value="Medium">Medium</SelectItem>
-                                        <SelectItem value="LinkedIn">LinkedIn</SelectItem>
-                                        <SelectItem value="TikTok">TikTok</SelectItem>
-                                        <SelectItem value="Article">Article/Webpage</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label className="text-gruvbox-fg-muted text-xs uppercase tracking-wider">Tags</Label>
-                                {/* Tag columns with horizontal scroll */}
-                                <TagColumnsContainer
-                                    tags={formData.tags}
-                                    onRemoveTag={(idx) => {
-                                        const tagsList = formData.tags.split(',').map(t => t.trim()).filter(t => t);
-                                        const filtered = tagsList.filter((_, i) => i !== idx);
-                                        setFormData(prev => ({ ...prev, tags: filtered.join(', ') }));
-                                    }}
-                                    onAddTag={(newTag) => {
-                                        const currentTags = formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(t => t) : [];
-                                        if (!currentTags.includes(newTag)) {
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                tags: [...currentTags, newTag].join(', ')
-                                            }));
-                                        }
-                                    }}
-                                />
-                            </div>
-
-                            <div ref={notesContainerRef} className="space-y-1.5 flex-1 flex flex-col min-h-0">
-                                <Label htmlFor="notes" className="text-gruvbox-fg-muted text-xs uppercase tracking-wider flex-shrink-0">Notes</Label>
-                                <textarea
-                                    ref={notesTextareaRef}
-                                    id="notes"
-                                    value={formData.notes}
-                                    onChange={(e) => {
-                                        setFormData(prev => ({ ...prev, notes: e.target.value }));
-                                        // Trigger resize on next frame to ensure state is updated
-                                        requestAnimationFrame(autoResizeNotes);
-                                    }}
-                                    placeholder="Add your notes here..."
-                                    className="w-full rounded-md border border-gruvbox-bg-lighter/60 bg-gruvbox-bg/60 px-3 py-2 text-sm text-gruvbox-fg placeholder:text-gruvbox-fg-muted/50 focus:outline-none focus:border-gruvbox-yellow/40 transition-colors"
-                                    style={{
-                                        minHeight: '100px',
-                                        resize: 'none',
-                                        overflow: 'auto'
-                                    }}
-                                />
+                                    Cancel
+                                </button>
+                                <div className="creepy-btn-small">
+                                    <CreepyButton onClick={handleSave} disabled={saving}>
+                                        {saving ? 'Saving...' : 'Save Changes'}
+                                    </CreepyButton>
+                                </div>
                             </div>
                         </div>
-
-                        <div className="pt-4 flex justify-end gap-3 border-t border-gruvbox-bg-lighter/40 mt-auto flex-shrink-0">
-                            <button
-                                className="px-4 py-2 text-sm font-medium text-gruvbox-fg-muted hover:text-gruvbox-fg transition-colors"
-                                onClick={() => onOpenChange(false)}
-                            >
-                                Cancel
-                            </button>
-                            <div className="creepy-btn-small">
-                                <CreepyButton onClick={handleSave} disabled={saving}>
-                                    {saving ? 'Saving...' : 'Save Changes'}
-                                </CreepyButton>
-                            </div>
-                        </div>
-                    </div>
+                    )}
 
                 </div>
-            </DialogContent>
+            </MotionDialogContent>
         </Dialog>
     );
 };
