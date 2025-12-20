@@ -18,6 +18,7 @@ import { getTagColors, getTagColor } from '@/utils/tagColors';
 import { TagPill } from '@/components/TagColorPicker';
 import { Plus, FileText, File, Tag, X } from 'lucide-react'
 import AddDropzoneCard from '@/components/AddDropzoneCard'
+import { InlineNoteComposer } from '@/components/NoteComposer'
 
 const AddCard = ({ onAddNote, onAddFile }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -562,10 +563,13 @@ function App() {
 
                 {/* Masonry Grid */}
                 <div className="w-full columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 [column-gap:1rem]">
-                  {/* Add Dropzone Card - hide in selection mode */}
+                  {/* Inline Note Composer - hide in selection mode */}
                   {!selectionMode && (
-                    <AddDropzoneCard
-                      onAddNote={() => setShowQuickNoteModal(true)}
+                    <InlineNoteComposer
+                      onNoteCreated={(savedNote) => {
+                        // Refresh bookmarks to show the new note
+                        refetch?.();
+                      }}
                     />
                   )}
 
@@ -695,6 +699,7 @@ function App() {
             setNoteToEdit(null);
           }}
         />
+
       </main>
     </div>
   )
