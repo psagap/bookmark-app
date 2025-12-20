@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { extractTagsFromContent } from '@/utils/tagExtraction';
 
 /**
  * NoteComposer - A minimal, ultra-readable note editor with satisfying save animations
@@ -501,6 +502,9 @@ const formatTime = (date) => {
  */
 const NoteComposerIntegrated = ({ onNoteCreated, className }) => {
   const handleSave = async (content) => {
+    // Extract tags from content
+    const extractedTags = extractTagsFromContent(content);
+
     const noteBookmark = {
       url: `note://${Date.now()}`,
       title: content.split('\n')[0].substring(0, 100) || 'Untitled Note',
@@ -508,7 +512,7 @@ const NoteComposerIntegrated = ({ onNoteCreated, className }) => {
       content: content,
       category: 'Note',
       subCategory: 'note',
-      tags: [],
+      tags: extractedTags, // Include extracted tags
       thumbnail: null,
       type: 'note',
       metadata: {
@@ -618,6 +622,9 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
 
     setState('saving');
 
+    // Extract tags from content
+    const extractedTags = extractTagsFromContent(content);
+
     const noteBookmark = {
       url: `note://${Date.now()}`,
       title: content.split('\n')[0].substring(0, 100) || 'Untitled Note',
@@ -625,7 +632,7 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
       content: content,
       category: 'Note',
       subCategory: 'note',
-      tags: [],
+      tags: extractedTags, // Include extracted tags
       thumbnail: null,
       type: 'note',
       metadata: {
@@ -830,6 +837,9 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
           );
           border: 2px dashed rgba(255, 255, 255, 0.08);
           transition: border-color 0.2s ease, box-shadow 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .inline-composer-collapsed:hover {
@@ -852,6 +862,8 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
           justify-content: center;
           gap: 10px;
           padding: 24px 20px;
+          width: 545px;
+          height: 118px;
         }
 
         .inline-composer-icon {

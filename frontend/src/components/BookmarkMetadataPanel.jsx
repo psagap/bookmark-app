@@ -214,3 +214,5 @@ const BookmarkMetadataPanel = ({ bookmark, className = '' }) => {
 
 export default BookmarkMetadataPanel;
 
+
+

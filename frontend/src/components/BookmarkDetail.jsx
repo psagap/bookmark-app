@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Play, ExternalLink, X, Plus, Link2, MoreHorizontal, StickyNote } from "lucide-react";
 import { getTagColor, getTagColors, getAllTagColors, setTagColor } from '@/utils/tagColors';
+import { extractTagsFromContent } from '@/utils/tagExtraction';
 import { motion } from 'framer-motion';
 
 // Helper component to render YouTube descriptions with auto-linked URLs, @mentions, #hashtags, and timestamps
@@ -851,8 +852,13 @@ const DefaultPreview = ({ bookmark }) => (
 );
 
 // Note Preview - Distraction-free writing space
-const NotePreview = ({ bookmark, notes, onNotesChange, title, onTitleChange, onSave, saving, availableTags = [], onClose }) => {
+const NotePreview = ({ bookmark, notes, onNotesChange, title, onTitleChange, onSave, saving, availableTags = [], onClose, onTagClick }) => {
     const [isFocused, setIsFocused] = useState(false);
+    
+    // Extract tags from notes content
+    const extractedTags = extractTagsFromContent(notes || '');
+    // Also check bookmark.tags array - normalize to lowercase for consistency
+    const allTags = [...new Set([...extractedTags, ...(bookmark?.tags || []).map(t => t.toLowerCase())])];
 
     return (
         <div className="h-full bg-gruvbox-bg-darkest flex flex-col overflow-hidden relative">
@@ -889,7 +895,7 @@ const NotePreview = ({ bookmark, notes, onNotesChange, title, onTitleChange, onS
                 <span className="text-xs font-medium">Back</span>
             </motion.button>
 
-            {/* Minimal header - just title */}
+            {/* Minimal header - tags and title */}
             <motion.div
                 className="flex-shrink-0 pt-20 pb-8 px-8 relative z-10"
                 initial={{ opacity: 0, y: -10 }}
@@ -897,6 +903,39 @@ const NotePreview = ({ bookmark, notes, onNotesChange, title, onTitleChange, onS
                 transition={{ delay: 0.1 }}
             >
                 <div className="max-w-2xl mx-auto">
+                    {/* Tags section - right before title */}
+                    {allTags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            {allTags.map((tag, index) => {
+                                const tagColor = getTagColor(tag, index > 0 ? getTagColor(allTags[index - 1]).id : null);
+                                return (
+                                    <button
+                                        key={tag}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onTagClick?.(tag);
+                                        }}
+                                        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-all hover:scale-105 cursor-pointer"
+                                        style={{
+                                            backgroundColor: tagColor.bg,
+                                            color: tagColor.text,
+                                            border: `1px solid ${tagColor.border}`,
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = tagColor.hover;
+                                            e.currentTarget.style.color = tagColor.hoverText;
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = tagColor.bg;
+                                            e.currentTarget.style.color = tagColor.text;
+                                        }}
+                                    >
+                                        #{tag}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
                     <input
                         type="text"
                         value={title}
@@ -1627,7 +1666,7 @@ const getRandomPlaceholder = () => {
     return TITLE_PLACEHOLDERS[Math.floor(Math.random() * TITLE_PLACEHOLDERS.length)];
 };
 
-const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave, allTags = [], autoPlay = false }) => {
+const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave, allTags = [], autoPlay = false, onTagClick }) => {
     const [formData, setFormData] = useState({
         title: '',
         category: '',
@@ -1872,6 +1911,7 @@ const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave, allTags = [], au
                     saving={saving}
                     availableTags={allTags}
                     onClose={() => onOpenChange(false)}
+                    onTagClick={onTagClick}
                 />
             );
         }

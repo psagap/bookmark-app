@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Play, ExternalLink, MoreHorizontal, Pin, Layers, Trash2, RefreshCw, Check, Edit3, Maximize2, PenLine } from "lucide-react";
+import { Play, ExternalLink, MoreHorizontal, Pin, Layers, Trash2, RefreshCw, Check, Edit3, Maximize2, Minimize2, PenLine, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import GlowingCard from './GlowingCard';
-import { getTagColors } from '@/utils/tagColors';
+import { getTagColors, getTagColor } from '@/utils/tagColors';
+import { DeletableTagPill } from './TagColorPicker';
 import NoteBlockRenderer from './NoteBlockRenderer';
+import { extractTagsFromContent } from '@/utils/tagExtraction';
 
 // X Logo SVG Component
 const XLogo = ({ className }) => (
@@ -167,13 +169,19 @@ const CardMenuInline = ({ onPin, onCreateSide, onDelete, onRefresh, onEdit, isPi
             }}
           />
           <div
-            className="fixed z-[9999] min-w-[160px] bg-gruvbox-bg-light/95 backdrop-blur-md border border-gruvbox-bg-lighter rounded-lg shadow-xl overflow-hidden"
-            style={{ top: menuPosition.top, left: menuPosition.left }}
+            className="fixed z-[9999] min-w-[160px] rounded-xl overflow-hidden"
+            style={{
+              top: menuPosition.top,
+              left: menuPosition.left,
+              background: 'linear-gradient(180deg, #3c3836 0%, #282828 100%)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.2)',
+            }}
           >
             {showEdit && onEdit && (
               <button
                 onClick={(e) => handleClick(e, onEdit)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gruvbox-fg hover:bg-gruvbox-yellow/10 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gruvbox-fg hover:bg-white/10 hover:text-gruvbox-yellow transition-all duration-150"
               >
                 <Edit3 className="w-4 h-4" />
                 <span>Edit</span>
@@ -181,7 +189,7 @@ const CardMenuInline = ({ onPin, onCreateSide, onDelete, onRefresh, onEdit, isPi
             )}
             <button
               onClick={(e) => handleClick(e, onPin)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gruvbox-fg hover:bg-gruvbox-yellow/10 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gruvbox-fg hover:bg-white/10 hover:text-gruvbox-yellow transition-all duration-150"
             >
               <Pin className={cn("w-4 h-4", isPinned && "fill-current text-gruvbox-yellow")} />
               <span>{isPinned ? 'Unpin' : 'Pin'}</span>
@@ -189,22 +197,22 @@ const CardMenuInline = ({ onPin, onCreateSide, onDelete, onRefresh, onEdit, isPi
             <button
               onClick={(e) => handleClick(e, onRefresh)}
               disabled={isRefreshing}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gruvbox-fg hover:bg-gruvbox-yellow/10 transition-colors disabled:opacity-50"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gruvbox-fg hover:bg-white/10 hover:text-gruvbox-yellow transition-all duration-150 disabled:opacity-50"
             >
               <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
               <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
             </button>
             <button
               onClick={(e) => handleClick(e, onCreateSide)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gruvbox-fg hover:bg-gruvbox-yellow/10 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gruvbox-fg hover:bg-white/10 hover:text-gruvbox-yellow transition-all duration-150"
             >
               <Layers className="w-4 h-4" />
               <span>Add to Side</span>
             </button>
-            <div className="h-px bg-gruvbox-bg-lighter mx-2" />
+            <div className="h-px bg-white/10 mx-3 my-1" />
             <button
               onClick={(e) => handleClick(e, onDelete)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gruvbox-red-light hover:bg-gruvbox-red/10 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gruvbox-red-light hover:bg-gruvbox-red/20 transition-all duration-150"
             >
               <Trash2 className="w-4 h-4" />
               <span>Delete</span>
@@ -217,7 +225,7 @@ const CardMenuInline = ({ onPin, onCreateSide, onDelete, onRefresh, onEdit, isPi
   );
 };
 
-const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUpdate, onOpenEditor, selectionMode, isSelected, onToggleSelect, collection }) => {
+const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUpdate, onOpenEditor, selectionMode, isSelected, onToggleSelect, collection, onTagClick, onTagDelete }) => {
   const { title, url, thumbnail, category, notes, content, type, metadata } = bookmark;
   // Support both 'notes' and 'content' field names
   const noteData = notes || content;
@@ -254,20 +262,34 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
   };
 
   // Note Card - Modern minimal design matching InlineNoteComposer
+  const [isCardExpanded, setIsCardExpanded] = useState(false);
+
   if (isNote) {
     const noteContent = noteData || title || '';
     const hasContent = noteContent.trim().length > 0;
 
-    // Format date simply
+    // Extract tags from note content
+    const extractedTags = extractTagsFromContent(noteContent);
+    // Also check bookmark.tags array (for manually added tags) - normalize to lowercase
+    const allTags = [...new Set([...extractedTags, ...(bookmark.tags || []).map(t => t.toLowerCase())])];
+
+    // Format date with time
     const formatNoteDate = (dateString) => {
       if (!dateString) return '';
       const d = new Date(dateString);
-      return d.toLocaleDateString('en-US', {
+      return d.toLocaleString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
         month: 'short',
         day: 'numeric',
         year: 'numeric'
       });
     };
+
+    // Check if content is long enough to need expand button
+    const contentLength = noteContent.length;
+    const needsExpand = contentLength > 300;
 
     return (
       <div
@@ -302,22 +324,6 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
             <SelectionCheckbox isSelected={isSelected} onToggle={onToggleSelect} />
           )}
 
-          {/* Menu - top right, only on hover */}
-          {!selectionMode && (
-            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-              <CardMenuInline
-                onPin={() => onPin?.(bookmark)}
-                onCreateSide={() => onCreateSide?.(bookmark)}
-                onDelete={() => onDelete?.(bookmark)}
-                onRefresh={handleRefresh}
-                onEdit={handleOpenEditor}
-                isPinned={bookmark.pinned}
-                isRefreshing={isRefreshing}
-                showEdit={true}
-              />
-            </div>
-          )}
-
           {/* Pin indicator */}
           {bookmark.pinned && !selectionMode && (
             <div className="absolute top-3 left-3 z-10">
@@ -328,8 +334,13 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
           {/* Content area */}
           <div className="relative z-[1] p-4">
             {hasContent ? (
-              <div className="overflow-x-hidden max-h-[200px] overflow-y-auto note-scroll-area">
-                <div className="text-[15px] leading-relaxed text-[rgba(251,241,199,0.88)]">
+              <div
+                className={cn(
+                  "overflow-x-hidden overflow-y-auto note-scroll-area transition-all duration-300 ease-out",
+                  isCardExpanded ? "max-h-[500px]" : "max-h-[200px]"
+                )}
+              >
+                <div className="text-[15px] leading-relaxed text-[rgba(251,241,199,0.88)] break-words">
                   <NoteBlockRenderer content={noteContent} compact={true} />
                 </div>
               </div>
@@ -342,14 +353,77 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
             )}
           </div>
 
-          {/* Footer with date */}
+          {/* Tags section - above footer */}
+          {allTags.length > 0 && (
+            <div className="relative z-[1] px-4 pb-3 flex flex-wrap gap-1.5">
+              {allTags.map((tag) => (
+                <DeletableTagPill
+                  key={tag}
+                  tag={tag}
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTagClick?.(tag);
+                  }}
+                  onDelete={onTagDelete ? (tagToDelete) => {
+                    onTagDelete(bookmark, tagToDelete);
+                  } : undefined}
+                  showColorPicker={true}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Footer with date, expand button, and menu */}
           <div
-            className="relative z-[1] px-4 py-2.5 border-t"
+            className="relative z-[1] px-4 py-2.5 border-t flex items-center justify-between"
             style={{ borderColor: 'rgba(255, 255, 255, 0.04)' }}
           >
             <span className="text-[11px] font-medium text-[rgba(168,153,132,0.6)] tracking-wide">
               {formatNoteDate(bookmark.createdAt)}
             </span>
+
+            {/* Right side: expand button + menu */}
+            <div className="flex items-center gap-1">
+              {/* Expand/Collapse button */}
+              {needsExpand && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsCardExpanded(!isCardExpanded);
+                  }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-[rgba(168,153,132,0.7)] hover:text-[rgba(254,128,25,0.9)] hover:bg-[rgba(254,128,25,0.1)] transition-all duration-200"
+                >
+                  {isCardExpanded ? (
+                    <>
+                      <ChevronUp className="w-3 h-3" />
+                      <span>Less</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-3 h-3" />
+                      <span>More</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Menu - in footer, shows on hover */}
+              {!selectionMode && (
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                  <CardMenuInline
+                    onPin={() => onPin?.(bookmark)}
+                    onCreateSide={() => onCreateSide?.(bookmark)}
+                    onDelete={() => onDelete?.(bookmark)}
+                    onRefresh={handleRefresh}
+                    onEdit={handleOpenEditor}
+                    isPinned={bookmark.pinned}
+                    isRefreshing={isRefreshing}
+                    showEdit={true}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Hover border glow */}
@@ -574,11 +648,13 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
               </a>
             </div>
 
-            {/* Description - shows on hover */}
+            {/* Description - smooth slide-in on hover */}
             {(noteData || metadata?.ogDescription) && (
-              <p className="text-gruvbox-fg-muted text-xs mt-2 line-clamp-2 opacity-0 group-hover:opacity-100 transition-opacity h-0 group-hover:h-auto overflow-hidden">
-                {noteData || metadata?.ogDescription}
-              </p>
+              <div className="overflow-hidden transition-all duration-300 ease-out max-h-0 group-hover:max-h-16 opacity-0 group-hover:opacity-100">
+                <p className="text-gruvbox-fg-muted text-xs mt-2 line-clamp-2 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300 ease-out">
+                  {noteData || metadata?.ogDescription}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -586,113 +662,119 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
     );
   }
 
-  // Default Webpage Card - Style 1 (white content box with slide-up)
+  // Default Webpage Card - Clean split layout (image top, content bottom)
   return (
     <div className="break-inside-avoid mb-5">
       <div className={cn(
-        "bookmark-card bookmark-card-slideup group relative rounded-xl overflow-hidden min-h-[380px] transition-all duration-300",
+        "bookmark-card group relative rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl",
         isSelected && "ring-2 ring-gruvbox-yellow ring-offset-2 ring-offset-gruvbox-bg-darkest"
-      )}
-      style={{
-        backgroundImage: thumbnail ? `url(${thumbnail})` : undefined,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundColor: thumbnail ? undefined : '#3c3836',
-      }}
-      >
+      )}>
         {selectionMode && (
           <SelectionCheckbox isSelected={isSelected} onToggle={onToggleSelect} />
         )}
         <CollectionGlow collection={collection} />
 
-        {/* Date Badge - Corner style (top left) */}
-        <DateBadge date={bookmark.createdAt} variant="corner" />
+        {/* Thumbnail area */}
+        <div
+          className="relative aspect-[16/10] bg-gruvbox-bg-darkest"
+          style={{
+            backgroundImage: thumbnail ? `url(${thumbnail})` : undefined,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          {/* Gradient overlay for depth */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
 
-        {/* Gradient overlay for readability when no thumbnail */}
-        {!thumbnail && (
-          <div className="absolute inset-0 bg-gradient-to-b from-gruvbox-bg-light to-gruvbox-bg-dark" />
-        )}
-
-        {/* Menu button - top right on cover photo */}
-        {!selectionMode && (
-          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-            <CardMenuInline
-              onPin={() => onPin?.(bookmark)}
-              onCreateSide={() => onCreateSide?.(bookmark)}
-              onDelete={() => onDelete?.(bookmark)}
-              onRefresh={handleRefresh}
-              isPinned={bookmark.pinned}
-              isRefreshing={isRefreshing}
-              variant="overlay"
-            />
-          </div>
-        )}
-
-        {/* Content area - slides up on hover */}
-        <div className="card-data absolute bottom-0 left-0 right-0 transform translate-y-[calc(100%-110px)] group-hover:translate-y-0 transition-transform duration-300 ease-out">
-          <div className="card-content bg-gruvbox-bg-light/95 backdrop-blur-sm px-6 py-5 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
-            {/* Header row: Domain + Category pill */}
-            <div className="flex items-center gap-2.5 mb-3">
-              <img
-                src={`https://www.google.com/s2/favicons?domain=${url}&sz=32`}
-                alt=""
-                className="w-4 h-4 rounded"
+          {/* Menu button - top right */}
+          {!selectionMode && (
+            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+              <CardMenuInline
+                onPin={() => onPin?.(bookmark)}
+                onCreateSide={() => onCreateSide?.(bookmark)}
+                onDelete={() => onDelete?.(bookmark)}
+                onRefresh={handleRefresh}
+                isPinned={bookmark.pinned}
+                isRefreshing={isRefreshing}
+                variant="overlay"
               />
-              <span className="text-xs text-gruvbox-fg-muted font-medium">{getDomain(url)}</span>
-              {/* Category pill - inline with domain for clean reading flow */}
-              {category && (
-                <span className="category-pill text-[11px] px-2.5 py-1 rounded-full bg-gruvbox-bg-lighter text-gruvbox-fg-muted font-medium transition-colors duration-200 hover:bg-gruvbox-yellow hover:text-gruvbox-bg-darkest cursor-pointer">
-                  {category}
-                </span>
-              )}
             </div>
+          )}
 
-            {/* Title */}
-            <h3 className="text-gruvbox-fg text-lg font-light leading-snug line-clamp-2 pr-2">
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-gruvbox-yellow transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {title}
-              </a>
-            </h3>
+          {/* No thumbnail fallback */}
+          {!thumbnail && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gruvbox-bg-light to-gruvbox-bg-dark">
+              <ExternalLink className="w-10 h-10 text-gruvbox-fg-muted/30" />
+            </div>
+          )}
+        </div>
 
-            {/* Timestamp - like tweets */}
-            {bookmark.createdAt && (
-              <p className="text-xs text-gruvbox-fg-muted mt-2">
-                {formatFullTimestamp(bookmark.createdAt)}
-              </p>
+        {/* Content area - solid opaque background */}
+        <div className="bg-gruvbox-bg-light p-4">
+          {/* Tags section - at top like note cards */}
+          {bookmark.tags?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {bookmark.tags.map((tag) => {
+                const normalizedTag = tag.toLowerCase();
+                return (
+                  <DeletableTagPill
+                    key={tag}
+                    tag={normalizedTag}
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTagClick?.(normalizedTag);
+                    }}
+                    onDelete={onTagDelete ? (tagToDelete) => {
+                      onTagDelete(bookmark, tagToDelete);
+                    } : undefined}
+                    showColorPicker={true}
+                  />
+                );
+              })}
+            </div>
+          )}
+
+          {/* Header row: Domain + Category pill */}
+          <div className="flex items-center gap-2 mb-2.5">
+            <img
+              src={`https://www.google.com/s2/favicons?domain=${url}&sz=32`}
+              alt=""
+              className="w-4 h-4 rounded"
+            />
+            <span className="text-xs text-gruvbox-fg-muted font-medium truncate">{getDomain(url)}</span>
+            {category && (
+              <span className="category-pill text-[10px] px-2 py-0.5 rounded-full bg-gruvbox-bg-lighter text-gruvbox-fg-muted font-medium ml-auto flex-shrink-0">
+                {category}
+              </span>
             )}
+          </div>
 
-            {/* Description - visible on hover */}
-            <p className="card-text text-gruvbox-fg-muted text-sm mt-3 line-clamp-2 h-[40px] pr-2">
-              {noteData || metadata?.ogDescription || ''}
+          {/* Title */}
+          <h3 className="text-gruvbox-fg text-[15px] font-medium leading-snug line-clamp-2 mb-2">
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-gruvbox-yellow transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {title}
+            </a>
+          </h3>
+
+          {/* Description */}
+          {(noteData || metadata?.ogDescription) && (
+            <p className="text-gruvbox-fg-muted text-sm leading-relaxed line-clamp-2 mb-3">
+              {noteData || metadata?.ogDescription}
             </p>
+          )}
 
-            {/* Tags row */}
-            {bookmark.tags?.length > 0 && (
-              <div className="card-text flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-gruvbox-bg-lighter/50">
-                {(() => {
-                  const tagsToShow = bookmark.tags?.slice(0, 3) || [];
-                  const tagColors = getTagColors(tagsToShow);
-                  return tagsToShow.map((tag, idx) => (
-                    <span
-                      key={tag}
-                      className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                      style={{
-                        backgroundColor: tagColors[idx].bg,
-                        color: tagColors[idx].text,
-                      }}
-                    >
-                      #{tag}
-                    </span>
-                  ));
-                })()}
-              </div>
-            )}
+          {/* Footer: Timestamp */}
+          <div className="pt-2.5 border-t border-gruvbox-bg-lighter/50">
+            <span className="text-[11px] text-gruvbox-fg-muted">
+              {bookmark.createdAt && formatFullTimestamp(bookmark.createdAt)}
+            </span>
           </div>
         </div>
       </div>

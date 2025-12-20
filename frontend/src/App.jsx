@@ -16,6 +16,7 @@ import { useBookmarks } from '@/hooks/useBookmarks'
 import { useCollections } from '@/hooks/useCollections'
 import { getTagColors, getTagColor } from '@/utils/tagColors';
 import { TagPill } from '@/components/TagColorPicker';
+import { extractTagsFromContent } from '@/utils/tagExtraction';
 import { Plus, FileText, File, Tag, X } from 'lucide-react'
 import AddDropzoneCard from '@/components/AddDropzoneCard'
 import { InlineNoteComposer } from '@/components/NoteComposer'
@@ -327,6 +328,43 @@ function App() {
     }
   };
 
+  // Handle tag deletion from a bookmark card
+  const handleTagDelete = async (bookmark, tagToDelete) => {
+    // Get current tags (support both tags array and extracted tags from content)
+    const currentTags = bookmark.tags || [];
+    const noteContent = bookmark.notes || bookmark.content || '';
+
+    // Remove the tag from the tags array
+    const updatedTags = currentTags.filter(t => t.toLowerCase() !== tagToDelete.toLowerCase());
+
+    // Also remove the hashtag from the content if present
+    const updatedContent = noteContent.replace(
+      new RegExp(`#${tagToDelete}\\b`, 'gi'),
+      ''
+    ).replace(/\s+/g, ' ').trim();
+
+    const updatedBookmark = {
+      ...bookmark,
+      tags: updatedTags,
+      notes: bookmark.notes !== undefined ? updatedContent : bookmark.notes,
+      content: bookmark.content !== undefined ? updatedContent : bookmark.content,
+    };
+
+    // Use the same save pattern as handleSaveBookmark
+    updateBookmark(updatedBookmark);
+
+    try {
+      await fetch(`http://127.0.0.1:3000/api/bookmarks/${bookmark.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedBookmark)
+      });
+    } catch (error) {
+      console.error('Error deleting tag:', error);
+      refetch();
+    }
+  };
+
   const handleCreateSide = (bookmark) => {
     // Open the collection modal for this single bookmark
     setSingleBookmarkToAdd(bookmark);
@@ -347,6 +385,19 @@ function App() {
       }
     } catch (error) {
       console.error('Error refreshing bookmark:', error);
+    }
+  };
+
+  // Handle tag click - filter by single tag
+  const handleTagClick = (tagName) => {
+    const normalizedTag = tagName.toLowerCase();
+    // If tag is already active, clear filter; otherwise set it as the only active tag
+    if (activeTags.length === 1 && activeTags[0].toLowerCase() === normalizedTag) {
+      setActiveTags([]);
+      updateURL(mainTab, activeCollection, []);
+    } else {
+      setActiveTags([normalizedTag]);
+      updateURL(mainTab, activeCollection, [normalizedTag]);
     }
   };
 
@@ -385,10 +436,19 @@ function App() {
     }
 
     // Filter by tags - bookmark must have ALL selected tags (AND logic)
+    // Also check for tags extracted from note content
     if (activeTags.length > 0) {
-      filtered = filtered.filter(b =>
-        activeTags.every(tag => b.tags?.includes(tag))
-      );
+      filtered = filtered.filter(b => {
+        // Get tags from bookmark.tags array
+        const bookmarkTags = (b.tags || []).map(t => t.toLowerCase());
+        // Extract tags from note content
+        const noteContent = b.notes || b.content || '';
+        const extractedTags = extractTagsFromContent(noteContent);
+        // Combine both sources
+        const allBookmarkTags = [...new Set([...bookmarkTags, ...extractedTags])];
+        // Check if bookmark has all active tags
+        return activeTags.every(tag => allBookmarkTags.includes(tag.toLowerCase()));
+      });
     }
 
     // Power Search filters
@@ -619,6 +679,8 @@ function App() {
                           collection={collections.find(c => c.id === bookmark.collectionId)}
                           onCardClick={(bm, autoPlay) => { setSelectedBookmark(bm); setAutoPlayOnOpen(autoPlay || false); }}
                           onOpenEditor={(bm) => setNoteToEdit(bm)}
+                          onTagClick={handleTagClick}
+                          onTagDelete={handleTagDelete}
                         />
                       </div>
                     ))
@@ -660,6 +722,7 @@ function App() {
           onSave={() => refetch()}
           allTags={allTags}
           autoPlay={autoPlayOnOpen}
+          onTagClick={handleTagClick}
         />
 
         {/* Collection Modal */}
@@ -698,6 +761,7 @@ function App() {
             handleDelete(bm);
             setNoteToEdit(null);
           }}
+          availableTags={allTags}
         />
 
       </main>
