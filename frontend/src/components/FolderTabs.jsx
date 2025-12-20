@@ -75,7 +75,10 @@ const FolderTabs = ({
       {/* Header Row - Tabs on left, Filters on right */}
       <div className="flex items-center justify-between px-4 py-3 mb-2">
         {/* Left: Main Tabs - Unified Toggle Switch */}
-        <div className="relative inline-flex items-center bg-gruvbox-bg-dark/80 rounded-full p-1 border border-gruvbox-bg-lighter/20">
+        <div className="relative inline-flex items-center rounded-full p-1" style={{
+          background: 'linear-gradient(145deg, rgba(40, 40, 40, 0.6), rgba(30, 30, 30, 0.8))',
+          boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.03)',
+        }}>
           {tabs.map((tab, index) => {
             const isActive = activeTab === tab.id;
             return (
@@ -84,14 +87,18 @@ const FolderTabs = ({
                 onClick={() => onTabChange?.(tab.id)}
                 className={cn(
                   "relative z-10 px-5 py-2 text-sm font-semibold uppercase tracking-wider transition-colors duration-200 rounded-full",
-                  isActive ? "text-gruvbox-bg-darkest" : "text-gruvbox-fg-muted/70 hover:text-gruvbox-fg"
+                  isActive ? "text-gruvbox-bg-darkest" : "text-gruvbox-fg-muted/60 hover:text-gruvbox-fg"
                 )}
               >
                 {isActive && (
                   <motion.div
                     layoutId="main-tab-indicator"
-                    className="absolute inset-0 bg-gradient-to-r from-gruvbox-yellow to-gruvbox-orange rounded-full shadow-lg"
-                    transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                      background: 'linear-gradient(135deg, #d79921 0%, #fe8019 100%)',
+                      boxShadow: '0 2px 8px rgba(254, 128, 25, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
+                    }}
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}
                 <span className="relative z-10">{tab.label}</span>
@@ -116,8 +123,12 @@ const FolderTabs = ({
       {/* Content Area */}
       <div className="folder-content relative">
         <div
-          className="folder-content-inner rounded-2xl overflow-visible border border-gruvbox-bg-lighter/30"
-          style={{ backgroundColor: 'var(--theme-bg-light)' }}
+          className="folder-content-inner rounded-2xl overflow-visible"
+          style={{
+            backgroundColor: 'var(--theme-bg-light)',
+            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.02), 0 -1px 0 rgba(0, 0, 0, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.04)',
+          }}
         >
           <div className="folder-page min-h-[70vh] p-4">
             <AnimatePresence mode="wait">

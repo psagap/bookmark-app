@@ -13,7 +13,7 @@ const isHtmlContent = (text) => {
   return /<[a-z][\s\S]*>/i.test(text);
 };
 
-// Parse HTML to blocks
+// Parse HTML to blocks (supports TipTap HTML output)
 const parseHtmlToBlocks = (html) => {
   if (!html) return [];
 
@@ -47,17 +47,30 @@ const parseHtmlToBlocks = (html) => {
       case 'h3':
         blocks.push({ id: `block-${blockId++}`, type: 'heading3', content: node.textContent.trim() });
         break;
+      case 'blockquote':
+        blocks.push({ id: `block-${blockId++}`, type: 'blockquote', content: node.textContent.trim() });
+        break;
       case 'ul':
+        // Check if it's a TipTap task list
+        const isTaskList = node.getAttribute('data-type') === 'taskList';
         Array.from(node.children).forEach(li => {
           if (li.tagName.toLowerCase() === 'li') {
-            // Check if it's a todo item
+            // Check if it's a todo item (TipTap style or checkbox style)
+            const isTodoItem = li.getAttribute('data-type') === 'taskItem' || li.getAttribute('data-checked') !== null;
             const checkbox = li.querySelector('input[type="checkbox"]');
-            if (checkbox) {
+
+            if (isTaskList || isTodoItem || checkbox) {
+              const isChecked = li.getAttribute('data-checked') === 'true' || (checkbox && checkbox.checked);
+              // Get text content excluding the checkbox
+              let content = '';
+              const textContainer = li.querySelector('div, p') || li;
+              content = textContainer.textContent.trim();
+
               blocks.push({
                 id: `block-${blockId++}`,
                 type: 'todo',
-                content: li.textContent.trim(),
-                checked: checkbox.checked
+                content,
+                checked: isChecked
               });
             } else {
               blocks.push({ id: `block-${blockId++}`, type: 'bullet', content: li.textContent.trim() });
@@ -73,8 +86,18 @@ const parseHtmlToBlocks = (html) => {
         });
         break;
       case 'pre':
+        // Handle code blocks - TipTap wraps code in pre > code
+        const codeElement = node.querySelector('code');
+        blocks.push({ id: `block-${blockId++}`, type: 'code', content: codeElement?.textContent || node.textContent });
+        break;
       case 'code':
-        blocks.push({ id: `block-${blockId++}`, type: 'code', content: node.textContent });
+        // Inline code - skip if inside pre
+        if (node.parentElement?.tagName.toLowerCase() !== 'pre') {
+          blocks.push({ id: `block-${blockId++}`, type: 'code', content: node.textContent });
+        }
+        break;
+      case 'hr':
+        blocks.push({ id: `block-${blockId++}`, type: 'divider', content: '' });
         break;
       case 'p':
       case 'div':
@@ -115,8 +138,8 @@ const parseHtmlToBlocks = (html) => {
   // Merge consecutive paragraphs that might be the same content
   const mergedBlocks = [];
   blocks.forEach((block, index) => {
-    // Skip empty blocks
-    if (!block.content) return;
+    // Skip empty blocks (except dividers)
+    if (!block.content && block.type !== 'divider') return;
 
     // Avoid duplicate consecutive content
     const lastBlock = mergedBlocks[mergedBlocks.length - 1];
@@ -303,6 +326,11 @@ const RenderBlock = ({ block, compact }) => {
         <div className="border-l-2 border-gruvbox-yellow/50 pl-3 py-1 text-sm text-gruvbox-fg-muted italic">
           {block.content}
         </div>
+      );
+
+    case 'divider':
+      return (
+        <hr className="border-none h-px bg-gruvbox-bg-lighter/50 my-2" />
       );
 
     case 'tag':

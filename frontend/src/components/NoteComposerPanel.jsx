@@ -1,0 +1,553 @@
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { X, FileText } from 'lucide-react';
+
+/**
+ * NoteComposerPanel - Right-side sliding panel for note creation
+ *
+ * Design: Direction 1 - Slides in from the right, anchored to app frame
+ * Features:
+ * - Thin vertical accent stripe on left edge
+ * - Mixed case header ("New note")
+ * - Small "⌘↩ Save" hint bottom-left
+ * - Auto-expanding textarea
+ * - ⌘+Enter saves, Esc closes
+ */
+
+const springs = {
+  panel: { type: 'spring', stiffness: 300, damping: 30 },
+  content: { type: 'spring', stiffness: 200, damping: 25 },
+  backdrop: { duration: 0.2 },
+};
+
+const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
+  const [content, setContent] = useState('');
+  const [state, setState] = useState('idle'); // idle | dirty | saving | feedback
+  const textareaRef = useRef(null);
+  const panelRef = useRef(null);
+  const shouldReduceMotion = useReducedMotion();
+
+  // Auto-resize textarea
+  const adjustHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      const newHeight = Math.min(Math.max(120, textarea.scrollHeight), 400);
+      textarea.style.height = `${newHeight}px`;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      adjustHeight();
+    }
+  }, [content, isOpen, adjustHeight]);
+
+  // Focus textarea when panel opens
+  useEffect(() => {
+    if (isOpen && textareaRef.current) {
+      const timer = setTimeout(() => textareaRef.current?.focus(), 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  // Lock body scroll when open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  // Reset state when panel closes
+  useEffect(() => {
+    if (!isOpen) {
+      setContent('');
+      setState('idle');
+    }
+  }, [isOpen]);
+
+  const handleChange = (e) => {
+    const newContent = e.target.value;
+    setContent(newContent);
+    setState(newContent.trim() ? 'dirty' : 'idle');
+  };
+
+  const handleSave = async () => {
+    if (state !== 'dirty' || !content.trim()) return;
+
+    setState('saving');
+
+    const noteBookmark = {
+      url: `note://${Date.now()}`,
+      title: content.split('\n')[0].substring(0, 100) || 'Untitled Note',
+      notes: content,
+      content: content,
+      category: 'Note',
+      subCategory: 'note',
+      tags: [],
+      thumbnail: null,
+      type: 'note',
+      metadata: {
+        isQuickNote: true,
+        createdAt: new Date().toISOString(),
+      }
+    };
+
+    try {
+      const response = await fetch('http://127.0.0.1:3000/api/bookmarks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(noteBookmark)
+      });
+
+      if (response.ok) {
+        const savedNote = await response.json();
+        setState('feedback');
+
+        setTimeout(() => {
+          setContent('');
+          setState('idle');
+          onNoteCreated?.(savedNote);
+          onClose();
+        }, shouldReduceMotion ? 300 : 600);
+      }
+    } catch (error) {
+      console.error('Error saving note:', error);
+      setState('dirty');
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleSave();
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (!content.trim()) {
+        onClose();
+      }
+    }
+  };
+
+  const handleClose = () => {
+    if (state === 'saving' || state === 'feedback') return;
+    onClose();
+  };
+
+  const isDirty = state === 'dirty';
+  const isSaving = state === 'saving';
+  const isFeedback = state === 'feedback';
+  const isLocked = isSaving || isFeedback;
+
+  const panelContent = (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            className="note-panel-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={springs.backdrop}
+            onClick={handleClose}
+          />
+
+          {/* Panel */}
+          <motion.div
+            ref={panelRef}
+            className="note-panel"
+            initial={{ x: '100%', opacity: 0.8 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0.8 }}
+            transition={shouldReduceMotion ? { duration: 0.15 } : springs.panel}
+          >
+            {/* Accent stripe on left edge */}
+            <div className="note-panel-accent" />
+
+            {/* Panel content */}
+            <div className="note-panel-inner">
+              {/* Header */}
+              <div className="note-panel-header">
+                <div className="note-panel-header-left">
+                  <FileText className="w-4 h-4 text-gruvbox-fg-muted" />
+                  <span className="note-panel-title">New note</span>
+                </div>
+                <button
+                  onClick={handleClose}
+                  className="note-panel-close"
+                  aria-label="Close panel"
+                  disabled={isLocked}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Main content area */}
+              <div className="note-panel-content">
+                <AnimatePresence mode="wait">
+                  {isFeedback ? (
+                    <motion.div
+                      key="feedback"
+                      className="note-panel-feedback"
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={springs.content}
+                    >
+                      <p>Saved!</p>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="editor"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: isSaving ? 0.5 : 1 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <textarea
+                        ref={textareaRef}
+                        value={content}
+                        onChange={handleChange}
+                        onKeyDown={handleKeyDown}
+                        disabled={isLocked}
+                        placeholder="What's on your mind?"
+                        className="note-panel-textarea"
+                        rows={4}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Footer */}
+              <div className="note-panel-footer">
+                <span className="note-panel-hint">
+                  {isSaving ? (
+                    'Saving...'
+                  ) : (
+                    <>
+                      <kbd>⌘</kbd><span className="note-panel-hint-plus">+</span><kbd>↩</kbd> Save
+                    </>
+                  )}
+                </span>
+
+                <div className="note-panel-actions">
+                  <button
+                    onClick={handleClose}
+                    className="note-panel-btn-secondary"
+                    disabled={isLocked}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    className="note-panel-btn-primary"
+                    disabled={!isDirty || isLocked}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+
+  return (
+    <>
+      {createPortal(panelContent, document.body)}
+
+      <style>{`
+        .note-panel-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.4);
+          backdrop-filter: blur(2px);
+          z-index: 100;
+        }
+
+        .note-panel {
+          position: fixed;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          width: 100%;
+          max-width: 420px;
+          background: linear-gradient(
+            180deg,
+            rgba(40, 40, 40, 0.98) 0%,
+            rgba(32, 32, 32, 0.99) 50%,
+            rgba(28, 28, 28, 1) 100%
+          );
+          border-left: 1px solid rgba(255, 255, 255, 0.06);
+          box-shadow:
+            -8px 0 32px rgba(0, 0, 0, 0.4),
+            -2px 0 8px rgba(0, 0, 0, 0.2);
+          z-index: 101;
+          display: flex;
+          overflow: hidden;
+        }
+
+        /* Accent stripe on left edge */
+        .note-panel-accent {
+          width: 3px;
+          background: linear-gradient(
+            180deg,
+            var(--theme-secondary, #fe8019) 0%,
+            rgba(254, 128, 25, 0.6) 50%,
+            rgba(254, 128, 25, 0.3) 100%
+          );
+          flex-shrink: 0;
+        }
+
+        .note-panel-inner {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+        }
+
+        /* Header */
+        .note-panel-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .note-panel-header-left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .note-panel-title {
+          font-family: 'Inter', -apple-system, sans-serif;
+          font-size: 15px;
+          font-weight: 500;
+          color: var(--theme-fg, #ebdbb2);
+          letter-spacing: -0.01em;
+        }
+
+        .note-panel-close {
+          padding: 8px;
+          border-radius: 8px;
+          background: transparent;
+          border: none;
+          color: var(--theme-fg-muted, #a89984);
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .note-panel-close:hover:not(:disabled) {
+          background: rgba(255, 255, 255, 0.06);
+          color: var(--theme-fg, #ebdbb2);
+        }
+
+        .note-panel-close:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
+        /* Content area */
+        .note-panel-content {
+          flex: 1;
+          padding: 20px;
+          overflow-y: auto;
+        }
+
+        .note-panel-textarea {
+          display: block;
+          width: 100%;
+          min-height: 120px;
+          max-height: 400px;
+          padding: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 12px;
+          background: rgba(0, 0, 0, 0.2);
+          resize: none;
+          overflow-y: auto;
+
+          font-family: 'Inter', -apple-system, sans-serif;
+          font-size: 16px;
+          font-weight: 400;
+          line-height: 1.6;
+          color: rgba(251, 241, 199, 0.92);
+          caret-color: var(--theme-secondary, #fe8019);
+
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .note-panel-textarea::placeholder {
+          color: rgba(168, 153, 132, 0.5);
+        }
+
+        .note-panel-textarea:focus {
+          outline: none;
+          border-color: rgba(254, 128, 25, 0.4);
+          box-shadow: 0 0 0 3px rgba(254, 128, 25, 0.1);
+        }
+
+        .note-panel-textarea:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .note-panel-textarea::selection {
+          background: rgba(254, 128, 25, 0.25);
+        }
+
+        /* Feedback state */
+        .note-panel-feedback {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 120px;
+          padding: 32px;
+          background: linear-gradient(
+            135deg,
+            rgba(254, 128, 25, 0.15) 0%,
+            rgba(254, 128, 25, 0.08) 100%
+          );
+          border: 1px solid rgba(254, 128, 25, 0.3);
+          border-radius: 12px;
+        }
+
+        .note-panel-feedback p {
+          font-family: 'Inter', -apple-system, sans-serif;
+          font-size: 18px;
+          font-weight: 500;
+          color: var(--theme-secondary, #fe8019);
+        }
+
+        /* Footer */
+        .note-panel-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px;
+          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          background: rgba(0, 0, 0, 0.15);
+        }
+
+        .note-panel-hint {
+          font-family: 'Inter', -apple-system, sans-serif;
+          font-size: 12px;
+          color: var(--theme-fg-muted, #a89984);
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .note-panel-hint kbd {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 20px;
+          height: 20px;
+          padding: 0 5px;
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 4px;
+          font-family: 'Inter', sans-serif;
+          font-size: 11px;
+          font-weight: 500;
+          color: var(--theme-fg, #ebdbb2);
+        }
+
+        .note-panel-hint-plus {
+          font-size: 10px;
+          opacity: 0.6;
+        }
+
+        .note-panel-actions {
+          display: flex;
+          gap: 8px;
+        }
+
+        .note-panel-btn-secondary {
+          padding: 8px 16px;
+          border-radius: 8px;
+          background: transparent;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          font-family: 'Inter', -apple-system, sans-serif;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--theme-fg-muted, #a89984);
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .note-panel-btn-secondary:hover:not(:disabled) {
+          background: rgba(255, 255, 255, 0.05);
+          border-color: rgba(255, 255, 255, 0.15);
+          color: var(--theme-fg, #ebdbb2);
+        }
+
+        .note-panel-btn-secondary:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
+        .note-panel-btn-primary {
+          padding: 8px 20px;
+          border-radius: 8px;
+          background: var(--theme-secondary, #fe8019);
+          border: none;
+          font-family: 'Inter', -apple-system, sans-serif;
+          font-size: 13px;
+          font-weight: 600;
+          color: rgba(29, 32, 33, 0.95);
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .note-panel-btn-primary:hover:not(:disabled) {
+          filter: brightness(1.1);
+          transform: translateY(-1px);
+        }
+
+        .note-panel-btn-primary:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .note-panel-btn-primary:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 480px) {
+          .note-panel {
+            max-width: 100%;
+          }
+
+          .note-panel-accent {
+            width: 2px;
+          }
+        }
+
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+          .note-panel,
+          .note-panel-backdrop {
+            transition: opacity 0.15s ease !important;
+          }
+        }
+      `}</style>
+    </>
+  );
+};
+
+export default NoteComposerPanel;

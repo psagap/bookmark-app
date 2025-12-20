@@ -1,11 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Play, ExternalLink, MoreHorizontal, Pin, Layers, Trash2, RefreshCw, Check, Edit3, X, Maximize2, PenLine } from "lucide-react";
+import { Play, ExternalLink, MoreHorizontal, Pin, Layers, Trash2, RefreshCw, Check, Edit3, Maximize2, PenLine } from "lucide-react";
 import { cn } from "@/lib/utils";
 import GlowingCard from './GlowingCard';
 import { getTagColors } from '@/utils/tagColors';
-import NoteBlockEditor, { blocksToText } from './NoteBlockEditor';
 import NoteBlockRenderer from './NoteBlockRenderer';
 
 // X Logo SVG Component
@@ -223,8 +222,6 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
   // Support both 'notes' and 'content' field names
   const noteData = notes || content;
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(null);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -235,149 +232,12 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
     }
   };
 
-  // Helper to strip HTML and convert to plain text for editing
-  const htmlToPlainText = (html) => {
-    if (!html || typeof html !== 'string') return html || '';
-    // Check if it contains HTML
-    if (!/<[a-z][\s\S]*>/i.test(html)) return html;
-
-    const temp = document.createElement('div');
-    temp.innerHTML = html;
-
-    const lines = [];
-
-    // Process each top-level node
-    const processNode = (node, isTopLevel = false) => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent.trim();
-        return text;
-      }
-      if (node.nodeType !== Node.ELEMENT_NODE) return '';
-
-      const tag = node.tagName.toLowerCase();
-
-      // Get text content directly for leaf nodes
-      const getText = () => {
-        let text = '';
-        node.childNodes.forEach(child => {
-          if (child.nodeType === Node.TEXT_NODE) {
-            text += child.textContent;
-          } else if (child.nodeType === Node.ELEMENT_NODE) {
-            // Handle inline elements
-            const childTag = child.tagName.toLowerCase();
-            if (childTag === 'span' || childTag === 'strong' || childTag === 'em' || childTag === 'b' || childTag === 'i') {
-              text += child.textContent;
-            } else if (childTag === 'br') {
-              text += '\n';
-            } else {
-              text += processNode(child, false);
-            }
-          }
-        });
-        return text.trim();
-      };
-
-      switch (tag) {
-        case 'h1':
-          return `# ${getText()}`;
-        case 'h2':
-          return `## ${getText()}`;
-        case 'h3':
-          return `### ${getText()}`;
-        case 'ul':
-          const bullets = [];
-          node.querySelectorAll(':scope > li').forEach(li => {
-            const liText = li.textContent.trim();
-            if (liText) bullets.push(`- ${liText}`);
-          });
-          return bullets.join('\n');
-        case 'ol':
-          const numbered = [];
-          node.querySelectorAll(':scope > li').forEach((li, i) => {
-            const liText = li.textContent.trim();
-            if (liText) numbered.push(`${i + 1}. ${liText}`);
-          });
-          return numbered.join('\n');
-        case 'li':
-          return getText();
-        case 'p':
-        case 'div':
-          const content = getText();
-          return content;
-        case 'br':
-          return '';
-        case 'pre':
-        case 'code':
-          return '```\n' + node.textContent + '\n```';
-        case 'span':
-          return getText();
-        default:
-          return getText();
-      }
-    };
-
-    // Process top-level nodes
-    Array.from(temp.childNodes).forEach(node => {
-      const result = processNode(node, true);
-      if (result && result.trim()) {
-        lines.push(result.trim());
-      }
-    });
-
-    return lines.join('\n');
+  // Open editor modal when card is clicked
+  const handleOpenEditor = () => {
+    if (onOpenEditor) {
+      onOpenEditor(bookmark);
+    }
   };
-
-  // Inline editing handlers
-  const handleStartEdit = useCallback(() => {
-    const plainText = htmlToPlainText(noteData || title || '');
-    setEditContent({ blocks: null, plainText });
-    setIsEditing(true);
-  }, [noteData, title]);
-
-  const handleSaveEdit = useCallback(() => {
-    if (editContent && onUpdate) {
-      onUpdate({
-        ...bookmark,
-        notes: editContent.plainText,
-        notesBlocks: editContent.blocks
-      });
-    }
-    setIsEditing(false);
-    setEditContent(null);
-  }, [bookmark, editContent, onUpdate]);
-
-  const handleCancelEdit = useCallback(() => {
-    setIsEditing(false);
-    setEditContent(null);
-  }, []);
-
-  const handleEditorChange = useCallback((content) => {
-    setEditContent(content);
-  }, []);
-
-  // Handle keyboard shortcuts for editing
-  const handleEditKeyDown = useCallback((e) => {
-    if (e.key === 'Escape') {
-      handleCancelEdit();
-    }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      handleSaveEdit();
-    }
-    // ⌘E / Ctrl+E to expand to full modal
-    if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
-      e.preventDefault();
-      if (editContent && onUpdate && onOpenEditor) {
-        const updatedBookmark = {
-          ...bookmark,
-          notes: editContent.plainText,
-          notesBlocks: editContent.blocks
-        };
-        onUpdate(updatedBookmark);
-        setIsEditing(false);
-        onOpenEditor(updatedBookmark);
-      }
-    }
-  }, [handleCancelEdit, handleSaveEdit, editContent, onUpdate, onOpenEditor, bookmark]);
 
   // Determine card type based on content
   const isVideo = url?.includes('youtube.com') || url?.includes('youtu.be');
@@ -393,190 +253,112 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
     }
   };
 
-  // Note Card - Enhanced with rich editor, scrollable content, expand button
+  // Note Card - Modern minimal design matching InlineNoteComposer
   if (isNote) {
     const noteContent = noteData || title || '';
     const hasContent = noteContent.trim().length > 0;
-    const isLongNote = noteContent.length > 300;
 
-    // Handle expand to open modal
-    const handleExpand = (e) => {
-      e.stopPropagation();
-      if (onOpenEditor) {
-        onOpenEditor(bookmark);
-      }
+    // Format date simply
+    const formatNoteDate = (dateString) => {
+      if (!dateString) return '';
+      const d = new Date(dateString);
+      return d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
     };
 
     return (
       <div
         className="break-inside-avoid mb-4"
         onClick={(e) => {
-          // Stop propagation to prevent App.jsx from opening detail panel
-          // Note cards handle their own click behavior (inline editing)
           e.stopPropagation();
+          if (!selectionMode) {
+            handleOpenEditor();
+          }
         }}
       >
         <div
           className={cn(
-            "bookmark-card group relative rounded-xl overflow-hidden transition-all duration-200",
-            isEditing
-              ? "shadow-lg ring-1 ring-gruvbox-yellow/40"
-              : "hover:shadow-md hover:-translate-y-0.5",
-            "bg-gradient-to-br from-gruvbox-bg-light to-gruvbox-bg border border-gruvbox-bg-lighter/40",
+            "note-card-modern group relative rounded-2xl overflow-hidden transition-all duration-200 cursor-pointer",
             isSelected && "ring-2 ring-gruvbox-yellow ring-offset-2 ring-offset-gruvbox-bg-darkest"
           )}
-          onKeyDown={isEditing ? handleEditKeyDown : undefined}
+          style={{
+            background: 'linear-gradient(165deg, rgba(40, 40, 40, 0.95) 0%, rgba(32, 32, 32, 0.98) 50%, rgba(28, 28, 28, 1) 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            boxShadow: '0 2px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
+          }}
         >
+          {/* Subtle gradient overlay */}
+          <div
+            className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            style={{
+              background: 'radial-gradient(ellipse 80% 60% at 20% 10%, rgba(254, 128, 25, 0.06) 0%, transparent 60%)',
+            }}
+          />
+
           {selectionMode && (
             <SelectionCheckbox isSelected={isSelected} onToggle={onToggleSelect} />
           )}
 
-          {/* Header bar with date+time and expand button */}
-          <div className="flex items-center justify-between px-3 py-2 bg-gruvbox-bg-lighter/30 border-b border-gruvbox-bg-lighter/40">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-gruvbox-yellow/70" />
-              <span className="text-xs text-gruvbox-fg-muted">
-                {formatFullTimestamp(bookmark.createdAt)}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1">
-              {isEditing ? (
-                <>
-                  {/* Expand button - top right during editing */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (editContent && onUpdate && onOpenEditor) {
-                        const updatedBookmark = {
-                          ...bookmark,
-                          notes: editContent.plainText,
-                          notesBlocks: editContent.blocks
-                        };
-                        onUpdate(updatedBookmark);
-                        setIsEditing(false);
-                        onOpenEditor(updatedBookmark);
-                      }
-                    }}
-                    className="group/expand relative p-1.5 rounded-md hover:bg-gruvbox-yellow/15 transition-all"
-                    title="Expand to full editor (⌘E)"
-                  >
-                    <Maximize2 className="w-3.5 h-3.5 text-gruvbox-fg-muted/60 group-hover/expand:text-gruvbox-yellow transition-colors" />
-                  </button>
-                  <button
-                    onClick={handleCancelEdit}
-                    className="p-1.5 text-gruvbox-fg-muted/60 hover:text-gruvbox-red hover:bg-gruvbox-red/10 rounded-md transition-all"
-                    title="Cancel (Esc)"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  {/* Expand button - opens full editor modal */}
-                  <button
-                    onClick={handleExpand}
-                    className="p-1.5 text-gruvbox-fg-muted/50 hover:text-gruvbox-yellow hover:bg-gruvbox-yellow/10 rounded-md transition-all opacity-0 group-hover:opacity-100"
-                    title="Expand to full editor"
-                  >
-                    <Maximize2 className="w-3.5 h-3.5" />
-                  </button>
-                  {!selectionMode && (
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <CardMenuInline
-                        onPin={() => onPin?.(bookmark)}
-                        onCreateSide={() => onCreateSide?.(bookmark)}
-                        onDelete={() => onDelete?.(bookmark)}
-                        onRefresh={handleRefresh}
-                        onEdit={handleStartEdit}
-                        isPinned={bookmark.pinned}
-                        isRefreshing={isRefreshing}
-                        showEdit={true}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Content area - scrollable with max height, click to edit */}
-          <div
-            className={cn(
-              "px-3 py-3",
-              !isEditing && "cursor-text"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!selectionMode && !isEditing) {
-                handleStartEdit();
-              }
-            }}
-          >
-            {isEditing ? (
-              <>
-                <div className="min-h-[80px] max-h-[200px] overflow-y-auto overflow-x-hidden note-scroll-area">
-                  <NoteBlockEditor
-                    initialContent={editContent?.plainText || ''}
-                    onChange={handleEditorChange}
-                    placeholder="Start writing... Type / for commands"
-                    compact={true}
-                    autoFocus={true}
-                  />
-                </div>
-                {/* Bottom action bar - outside scroll area, always visible */}
-                <div className="flex items-center justify-end pt-3 mt-2 border-t border-gruvbox-bg-lighter/30">
-                  <button
-                    onClick={handleSaveEdit}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gruvbox-yellow border border-gruvbox-yellow/40 rounded-full hover:bg-gruvbox-yellow hover:text-gruvbox-bg-darkest transition-all duration-200 hover:border-transparent hover:shadow-lg hover:shadow-gruvbox-yellow/20"
-                  >
-                    <span>Save</span>
-                    <span className="flex items-center gap-0.5 text-xs opacity-70">
-                      <span>⌘</span>
-                      <span>↵</span>
-                    </span>
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                {hasContent ? (
-                  <div className="overflow-x-hidden max-h-[250px] overflow-y-auto note-scroll-area">
-                    <NoteBlockRenderer content={noteContent} compact={true} />
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-6 text-center">
-                    <div className="w-10 h-10 rounded-full bg-gruvbox-yellow/10 flex items-center justify-center mb-3 group-hover:bg-gruvbox-yellow/20 transition-colors">
-                      <PenLine className="w-5 h-5 text-gruvbox-yellow/60 group-hover:text-gruvbox-yellow transition-colors" />
-                    </div>
-                    <p className="text-sm text-gruvbox-fg-muted/50 group-hover:text-gruvbox-fg-muted transition-colors">
-                      Click to start writing...
-                    </p>
-                    <p className="text-xs text-gruvbox-fg-muted/30 mt-1">
-                      Type <span className="px-1 py-0.5 bg-gruvbox-bg-lighter/30 rounded text-[10px]">/</span> for formatting options
-                    </p>
-                  </div>
-                )}
-
-                {/* Scroll indicator for long notes */}
-                {isLongNote && hasContent && (
-                  <div className="flex items-center justify-center pt-2 border-t border-gruvbox-bg-lighter/30 mt-2">
-                    <span className="text-[10px] text-gruvbox-fg-muted/40 flex items-center gap-1">
-                      <span className="w-1 h-1 rounded-full bg-gruvbox-fg-muted/30 animate-bounce" />
-                      Scroll for more
-                    </span>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Pin indicator */}
-          {bookmark.pinned && !isEditing && (
-            <div className="absolute top-2 right-10 opacity-60">
-              <Pin className="w-3.5 h-3.5 text-gruvbox-yellow fill-gruvbox-yellow" />
+          {/* Menu - top right, only on hover */}
+          {!selectionMode && (
+            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <CardMenuInline
+                onPin={() => onPin?.(bookmark)}
+                onCreateSide={() => onCreateSide?.(bookmark)}
+                onDelete={() => onDelete?.(bookmark)}
+                onRefresh={handleRefresh}
+                onEdit={handleOpenEditor}
+                isPinned={bookmark.pinned}
+                isRefreshing={isRefreshing}
+                showEdit={true}
+              />
             </div>
           )}
+
+          {/* Pin indicator */}
+          {bookmark.pinned && !selectionMode && (
+            <div className="absolute top-3 left-3 z-10">
+              <Pin className="w-3.5 h-3.5 text-gruvbox-yellow/70 fill-gruvbox-yellow/70" />
+            </div>
+          )}
+
+          {/* Content area */}
+          <div className="relative z-[1] p-4">
+            {hasContent ? (
+              <div className="overflow-x-hidden max-h-[200px] overflow-y-auto note-scroll-area">
+                <div className="text-[15px] leading-relaxed text-[rgba(251,241,199,0.88)]">
+                  <NoteBlockRenderer content={noteContent} compact={true} />
+                </div>
+              </div>
+            ) : (
+              <div className="py-4 text-center">
+                <p className="text-sm text-[rgba(168,153,132,0.5)]">
+                  Empty note
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Footer with date */}
+          <div
+            className="relative z-[1] px-4 py-2.5 border-t"
+            style={{ borderColor: 'rgba(255, 255, 255, 0.04)' }}
+          >
+            <span className="text-[11px] font-medium text-[rgba(168,153,132,0.6)] tracking-wide">
+              {formatNoteDate(bookmark.createdAt)}
+            </span>
+          </div>
+
+          {/* Hover border glow */}
+          <div
+            className="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            style={{
+              boxShadow: 'inset 0 0 0 1px rgba(254, 128, 25, 0.15), 0 4px 20px rgba(0, 0, 0, 0.2)',
+            }}
+          />
         </div>
       </div>
     );
