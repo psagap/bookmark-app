@@ -1,26 +1,27 @@
 import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
 export function useCollections() {
     const [collections, setCollections] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const fetchCollections = useCallback(() => {
+    const fetchCollections = useCallback(async () => {
         setLoading(true);
-        fetch('/api/collections')
-            .then(res => {
-                if (!res.ok) throw new Error('Failed to fetch collections');
-                return res.json();
-            })
-            .then(data => {
-                setCollections(data);
-                setLoading(false);
-            })
-            .catch(err => {
-                console.error(err);
-                setError(err);
-                setLoading(false);
-            });
+        try {
+            const { data, error } = await supabase
+                .from('collections')
+                .select('*')
+                .order('name');
+
+            if (error) throw error;
+            setCollections(data || []);
+        } catch (err) {
+            console.error('Error fetching collections:', err);
+            setError(err);
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
     useEffect(() => {
@@ -28,38 +29,57 @@ export function useCollections() {
     }, [fetchCollections]);
 
     const createCollection = useCallback(async (name, color) => {
-        const response = await fetch('/api/collections', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, color })
-        });
-        if (!response.ok) throw new Error('Failed to create collection');
-        const newCollection = await response.json();
-        setCollections(prev => [...prev, newCollection]);
-        return newCollection;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase
+            .from('collections')
+            .insert([{ name, color, user_id: user.id, user_email: user.email || '' }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        setCollections(prev => [...prev, data]);
+        return data;
     }, []);
 
     const addToCollection = useCallback(async (collectionId, bookmarkIds) => {
-        const response = await fetch(`/api/collections/${collectionId}/bookmarks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bookmarkIds })
-        });
-        if (!response.ok) throw new Error('Failed to add bookmarks to collection');
-        return response.json();
+        // In our schema, many bookmarks can belong to one collection (one-to-many)
+        // So we update the collection_id of the bookmarks
+        const { error } = await supabase
+            .from('bookmarks')
+            .update({ collection_id: collectionId })
+            .in('id', bookmarkIds);
+
+        if (error) throw error;
     }, []);
 
     const deleteCollection = useCallback(async (collectionId) => {
-        const response = await fetch(`/api/collections/${collectionId}`, {
-            method: 'DELETE'
-        });
-        if (!response.ok) throw new Error('Failed to delete collection');
+        const { error } = await supabase
+            .from('collections')
+            .delete()
+            .eq('id', collectionId);
+
+        if (error) throw error;
         setCollections(prev => prev.filter(c => c.id !== collectionId));
+    }, []);
+
+    const updateCollection = useCallback(async (collectionId, updates) => {
+        const { data, error } = await supabase
+            .from('collections')
+            .update(updates)
+            .eq('id', collectionId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        setCollections(prev => prev.map(c => (c.id === collectionId ? { ...c, ...data } : c)));
+        return data;
     }, []);
 
     const refetch = useCallback(() => {
         fetchCollections();
     }, [fetchCollections]);
 
-    return { collections, loading, error, createCollection, addToCollection, deleteCollection, refetch };
+    return { collections, loading, error, createCollection, addToCollection, deleteCollection, updateCollection, refetch };
 }

@@ -824,6 +824,196 @@ export const themes = {
       meshColor5: 'rgba(16, 0, 43, 0.9)',
     },
   },
+
+  // ============================================
+  // NOVA RED DARK - Exact shadcn Nova preset (Dark Mode)
+  // Colors from: oklch values converted to HSL
+  // ============================================
+  novaRedDark: {
+    id: 'novaRedDark',
+    name: 'Nova Red Dark',
+    description: 'Shadcn Nova dark with red accent - pure neutrals',
+    category: 'nova',
+    preview: {
+      primary: '#e04d30',
+      secondary: '#454045',
+      background: '#252525',
+      accent: '#5f5f5f',
+    },
+    colors: {
+      // Core semantic (HSL format) - Exact shadcn Nova Red dark theme OKLCH→HSL
+      // background: oklch(0.145 0 0) → pure neutral
+      background: '0 0% 15%',
+      // foreground: oklch(0.985 0 0)
+      foreground: '0 0% 98%',
+      // card: oklch(0.205 0 0)
+      card: '0 0% 21%',
+      cardForeground: '0 0% 98%',
+      // popover: oklch(0.205 0 0)
+      popover: '0 0% 21%',
+      popoverForeground: '0 0% 98%',
+      // primary: oklch(0.637 0.237 25.331) → red-orange ~hue 12
+      primary: '12 70% 53%',
+      primaryForeground: '12 10% 97%',
+      // secondary: oklch(0.274 0.006 286.033) → dark neutral with very slight purple
+      secondary: '286 5% 27%',
+      secondaryForeground: '0 0% 98%',
+      // muted: oklch(0.269 0 0)
+      muted: '0 0% 27%',
+      // muted-foreground: oklch(0.708 0 0)
+      mutedForeground: '0 0% 71%',
+      // accent: oklch(0.371 0 0)
+      accent: '0 0% 37%',
+      accentForeground: '0 0% 98%',
+      // destructive: oklch(0.704 0.191 22.216)
+      destructive: '12 65% 58%',
+      destructiveForeground: '12 10% 97%',
+      // border: oklch(1 0 0 / 10%) → white at 10%
+      border: '0 0% 25%',
+      // input: oklch(1 0 0 / 15%)
+      input: '0 0% 28%',
+      // ring: oklch(0.556 0 0)
+      ring: '0 0% 56%',
+      // Extended colors (HEX) - Pure neutrals only
+      bgDarkest: '#1a1a1a',
+      bgDark: '#252525',
+      bg: '#343434',
+      bgLight: '#454545',
+      bgLighter: '#5f5f5f',
+      fg: '#fafafa',
+      fgLight: '#ffffff',
+      fgMuted: '#b5b5b5',
+      // Primary red from oklch(0.637 0.237 25.331)
+      primaryHex: '#e04d30',
+      primaryLightHex: '#e8634a',
+      // Secondary is neutral gray
+      secondaryHex: '#454045',
+      secondaryLightHex: '#5a555a',
+      // All accents use the same red or neutral - no yellow
+      accent1: '#e04d30',
+      accent2: '#e8634a',
+      accent3: '#b5b5b5',
+      accent4: '#8a8a8a',
+      selectionBg: 'rgba(224, 77, 48, 0.35)',
+      selectionText: '#ffffff',
+    },
+    fonts: {
+      display: "'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      body: "'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      mono: "'JetBrains Mono', monospace",
+    },
+    glow: {
+      // Primary red glow only
+      color: '12 70% 53%',
+      colorRgb: '224, 77, 48',
+      secondary: '12 65% 58%',
+      secondaryRgb: '232, 99, 74',
+      intensity: '0.6',
+    },
+    effects: {
+      // Minimal mesh - just subtle red tint, no gradients
+      meshColor1: 'rgba(224, 77, 48, 0.04)',
+      meshColor2: 'rgba(224, 77, 48, 0.02)',
+      meshColor3: 'rgba(90, 90, 90, 0.03)',
+      meshColor4: 'rgba(90, 90, 90, 0.02)',
+      meshColor5: 'rgba(37, 37, 37, 0.98)',
+    },
+  },
+
+  // ============================================
+  // NOVA RED LIGHT - Exact shadcn Nova preset (Light Mode)
+  // Colors from: oklch values converted to HSL
+  // ============================================
+  novaRedLight: {
+    id: 'novaRedLight',
+    name: 'Nova Red Light',
+    description: 'Shadcn Nova light with red accent - pure neutrals',
+    category: 'nova',
+    preview: {
+      primary: '#c84528',
+      secondary: '#f7f7f7',
+      background: '#ffffff',
+      accent: '#f7f7f7',
+    },
+    colors: {
+      // Core semantic (HSL format) - Exact shadcn Nova Red light theme OKLCH→HSL
+      // background: oklch(1 0 0)
+      background: '0 0% 100%',
+      // foreground: oklch(0.145 0 0)
+      foreground: '0 0% 15%',
+      // card: oklch(1 0 0)
+      card: '0 0% 100%',
+      cardForeground: '0 0% 15%',
+      // popover: oklch(1 0 0)
+      popover: '0 0% 100%',
+      popoverForeground: '0 0% 15%',
+      // primary: oklch(0.577 0.245 27.325) → red-orange ~hue 12
+      primary: '12 76% 47%',
+      primaryForeground: '12 8% 97%',
+      // secondary: oklch(0.967 0.001 286.375) → near white
+      secondary: '286 2% 97%',
+      secondaryForeground: '286 5% 21%',
+      // muted: oklch(0.97 0 0)
+      muted: '0 0% 97%',
+      // muted-foreground: oklch(0.556 0 0)
+      mutedForeground: '0 0% 56%',
+      // accent: oklch(0.97 0 0)
+      accent: '0 0% 97%',
+      accentForeground: '0 0% 21%',
+      // destructive: oklch(0.58 0.22 27)
+      destructive: '12 76% 47%',
+      destructiveForeground: '12 8% 97%',
+      // border: oklch(0.922 0 0)
+      border: '0 0% 92%',
+      // input: oklch(0.922 0 0)
+      input: '0 0% 92%',
+      // ring: oklch(0.708 0 0)
+      ring: '0 0% 71%',
+      // Extended colors (HEX) - Pure neutrals, light mode inverted
+      bgDarkest: '#ebebeb',
+      bgDark: '#f5f5f5',
+      bg: '#fafafa',
+      bgLight: '#ffffff',
+      bgLighter: '#ffffff',
+      fg: '#252525',
+      fgLight: '#1a1a1a',
+      fgMuted: '#8f8f8f',
+      // Primary red from oklch(0.577 0.245 27.325)
+      primaryHex: '#c84528',
+      primaryLightHex: '#d95c3f',
+      // Secondary is neutral
+      secondaryHex: '#f7f7f7',
+      secondaryLightHex: '#fafafa',
+      // All accents use the same red or neutral - no yellow
+      accent1: '#c84528',
+      accent2: '#d95c3f',
+      accent3: '#8f8f8f',
+      accent4: '#c5c5c5',
+      selectionBg: 'rgba(200, 69, 40, 0.2)',
+      selectionText: '#1a1a1a',
+    },
+    fonts: {
+      display: "'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      body: "'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      mono: "'JetBrains Mono', monospace",
+    },
+    glow: {
+      // Minimal glow for light theme
+      color: '12 76% 47%',
+      colorRgb: '200, 69, 40',
+      secondary: '12 70% 55%',
+      secondaryRgb: '217, 92, 63',
+      intensity: '0.3',
+    },
+    effects: {
+      // Very minimal mesh for light theme - almost no effect
+      meshColor1: 'rgba(200, 69, 40, 0.02)',
+      meshColor2: 'rgba(200, 69, 40, 0.01)',
+      meshColor3: 'rgba(143, 143, 143, 0.02)',
+      meshColor4: 'rgba(143, 143, 143, 0.01)',
+      meshColor5: 'rgba(255, 255, 255, 0.99)',
+    },
+  },
 };
 
 // Theme categories for filtering in settings
@@ -837,6 +1027,7 @@ export const themeCategories = [
   { id: 'dark', label: 'Dark' },
   { id: 'minimal', label: 'Minimal' },
   { id: 'elegant', label: 'Elegant' },
+  { id: 'nova', label: 'Nova' },
 ];
 
 // Default theme ID

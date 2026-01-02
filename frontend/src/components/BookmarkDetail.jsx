@@ -14,6 +14,7 @@ import { Play, ExternalLink, X, Plus, Link2, MoreHorizontal, StickyNote } from "
 import { getTagColor, getTagColors, getAllTagColors, setTagColor } from '@/utils/tagColors';
 import { extractTagsFromContent } from '@/utils/tagExtraction';
 import { motion } from 'framer-motion';
+import { supabase } from '@/lib/supabaseClient';
 
 // Helper component to render YouTube descriptions with auto-linked URLs, @mentions, #hashtags, and timestamps
 const YouTubeLinkedText = ({ text, videoUrl = '', className = '' }) => {
@@ -289,20 +290,20 @@ const TagColumnsContainer = ({ tags, onRemoveTag, onAddTag }) => {
                         >
                             {/* Tag name - main clickable area */}
                             <span
-                                className="py-1.5 pl-2.5 pr-1 truncate max-w-[100px]"
+                                className="py-1.5 pl-2.5 pr-2.5 truncate max-w-[100px] transition-[padding] duration-200 group-hover:pr-1"
                                 style={{ color: color.text }}
                             >
                                 {tag}
                             </span>
 
-                            {/* Subtle divider */}
-                            <div
-                                className="w-px h-4 mx-0.5"
-                                style={{ backgroundColor: `${color.text}30` }}
-                            />
-
                             {/* Action buttons - grouped tightly */}
-                            <div className="flex items-center pr-1">
+                            <div className="flex items-center overflow-hidden min-w-0 max-w-0 pr-0 opacity-0 pointer-events-none transition-all duration-200 ease-out group-hover:max-w-[100px] group-hover:pr-1 group-hover:opacity-100 group-hover:pointer-events-auto">
+                                {/* Subtle divider */}
+                                <div
+                                    className="w-px h-4 mx-0.5"
+                                    style={{ backgroundColor: `${color.text}30` }}
+                                />
+
                                 {/* Ellipsis menu */}
                                 <button
                                     type="button"
@@ -544,7 +545,7 @@ const ArticlePreview = ({ bookmark }) => {
                 setLoading(true);
                 setError(null);
                 setRevealed(false);
-                const response = await fetch(`http://127.0.0.1:3000/api/article/extract?url=${encodeURIComponent(bookmark.url)}`);
+                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:3000'}/api/article/extract?url=${encodeURIComponent(bookmark.url)}`);
                 if (response.ok) {
                     const data = await response.json();
                     setArticle(data);
@@ -854,7 +855,7 @@ const DefaultPreview = ({ bookmark }) => (
 // Note Preview - Distraction-free writing space
 const NotePreview = ({ bookmark, notes, onNotesChange, title, onTitleChange, onSave, saving, availableTags = [], onClose, onTagClick }) => {
     const [isFocused, setIsFocused] = useState(false);
-    
+
     // Extract tags from notes content
     const extractedTags = extractTagsFromContent(notes || '');
     // Also check bookmark.tags array - normalize to lowercase for consistency
@@ -1781,24 +1782,23 @@ const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave, allTags = [], au
 
         setSaving(true);
         try {
-            const updatedBookmark = {
-                ...bookmark,
-                customTitle: formData.title || '',
+            const updatedData = {
+                title: formData.title || bookmark.title,
                 category: formData.category,
                 tags: formData.tags.split(',').map(t => t.trim()).filter(t => t),
                 notes: formData.notes
             };
 
-            const response = await fetch(`http://127.0.0.1:3000/api/bookmarks/${bookmark.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedBookmark)
-            });
+            const { data, error } = await supabase
+                .from('bookmarks')
+                .update(updatedData)
+                .eq('id', bookmark.id)
+                .select()
+                .single();
 
-            if (response.ok) {
-                if (onSave) onSave(await response.json());
-                onOpenChange(false);
-            }
+            if (error) throw error;
+            if (onSave) onSave(data);
+            onOpenChange(false);
         } catch (error) {
             console.error('Error saving bookmark:', error);
         } finally {
@@ -1882,9 +1882,9 @@ const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave, allTags = [], au
 
     // Check if this is a note-type bookmark (match BookmarkCard logic)
     const isNote = bookmark.type === 'note' ||
-                   bookmark.url?.startsWith('note://') ||
-                   bookmark.category === 'Note' ||
-                   (!bookmark.url && (bookmark.notes || bookmark.title));
+        bookmark.url?.startsWith('note://') ||
+        bookmark.category === 'Note' ||
+        (!bookmark.url && (bookmark.notes || bookmark.title));
 
     const isWiki = bookmark.url?.includes('wikipedia.org');
 

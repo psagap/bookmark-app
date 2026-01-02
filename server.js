@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = 3000;
@@ -13,27 +14,259 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'frontend/dist')));
 
-// Data file path
-const dataFile = path.join(__dirname, 'bookmarks.json');
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Helper functions
-const loadBookmarks = () => {
-  try {
-    if (fs.existsSync(dataFile)) {
-      return JSON.parse(fs.readFileSync(dataFile, 'utf8'));
-    }
-  } catch (err) {
-    console.error('Error loading bookmarks:', err);
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  : null;
+
+const ensureSupabase = () => {
+  if (!supabase) {
+    throw new Error('Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.');
   }
-  return [];
+  return supabase;
 };
 
-const saveBookmarks = (bookmarks) => {
-  try {
-    fs.writeFileSync(dataFile, JSON.stringify(bookmarks, null, 2));
-  } catch (err) {
-    console.error('Error saving bookmarks:', err);
+const toDate = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const toDbTimestamp = (value) => {
+  const date = toDate(value);
+  return date ? date.toISOString() : null;
+};
+
+const toEpochMs = (value) => {
+  const date = toDate(value);
+  return date ? date.getTime() : null;
+};
+
+const toDbBookmark = (bookmark) => ({
+  id: bookmark.id,
+  user_id: bookmark.userId,
+  url: bookmark.url,
+  title: bookmark.title,
+  thumbnail: bookmark.thumbnail || null,
+  created_at: toDbTimestamp(bookmark.createdAt),
+  updated_at: toDbTimestamp(bookmark.updatedAt),
+  category: bookmark.category || null,
+  sub_category: bookmark.subCategory || null,
+  tags: Array.isArray(bookmark.tags) ? bookmark.tags : [],
+  metadata: bookmark.metadata || {},
+  notes: bookmark.notes || '',
+  archived: bookmark.archived ?? false,
+  collection_id: bookmark.collectionId || null,
+  description: bookmark.description || null,
+});
+
+const fromDbBookmark = (row) => ({
+  id: row.id,
+  userId: row.user_id,
+  url: row.url,
+  title: row.title,
+  thumbnail: row.thumbnail || '',
+  createdAt: toEpochMs(row.created_at),
+  updatedAt: toEpochMs(row.updated_at),
+  category: row.category || null,
+  subCategory: row.sub_category || null,
+  tags: Array.isArray(row.tags) ? row.tags : [],
+  metadata: row.metadata || {},
+  notes: row.notes || '',
+  archived: row.archived ?? false,
+  collectionId: row.collection_id || null,
+  description: row.description || '',
+});
+
+const buildBookmarkUpdate = (patch) => {
+  const update = {};
+  if ('userId' in patch) update.user_id = patch.userId;
+  if ('url' in patch) update.url = patch.url;
+  if ('title' in patch) update.title = cleanTitle(patch.title);
+  if ('thumbnail' in patch) update.thumbnail = patch.thumbnail || null;
+  if ('category' in patch) update.category = patch.category || null;
+  if ('subCategory' in patch) update.sub_category = patch.subCategory || null;
+  if ('subcategory' in patch) update.sub_category = patch.subcategory || null;
+  if ('tags' in patch) update.tags = Array.isArray(patch.tags) ? patch.tags : [];
+  if ('metadata' in patch) update.metadata = patch.metadata || {};
+  if ('notes' in patch) update.notes = patch.notes || '';
+  if ('archived' in patch) update.archived = patch.archived;
+  if ('collectionId' in patch) update.collection_id = patch.collectionId || null;
+  if ('description' in patch) update.description = patch.description || '';
+  if ('createdAt' in patch) update.created_at = toDbTimestamp(patch.createdAt);
+  if ('updatedAt' in patch) update.updated_at = toDbTimestamp(patch.updatedAt);
+  return update;
+};
+
+const loadBookmarks = async () => {
+  const client = ensureSupabase();
+  const pageSize = 1000;
+  let from = 0;
+  let rows = [];
+
+  while (true) {
+    const { data, error } = await client
+      .from('bookmarks')
+      .select('*')
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    rows = rows.concat(data);
+
+    if (data.length < pageSize) {
+      break;
+    }
+
+    from += pageSize;
   }
+
+  return rows.map(fromDbBookmark);
+};
+
+const getBookmarkById = async (id) => {
+  const client = ensureSupabase();
+  const { data, error } = await client
+    .from('bookmarks')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? fromDbBookmark(data) : null;
+};
+
+const createBookmark = async (bookmark) => {
+  const client = ensureSupabase();
+  const { data, error } = await client
+    .from('bookmarks')
+    .insert([toDbBookmark(bookmark)])
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return fromDbBookmark(data);
+};
+
+const updateBookmarkById = async (id, patch) => {
+  const client = ensureSupabase();
+  const update = buildBookmarkUpdate(patch);
+
+  if (Object.keys(update).length === 0) {
+    return getBookmarkById(id);
+  }
+
+  const { data, error } = await client
+    .from('bookmarks')
+    .update(update)
+    .eq('id', id)
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? fromDbBookmark(data) : null;
+};
+
+const deleteBookmarkById = async (id) => {
+  const client = ensureSupabase();
+  const { data, error } = await client
+    .from('bookmarks')
+    .delete()
+    .eq('id', id)
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? fromDbBookmark(data) : null;
+};
+
+const deleteBookmarksByIds = async (ids) => {
+  const client = ensureSupabase();
+  const { data, error } = await client
+    .from('bookmarks')
+    .delete()
+    .in('id', ids)
+    .select('id');
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+};
+
+const setCollectionForBookmarks = async (collectionId, bookmarkIds) => {
+  const client = ensureSupabase();
+  const updatedAt = new Date().toISOString();
+  const { data, error } = await client
+    .from('bookmarks')
+    .update({ collection_id: collectionId, updated_at: updatedAt })
+    .in('id', bookmarkIds)
+    .select('id');
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+};
+
+const removeCollectionForBookmarks = async (collectionId, bookmarkIds) => {
+  const client = ensureSupabase();
+  const updatedAt = new Date().toISOString();
+  const { data, error } = await client
+    .from('bookmarks')
+    .update({ collection_id: null, updated_at: updatedAt })
+    .eq('collection_id', collectionId)
+    .in('id', bookmarkIds)
+    .select('id');
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+};
+
+const clearCollectionFromBookmarks = async (collectionId) => {
+  const client = ensureSupabase();
+  const updatedAt = new Date().toISOString();
+  const { data, error } = await client
+    .from('bookmarks')
+    .update({ collection_id: null, updated_at: updatedAt })
+    .eq('collection_id', collectionId)
+    .select('id');
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+};
+
+const asyncHandler = (handler) => (req, res, next) => {
+  Promise.resolve(handler(req, res, next)).catch(next);
 };
 
 // Clean up title by removing leading parenthetical numbers like "(2)" or "(34)"
@@ -208,8 +441,8 @@ const fetchYouTubeMetadata = async (videoId) => {
 // Routes
 
 // GET all bookmarks with filters
-app.get('/api/bookmarks', (req, res) => {
-  let bookmarks = loadBookmarks();
+app.get('/api/bookmarks', asyncHandler(async (req, res) => {
+  let bookmarks = await loadBookmarks();
   const { category, search, subcategory } = req.query;
 
   if (category) {
@@ -229,27 +462,44 @@ app.get('/api/bookmarks', (req, res) => {
 
   bookmarks.sort((a, b) => b.createdAt - a.createdAt);
   res.json(bookmarks);
-});
+}));
 
 // GET single bookmark
-app.get('/api/bookmarks/:id', (req, res) => {
-  const bookmarks = loadBookmarks();
-  const bookmark = bookmarks.find(b => b.id === req.params.id);
+app.get('/api/bookmarks/:id', asyncHandler(async (req, res) => {
+  const bookmark = await getBookmarkById(req.params.id);
 
   if (!bookmark) {
     return res.status(404).json({ error: 'Bookmark not found' });
   }
 
   res.json(bookmark);
-});
+}));
+
+// GET all unique tags across all bookmarks
+app.get('/api/tags', asyncHandler(async (req, res) => {
+  const bookmarks = await loadBookmarks();
+  const allTags = new Set();
+
+  bookmarks.forEach(bookmark => {
+    (bookmark.tags || []).forEach(tag => {
+      if (tag && typeof tag === 'string') {
+        allTags.add(tag.toLowerCase().trim());
+      }
+    });
+  });
+
+  res.json({
+    tags: Array.from(allTags).sort()
+  });
+}));
 
 // POST new bookmark
-app.post('/api/bookmarks', async (req, res) => {
-  const bookmarks = loadBookmarks();
+app.post('/api/bookmarks', asyncHandler(async (req, res) => {
   const url = req.body.url || '';
+  const incomingTags = Array.isArray(req.body.tags) ? req.body.tags : [];
 
   // Initialize metadata
-  let metadata = req.body.metadata || {};
+  let metadata = req.body.metadata && typeof req.body.metadata === 'object' ? req.body.metadata : {};
 
   // If it's a YouTube URL, fetch video metadata (API first, then scrape fallback)
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
@@ -285,92 +535,73 @@ app.post('/api/bookmarks', async (req, res) => {
     }
   }
 
+  const createdAt = toEpochMs(req.body.createdAt) ?? Date.now();
   const newBookmark = {
     id: req.body.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     userId: 'local-user',
     url: url,
     title: cleanTitle(req.body.title),
     thumbnail: req.body.thumbnail || req.body.ogImage || '',
-    createdAt: req.body.createdAt || Date.now(),
+    createdAt,
     updatedAt: Date.now(),
     category: req.body.category,
     subCategory: req.body.subcategory || req.body.subCategory,
-    tags: req.body.tags || [],
-    metadata: metadata,
+    tags: incomingTags,
+    metadata,
     notes: req.body.notes || '',
     archived: req.body.archived || false,
+    collectionId: req.body.collectionId || null,
+    description: req.body.description || '',
   };
 
-  bookmarks.push(newBookmark);
-  saveBookmarks(bookmarks);
-
-  res.status(201).json(newBookmark);
-});
+  const created = await createBookmark(newBookmark);
+  res.status(201).json(created);
+}));
 
 // PUT update bookmark
-app.put('/api/bookmarks/:id', (req, res) => {
-  const bookmarks = loadBookmarks();
-  const index = bookmarks.findIndex(b => b.id === req.params.id);
+app.put('/api/bookmarks/:id', asyncHandler(async (req, res) => {
+  const updated = await updateBookmarkById(req.params.id, {
+    ...req.body,
+    updatedAt: Date.now(),
+  });
 
-  if (index === -1) {
+  if (!updated) {
     return res.status(404).json({ error: 'Bookmark not found' });
   }
-
-  const updated = {
-    ...bookmarks[index],
-    ...req.body,
-    id: req.params.id,
-    updatedAt: Date.now(),
-  };
-
-  bookmarks[index] = updated;
-  saveBookmarks(bookmarks);
 
   res.json(updated);
-});
+}));
 
 // DELETE bookmark
-app.delete('/api/bookmarks/:id', (req, res) => {
-  let bookmarks = loadBookmarks();
-  const index = bookmarks.findIndex(b => b.id === req.params.id);
+app.delete('/api/bookmarks/:id', asyncHandler(async (req, res) => {
+  const deleted = await deleteBookmarkById(req.params.id);
 
-  if (index === -1) {
+  if (!deleted) {
     return res.status(404).json({ error: 'Bookmark not found' });
   }
 
-  const deleted = bookmarks[index];
-  bookmarks = bookmarks.filter((_, i) => i !== index);
-  saveBookmarks(bookmarks);
-
   res.json(deleted);
-});
+}));
 
 // POST bulk delete bookmarks
-app.post('/api/bookmarks/bulk-delete', (req, res) => {
+app.post('/api/bookmarks/bulk-delete', asyncHandler(async (req, res) => {
   const { ids } = req.body;
   if (!ids || !Array.isArray(ids)) {
     return res.status(400).json({ error: 'ids array is required' });
   }
 
-  let bookmarks = loadBookmarks();
-  const idsSet = new Set(ids);
-  const deleted = bookmarks.filter(b => idsSet.has(b.id));
-  bookmarks = bookmarks.filter(b => !idsSet.has(b.id));
-  saveBookmarks(bookmarks);
-
+  const deleted = await deleteBookmarksByIds(ids);
   res.json({ deleted: deleted.length, ids: deleted.map(b => b.id) });
-});
+}));
 
 // POST refresh bookmark metadata (fetch fresh images from oEmbed)
-app.post('/api/bookmarks/:id/refresh', async (req, res) => {
-  const bookmarks = loadBookmarks();
-  const index = bookmarks.findIndex(b => b.id === req.params.id);
+app.post('/api/bookmarks/:id/refresh', asyncHandler(async (req, res) => {
+  const bookmark = await getBookmarkById(req.params.id);
 
-  if (index === -1) {
+  if (!bookmark) {
     return res.status(404).json({ error: 'Bookmark not found' });
   }
 
-  const bookmark = bookmarks[index];
   const url = bookmark.url;
 
   try {
@@ -493,28 +724,23 @@ app.post('/api/bookmarks/:id/refresh', async (req, res) => {
       }
     }
 
-    // Update bookmark
-    const updated = {
-      ...bookmark,
+    const updated = await updateBookmarkById(req.params.id, {
       thumbnail,
       metadata: updatedMetadata,
       updatedAt: Date.now()
-    };
-
-    bookmarks[index] = updated;
-    saveBookmarks(bookmarks);
+    });
 
     res.json(updated);
   } catch (error) {
     console.error('Error refreshing bookmark:', error);
     res.status(500).json({ error: error.message });
   }
-});
+}));
 
 // POST backfill YouTube metadata for existing bookmarks missing videoDescription
-app.post('/api/youtube/backfill', async (req, res) => {
+app.post('/api/youtube/backfill', asyncHandler(async (req, res) => {
   try {
-    let bookmarks = loadBookmarks();
+    let bookmarks = await loadBookmarks();
     
     // Find YouTube bookmarks missing or with generic videoDescription
     const genericYouTubeDesc = "Enjoy the videos and music you love, upload original content, and share it all with friends, family, and the world on YouTube.";
@@ -555,23 +781,25 @@ app.post('/api/youtube/backfill', async (req, res) => {
       try {
         const youtubeData = await fetchYouTubeMetadata(videoId);
         if (youtubeData) {
-          // Find and update the bookmark in the array
-          const index = bookmarks.findIndex(b => b.id === bookmark.id);
-          if (index !== -1) {
-            bookmarks[index] = {
-              ...bookmarks[index],
-              metadata: {
-                ...bookmarks[index].metadata,
-                ...youtubeData
-              },
-              updatedAt: Date.now()
-            };
-            // Update thumbnail if we got a better one
-            if (youtubeData.thumbnails?.maxres?.url) {
-              bookmarks[index].thumbnail = youtubeData.thumbnails.maxres.url;
-            } else if (youtubeData.thumbnails?.high?.url) {
-              bookmarks[index].thumbnail = youtubeData.thumbnails.high.url;
-            }
+          const update = {
+            metadata: {
+              ...bookmark.metadata,
+              ...youtubeData
+            },
+            updatedAt: Date.now()
+          };
+
+          if (youtubeData.thumbnails?.maxres?.url) {
+            update.thumbnail = youtubeData.thumbnails.maxres.url;
+          } else if (youtubeData.thumbnails?.high?.url) {
+            update.thumbnail = youtubeData.thumbnails.high.url;
+          }
+
+          const updated = await updateBookmarkById(bookmark.id, update);
+          if (!updated) {
+            failed++;
+            results.push({ id: bookmark.id, status: 'failed', reason: 'Bookmark not found' });
+          } else {
             processed++;
             results.push({ 
               id: bookmark.id, 
@@ -593,9 +821,6 @@ app.post('/api/youtube/backfill', async (req, res) => {
       await new Promise(resolve => setTimeout(resolve, 200));
     }
 
-    // Save all updated bookmarks
-    saveBookmarks(bookmarks);
-
     res.json({
       message: `Backfill complete`,
       processed,
@@ -607,12 +832,12 @@ app.post('/api/youtube/backfill', async (req, res) => {
     console.error('YouTube backfill error:', error);
     res.status(500).json({ error: error.message });
   }
-});
+}));
 
 // POST backfill article metadata for existing bookmarks missing siteName/author
-app.post('/api/article/backfill', async (req, res) => {
+app.post('/api/article/backfill', asyncHandler(async (req, res) => {
   try {
-    let bookmarks = loadBookmarks();
+    let bookmarks = await loadBookmarks();
 
     // Find article bookmarks (not YouTube, Twitter, Wikipedia) missing metadata
     const articleBookmarks = bookmarks.filter(b => {
@@ -642,18 +867,20 @@ app.post('/api/article/backfill', async (req, res) => {
       try {
         const articleData = await extractArticleMetadata(bookmark.url);
         if (articleData) {
-          const index = bookmarks.findIndex(b => b.id === bookmark.id);
-          if (index !== -1) {
-            bookmarks[index] = {
-              ...bookmarks[index],
-              metadata: {
-                ...bookmarks[index].metadata,
-                siteName: articleData.siteName,
-                author: articleData.author,
-                publishedDate: articleData.publishedDate
-              },
-              updatedAt: Date.now()
-            };
+          const updated = await updateBookmarkById(bookmark.id, {
+            metadata: {
+              ...bookmark.metadata,
+              siteName: articleData.siteName,
+              author: articleData.author,
+              publishedDate: articleData.publishedDate
+            },
+            updatedAt: Date.now()
+          });
+
+          if (!updated) {
+            failed++;
+            results.push({ id: bookmark.id, status: 'failed', reason: 'Bookmark not found' });
+          } else {
             processed++;
             results.push({
               id: bookmark.id,
@@ -676,8 +903,6 @@ app.post('/api/article/backfill', async (req, res) => {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    saveBookmarks(bookmarks);
-
     res.json({
       message: 'Article backfill complete',
       processed,
@@ -689,7 +914,7 @@ app.post('/api/article/backfill', async (req, res) => {
     console.error('Article backfill error:', error);
     res.status(500).json({ error: error.message });
   }
-});
+}));
 
 // In-memory cache for oEmbed responses
 const oembedCache = new Map();
@@ -1455,9 +1680,9 @@ const saveCollections = (collections) => {
 };
 
 // GET all collections
-app.get('/api/collections', (req, res) => {
+app.get('/api/collections', asyncHandler(async (req, res) => {
   const collections = loadCollections();
-  const bookmarks = loadBookmarks();
+  const bookmarks = await loadBookmarks();
 
   // Add bookmark count to each collection
   const collectionsWithCounts = collections.map(c => ({
@@ -1466,10 +1691,10 @@ app.get('/api/collections', (req, res) => {
   }));
 
   res.json(collectionsWithCounts);
-});
+}));
 
 // GET single collection
-app.get('/api/collections/:id', (req, res) => {
+app.get('/api/collections/:id', asyncHandler(async (req, res) => {
   const collections = loadCollections();
   const collection = collections.find(c => c.id === req.params.id);
 
@@ -1477,11 +1702,11 @@ app.get('/api/collections/:id', (req, res) => {
     return res.status(404).json({ error: 'Collection not found' });
   }
 
-  const bookmarks = loadBookmarks();
+  const bookmarks = await loadBookmarks();
   collection.bookmarkCount = bookmarks.filter(b => b.collectionId === collection.id).length;
 
   res.json(collection);
-});
+}));
 
 // POST create new collection
 app.post('/api/collections', (req, res) => {
@@ -1529,7 +1754,7 @@ app.put('/api/collections/:id', (req, res) => {
 });
 
 // DELETE collection
-app.delete('/api/collections/:id', (req, res) => {
+app.delete('/api/collections/:id', asyncHandler(async (req, res) => {
   let collections = loadCollections();
   const index = collections.findIndex(c => c.id === req.params.id);
 
@@ -1538,25 +1763,17 @@ app.delete('/api/collections/:id', (req, res) => {
   }
 
   // Also remove collection reference from bookmarks
-  let bookmarks = loadBookmarks();
-  bookmarks = bookmarks.map(b => {
-    if (b.collectionId === req.params.id) {
-      const { collectionId, ...rest } = b;
-      return rest;
-    }
-    return b;
-  });
-  saveBookmarks(bookmarks);
+  await clearCollectionFromBookmarks(req.params.id);
 
   const deleted = collections[index];
   collections = collections.filter((_, i) => i !== index);
   saveCollections(collections);
 
   res.json(deleted);
-});
+}));
 
 // POST add bookmarks to collection
-app.post('/api/collections/:id/bookmarks', (req, res) => {
+app.post('/api/collections/:id/bookmarks', asyncHandler(async (req, res) => {
   const { bookmarkIds } = req.body;
 
   if (!bookmarkIds || !Array.isArray(bookmarkIds)) {
@@ -1570,48 +1787,23 @@ app.post('/api/collections/:id/bookmarks', (req, res) => {
     return res.status(404).json({ error: 'Collection not found' });
   }
 
-  let bookmarks = loadBookmarks();
-  const idsSet = new Set(bookmarkIds);
-  let updated = 0;
+  const updated = await setCollectionForBookmarks(req.params.id, bookmarkIds);
 
-  bookmarks = bookmarks.map(b => {
-    if (idsSet.has(b.id)) {
-      updated++;
-      return { ...b, collectionId: req.params.id, updatedAt: Date.now() };
-    }
-    return b;
-  });
-
-  saveBookmarks(bookmarks);
-
-  res.json({ updated, collectionId: req.params.id });
-});
+  res.json({ updated: updated.length, collectionId: req.params.id });
+}));
 
 // DELETE remove bookmarks from collection
-app.delete('/api/collections/:id/bookmarks', (req, res) => {
+app.delete('/api/collections/:id/bookmarks', asyncHandler(async (req, res) => {
   const { bookmarkIds } = req.body;
 
   if (!bookmarkIds || !Array.isArray(bookmarkIds)) {
     return res.status(400).json({ error: 'bookmarkIds array is required' });
   }
 
-  let bookmarks = loadBookmarks();
-  const idsSet = new Set(bookmarkIds);
-  let updated = 0;
+  const updated = await removeCollectionForBookmarks(req.params.id, bookmarkIds);
 
-  bookmarks = bookmarks.map(b => {
-    if (idsSet.has(b.id) && b.collectionId === req.params.id) {
-      updated++;
-      const { collectionId, ...rest } = b;
-      return { ...rest, updatedAt: Date.now() };
-    }
-    return b;
-  });
-
-  saveBookmarks(bookmarks);
-
-  res.json({ updated });
-});
+  res.json({ updated: updated.length });
+}));
 
 // ==================== END COLLECTIONS API ====================
 
@@ -1697,7 +1889,7 @@ const getDateFromPreset = (presetId) => {
 };
 
 // POST /api/search - Advanced search endpoint
-app.post('/api/search', (req, res) => {
+app.post('/api/search', asyncHandler(async (req, res) => {
   const {
     query = '',
     filters = {},
@@ -1706,7 +1898,7 @@ app.post('/api/search', (req, res) => {
     sortBy = 'relevance',
   } = req.body;
 
-  let bookmarks = loadBookmarks();
+  let bookmarks = await loadBookmarks();
 
   // Add type to each bookmark
   bookmarks = bookmarks.map(b => ({
@@ -1810,7 +2002,7 @@ app.post('/api/search', (req, res) => {
     query,
     filters,
   });
-});
+}));
 
 // POST /api/ocr - Extract text from image (server-side OCR)
 app.post('/api/ocr', async (req, res) => {
@@ -1853,9 +2045,9 @@ app.post('/api/ocr', async (req, res) => {
 });
 
 // GET /api/search/suggestions - Get search suggestions
-app.get('/api/search/suggestions', (req, res) => {
+app.get('/api/search/suggestions', asyncHandler(async (req, res) => {
   const { q = '' } = req.query;
-  const bookmarks = loadBookmarks();
+  const bookmarks = await loadBookmarks();
 
   // Collect all unique tags
   const tagSet = new Set();
@@ -1890,7 +2082,7 @@ app.get('/api/search/suggestions', (req, res) => {
   });
 
   res.json({ suggestions: suggestions.slice(0, 10) });
-});
+}));
 
 // ==================== SEMANTIC SEARCH API ====================
 
@@ -1983,7 +2175,7 @@ const cosineSimilarity = (vecA, vecB) => {
 };
 
 // POST /api/semantic-search - Semantic search with embeddings
-app.post('/api/semantic-search', async (req, res) => {
+app.post('/api/semantic-search', asyncHandler(async (req, res) => {
   const {
     query = '',
     filters = {},
@@ -1996,7 +2188,7 @@ app.post('/api/semantic-search', async (req, res) => {
   }
 
   try {
-    let bookmarks = loadBookmarks();
+    let bookmarks = await loadBookmarks();
 
     // Add type to each bookmark
     bookmarks = bookmarks.map(b => ({
@@ -2063,12 +2255,12 @@ app.post('/api/semantic-search', async (req, res) => {
     console.error('Semantic search error:', error);
     res.status(500).json({ error: 'Semantic search failed' });
   }
-});
+}));
 
 // POST /api/embeddings/generate - Pre-generate embeddings for all bookmarks
-app.post('/api/embeddings/generate', async (req, res) => {
+app.post('/api/embeddings/generate', asyncHandler(async (req, res) => {
   try {
-    const bookmarks = loadBookmarks();
+    const bookmarks = await loadBookmarks();
     let processed = 0;
 
     for (const bookmark of bookmarks) {
@@ -2093,15 +2285,15 @@ app.post('/api/embeddings/generate', async (req, res) => {
     console.error('Embedding generation error:', error);
     res.status(500).json({ error: 'Failed to generate embeddings' });
   }
-});
+}));
 
 // ==================== END SEMANTIC SEARCH API ====================
 
 // ==================== END POWER SEARCH API ====================
 
 // GET statistics
-app.get('/api/stats', (req, res) => {
-  const bookmarks = loadBookmarks();
+app.get('/api/stats', asyncHandler(async (req, res) => {
+  const bookmarks = await loadBookmarks();
   const stats = {
     total: bookmarks.length,
     categories: {},
@@ -2114,7 +2306,7 @@ app.get('/api/stats', (req, res) => {
   });
 
   res.json(stats);
-});
+}));
 
 // SPA fallback route - serve index.html for any non-API routes (must be after all API routes)
 app.get('*', (req, res) => {
@@ -2124,11 +2316,15 @@ app.get('*', (req, res) => {
 // Error handling
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-  res.status(500).json({ error: 'Internal server error' });
+  res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
 // Start server
 app.listen(PORT, () => {
   console.log(`📑 Bookmark server running on http://localhost:${PORT}`);
-  console.log(`Data stored in: ${dataFile}`);
+  if (supabase) {
+    console.log('Storage: Supabase (bookmarks table)');
+  } else {
+    console.log('⚠️ Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
+  }
 });

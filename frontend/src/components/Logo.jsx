@@ -15,17 +15,17 @@ const Logo = ({ size = 44, className = '' }) => {
       {/* Background glow */}
       <defs>
         <radialGradient id="logoGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="var(--gruvbox-yellow)" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="var(--gruvbox-yellow)" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--theme-primary)" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="var(--theme-primary)" stopOpacity="0" />
         </radialGradient>
         <linearGradient id="brainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="var(--gruvbox-yellow)" />
-          <stop offset="50%" stopColor="var(--gruvbox-orange)" />
-          <stop offset="100%" stopColor="var(--gruvbox-red)" />
+          <stop offset="0%" stopColor="var(--theme-primary)" />
+          <stop offset="50%" stopColor="var(--theme-secondary)" />
+          <stop offset="100%" stopColor="var(--theme-accent-1)" />
         </linearGradient>
         <linearGradient id="bookmarkGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="var(--gruvbox-aqua)" />
-          <stop offset="100%" stopColor="var(--gruvbox-blue)" />
+          <stop offset="0%" stopColor="var(--theme-accent-2)" />
+          <stop offset="100%" stopColor="var(--theme-accent-4)" />
         </linearGradient>
       </defs>
 
@@ -56,7 +56,7 @@ const Logo = ({ size = 44, className = '' }) => {
         {/* Neural connections / folds */}
         <path
           d="M12 16C14 18 16 18 18 16"
-          stroke="var(--gruvbox-yellow)"
+          stroke="var(--theme-primary)"
           strokeWidth="1.5"
           strokeLinecap="round"
           fill="none"
@@ -64,7 +64,7 @@ const Logo = ({ size = 44, className = '' }) => {
         />
         <path
           d="M22 16C24 18 26 18 28 16"
-          stroke="var(--gruvbox-yellow)"
+          stroke="var(--theme-primary)"
           strokeWidth="1.5"
           strokeLinecap="round"
           fill="none"
@@ -72,7 +72,7 @@ const Logo = ({ size = 44, className = '' }) => {
         />
         <path
           d="M14 24C16 26 18 26 20 24C22 26 24 26 26 24"
-          stroke="var(--gruvbox-orange)"
+          stroke="var(--theme-secondary)"
           strokeWidth="1.5"
           strokeLinecap="round"
           fill="none"
@@ -91,9 +91,9 @@ const Logo = ({ size = 44, className = '' }) => {
         />
 
         {/* Sparkle dots - memories/ideas */}
-        <circle cx="10" cy="20" r="1.5" fill="var(--gruvbox-yellow)" opacity="0.8" />
-        <circle cx="30" cy="20" r="1.5" fill="var(--gruvbox-yellow)" opacity="0.8" />
-        <circle cx="20" cy="10" r="1.5" fill="var(--gruvbox-orange)" opacity="0.8" />
+        <circle cx="10" cy="20" r="1.5" fill="var(--theme-primary)" opacity="0.8" />
+        <circle cx="30" cy="20" r="1.5" fill="var(--theme-primary)" opacity="0.8" />
+        <circle cx="20" cy="10" r="1.5" fill="var(--theme-secondary)" opacity="0.8" />
       </g>
     </svg>
   );

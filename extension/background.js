@@ -1,7 +1,160 @@
 /**
  * Background service worker
- * Handles communication with local server and offline storage
+ * Handles communication with Supabase and offline storage
  */
+
+// Supabase Configuration
+const SUPABASE_URL = 'https://oxkhforkxcmeyqdjybmw.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94a2hmb3JreGNtZXlxZGp5Ym13Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NzIzNjEsImV4cCI6MjA4MjU0ODM2MX0.0mdKH3c9Q6LIfTGLFwF5W4yAfA9VJ5Jq-5NFRmVHRyw';
+
+// Session storage key
+const SESSION_KEY = 'supabase_session';
+
+/**
+ * Get the current session from chrome storage
+ */
+async function getSession() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([SESSION_KEY], (result) => {
+      resolve(result[SESSION_KEY] || null);
+    });
+  });
+}
+
+/**
+ * Save session to chrome storage
+ */
+async function saveSession(session) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ [SESSION_KEY]: session }, resolve);
+  });
+}
+
+/**
+ * Clear session from chrome storage
+ */
+async function clearSession() {
+  return new Promise((resolve) => {
+    chrome.storage.local.remove([SESSION_KEY], resolve);
+  });
+}
+
+/**
+ * Get current user from session
+ */
+async function getCurrentUser() {
+  const session = await getSession();
+  return session?.user || null;
+}
+
+/**
+ * Refresh the session if needed
+ */
+async function refreshSession() {
+  const session = await getSession();
+  if (!session?.refresh_token) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        refresh_token: session.refresh_token,
+      }),
+    });
+
+    if (!response.ok) {
+      await clearSession();
+      return null;
+    }
+
+    const newSession = await response.json();
+    await saveSession(newSession);
+    return newSession;
+  } catch (error) {
+    console.error('Failed to refresh session:', error);
+    return null;
+  }
+}
+
+/**
+ * Get a valid access token, refreshing if needed
+ */
+async function getAccessToken() {
+  const session = await getSession();
+  if (!session?.access_token) {
+    return null;
+  }
+
+  // Check if token is expired (with 60s buffer)
+  const expiresAt = session.expires_at || 0;
+  const now = Math.floor(Date.now() / 1000);
+
+  if (expiresAt - now < 60) {
+    const refreshed = await refreshSession();
+    return refreshed?.access_token || null;
+  }
+
+  return session.access_token;
+}
+
+/**
+ * Check if there's an active session
+ */
+async function isAuthenticated() {
+  const token = await getAccessToken();
+  return !!token;
+}
+
+/**
+ * Save a bookmark to Supabase
+ */
+async function saveBookmarkToSupabase(bookmark) {
+  const accessToken = await getAccessToken();
+  const user = await getCurrentUser();
+
+  if (!accessToken || !user) {
+    throw new Error('Not authenticated. Please log in via the main app.');
+  }
+
+  // Prepare the bookmark data for Supabase
+  const bookmarkData = {
+    user_id: user.id,
+    user_email: user.email || '',
+    title: bookmark.title || '',
+    url: bookmark.url || '',
+    description: bookmark.metadata?.ogDescription || '',
+    notes: bookmark.notes || '',
+    tags: bookmark.tags || [],
+    pinned: false,
+    type: bookmark.category || 'Article',
+    cover_image: bookmark.thumbnail || '',
+  };
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/bookmarks`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${accessToken}`,
+      'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(bookmarkData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to save bookmark');
+  }
+
+  const [savedBookmark] = await response.json();
+  return savedBookmark;
+}
 
 // Initialize IndexedDB for offline storage
 const DB_NAME = 'BookmarkAppDB';
@@ -22,26 +175,6 @@ function initializeDB() {
       }
     };
   });
-}
-
-// Save bookmark to local server
-async function saveBookmarkToServer(bookmark) {
-  try {
-    const response = await fetch('http://127.0.0.1:3000/api/bookmarks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(bookmark),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error saving to server:', error);
-    throw error;
-  }
 }
 
 // Save bookmark to IndexedDB (for offline)
@@ -65,39 +198,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true; // Keep channel open for async response
   }
+
+  if (request.action === 'checkAuth') {
+    isAuthenticated()
+      .then(authenticated => sendResponse({ authenticated }))
+      .catch(() => sendResponse({ authenticated: false }));
+    return true;
+  }
+
+  if (request.action === 'setSession') {
+    saveSession(request.session)
+      .then(() => sendResponse({ success: true }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (request.action === 'clearSession') {
+    clearSession()
+      .then(() => sendResponse({ success: true }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
 });
 
 async function handleSaveBookmark(bookmark) {
+  // Check if authenticated first
+  const authenticated = await isAuthenticated();
+  if (!authenticated) {
+    throw new Error('Not logged in. Please sign in via the main app first.');
+  }
+
   try {
-    // If Twitter URL and no thumbnail, try oEmbed first
-    if ((bookmark.url.includes('twitter.com') || bookmark.url.includes('x.com'))
-        && !bookmark.thumbnail) {
-      try {
-        const oembedResponse = await fetch(
-          `http://127.0.0.1:3000/api/twitter/oembed?url=${encodeURIComponent(bookmark.url)}`
-        );
-
-        if (oembedResponse.ok) {
-          const oembedData = await oembedResponse.json();
-          if (oembedData.thumbnail) {
-            bookmark.thumbnail = oembedData.thumbnail;
-            bookmark.metadata = bookmark.metadata || {};
-            bookmark.metadata.oembedData = {
-              authorName: oembedData.authorName,
-              authorUrl: oembedData.authorUrl
-            };
-          }
-        }
-      } catch (oembedError) {
-        console.warn('oEmbed fetch failed, continuing with original data:', oembedError);
-      }
-    }
-
-    // Try to save to server
-    const savedBookmark = await saveBookmarkToServer(bookmark);
-    return { source: 'server', bookmark: savedBookmark };
-  } catch (serverError) {
-    console.warn('Server unavailable, saving offline:', serverError);
+    // Try to save to Supabase
+    const savedBookmark = await saveBookmarkToSupabase(bookmark);
+    return { source: 'supabase', bookmark: savedBookmark };
+  } catch (error) {
+    console.warn('Supabase unavailable, saving offline:', error);
     // Fallback to offline storage
     const offlineId = await saveBookmarkOffline(bookmark);
     return { source: 'offline', id: offlineId, bookmark };
@@ -134,8 +270,13 @@ async function deleteOfflineBookmark(id) {
   }
 }
 
-// Sync offline bookmarks to server
+// Sync offline bookmarks to Supabase
 async function syncOfflineBookmarks() {
+  const authenticated = await isAuthenticated();
+  if (!authenticated) {
+    return; // Can't sync without auth
+  }
+
   const offlineBookmarks = await getOfflineBookmarks();
 
   if (offlineBookmarks.length === 0) {
@@ -146,23 +287,12 @@ async function syncOfflineBookmarks() {
 
   for (const bookmark of offlineBookmarks) {
     try {
-      // Try to save to server
-      const response = await fetch('http://localhost:3000/api/bookmarks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bookmark),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
+      await saveBookmarkToSupabase(bookmark);
       // Successfully synced, delete from IndexedDB
       await deleteOfflineBookmark(bookmark.id);
       console.log(`Successfully synced bookmark: ${bookmark.title}`);
     } catch (error) {
       console.warn(`Could not sync bookmark "${bookmark.title}", will retry later:`, error);
-      // Keep the bookmark in IndexedDB for next sync attempt
     }
   }
 }

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import Fuse from 'fuse.js';
 import {
   Search, X, Command, Link2, StickyNote, Twitter, Youtube,
-  Globe, FolderOpen, Tag, ChevronDown, ChevronRight, Filter, Sparkles,
+  BookOpen, FolderOpen, Tag, ChevronDown, ChevronRight, Filter, Sparkles,
   Calendar, Clock, Image, FileText, Zap, ArrowUp, ArrowDown, CornerDownLeft,
   Loader2, AlertCircle, TrendingUp, Hash
 } from 'lucide-react';
@@ -27,7 +27,7 @@ const PIXIE_FOLDER_COLORS = [
 
 // Type definitions with icons and colors
 const BOOKMARK_TYPES = [
-  { id: 'link', label: 'Links', icon: Globe, color: 'gruvbox-aqua' },
+  { id: 'link', label: 'Links', icon: BookOpen, color: 'gruvbox-aqua' },
   { id: 'note', label: 'Notes', icon: StickyNote, color: 'gruvbox-yellow' },
   { id: 'tweet', label: 'Tweets', icon: Twitter, color: 'gruvbox-blue' },
   { id: 'youtube', label: 'YouTube', icon: Youtube, color: 'gruvbox-red' },

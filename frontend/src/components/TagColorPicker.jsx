@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Palette } from 'lucide-react';
+import { Check, MoreHorizontal, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAllTagColors, getTagColor, setTagColor } from '@/utils/tagColors';
 
@@ -359,8 +359,8 @@ export const TagPill = ({
 };
 
 /**
- * DeletableTagPill - Tag pill with animated hover-to-reveal delete button
- * X button expands from the right on hover
+ * DeletableTagPill - Tag pill with animated hover-to-reveal action button
+ * Action expands from the right on hover
  */
 export const DeletableTagPill = ({
   tag,
@@ -370,6 +370,7 @@ export const DeletableTagPill = ({
   onColorChange,
   showColorPicker = true,
   size = 'default', // 'small' | 'default' | 'large'
+  actionIcon = 'delete', // 'delete' | 'menu'
   className,
 }) => {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -396,13 +397,16 @@ export const DeletableTagPill = ({
     default: 'w-4 h-4 text-[10px]',
     large: 'w-5 h-5 text-xs',
   };
+  const actionIconSizes = {
+    small: 'w-3 h-3',
+    default: 'w-3.5 h-3.5',
+    large: 'w-4 h-4',
+  };
 
-  const handleContextMenu = (e) => {
+  const openColorPicker = (e) => {
     if (!showColorPicker) return;
-
     e.preventDefault();
     e.stopPropagation();
-
     const rect = pillRef.current?.getBoundingClientRect();
     if (rect) {
       setPosition({
@@ -411,6 +415,11 @@ export const DeletableTagPill = ({
       });
     }
     setIsPickerOpen(true);
+  };
+
+  const handleContextMenu = (e) => {
+    if (!showColorPicker) return;
+    openColorPicker(e);
   };
 
   const handleColorSelect = (colorId) => {
@@ -424,11 +433,24 @@ export const DeletableTagPill = ({
     onDelete?.(tag);
   };
 
+  const handleActionClick = (e) => {
+    if (actionIcon === 'menu') {
+      openColorPicker(e);
+      return;
+    }
+    handleDelete(e);
+  };
+
   const handleClick = (e) => {
     if (onClick) {
       onClick(e, tag);
     }
   };
+
+  const showActionButton = actionIcon === 'menu' ? showColorPicker : !!onDelete;
+  const actionLabel = actionIcon === 'menu'
+    ? `Change color for ${tag}`
+    : `Remove ${tag} tag`;
 
   return (
     <>
@@ -454,18 +476,22 @@ export const DeletableTagPill = ({
         <span className={paddingClasses[size]}>#{tag}</span>
 
         {/* Animated delete button - expands from right on hover */}
-        {onDelete && (
+        {showActionButton && (
           <span className="deletable-tag-delete-wrapper overflow-hidden transition-all duration-200 ease-out opacity-0 group-hover:opacity-100 flex items-center">
             <button
-              onClick={handleDelete}
+              onClick={handleActionClick}
               className={cn(
                 "flex items-center justify-center rounded-full transition-all duration-150",
                 "bg-black/20 hover:bg-black/40",
                 deleteButtonSizes[size]
               )}
-              aria-label={`Remove ${tag} tag`}
+              aria-label={actionLabel}
             >
-              <span className="leading-none">×</span>
+              {actionIcon === 'menu' ? (
+                <MoreHorizontal className={actionIconSizes[size]} />
+              ) : (
+                <span className="leading-none">×</span>
+              )}
             </button>
           </span>
         )}

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&family=Orbitron:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&family=Orbitron:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -91,6 +91,37 @@
     --gruvbox-aqua-light: var(--theme-accent-2);
     --gruvbox-purple: var(--theme-accent-3);
     --gruvbox-purple-light: var(--theme-accent-3);
+
+    /* ========================================
+       UI SIZE VARIABLES
+       Default to "large" size (compact)
+       ======================================== */
+    --ui-pill-px: 0.875rem;
+    --ui-pill-py: 0.375rem;
+    --ui-pill-gap: 0.5rem;
+    --ui-pill-icon: 1rem;
+    --ui-pill-text: 1rem;
+    --ui-search-text: 1.125rem;
+  }
+
+  /* UI Size: Large (default - compact) */
+  :root.ui-size-large {
+    --ui-pill-px: 0.875rem;
+    --ui-pill-py: 0.375rem;
+    --ui-pill-gap: 0.5rem;
+    --ui-pill-icon: 1rem;
+    --ui-pill-text: 1rem;
+    --ui-search-text: 1.125rem;
+  }
+
+  /* UI Size: Minimal */
+  :root.ui-size-minimal {
+    --ui-pill-px: 0.75rem;
+    --ui-pill-py: 0.375rem;
+    --ui-pill-gap: 0.375rem;
+    --ui-pill-icon: 0.875rem;
+    --ui-pill-text: 0.8125rem;
+    --ui-search-text: 0.875rem;
   }
 
   .dark {
@@ -507,11 +538,11 @@
   }
 
   .folder-content {
-    filter: drop-shadow(0px 4px 20px rgba(0, 0, 0, 0.25));
+    /* Wrapper for elevated panel */
   }
 
   .folder-content-inner {
-    border: 1px solid var(--theme-bg-lighter);
+    /* Main container - styles applied inline for proper corner handling */
   }
 
   .folder-page {
@@ -575,32 +606,84 @@
   }
 
   /* ========================================
-     SIDES GRID
+     SIDES GRID - Modern Folder View
      ======================================== */
 
   .sides-container {
     width: 100%;
+    padding: 0 1rem;
   }
 
-  .sides-grid {
-    display: flex;
-    gap: 16px;
-    justify-content: center;
-    padding: 1rem 0;
-    max-width: 1400px;
-    margin: 0 auto;
+  /* Modern side card styling */
+  .side-card-modern {
+    width: 100%;
+    min-width: 0;
   }
 
-  .sides-grid--collapsed {
-    overflow: hidden;
+  /* Selected folder view */
+  .sides-selected-view {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
   }
 
-  .sides-grid--expanded {
-    overflow: visible;
+  .sides-selected-view--visible {
+    opacity: 1;
+    transform: translateY(0);
   }
 
   /* Inline filter pill animation */
   .inline-filter-pill {
     overflow: hidden;
+  }
+
+  /* ========================================
+     SIDES GALLERY - Crystalline Collections
+     ======================================== */
+
+  .sides-gallery {
+    min-height: 60vh;
+  }
+
+  /* Glass card hover glow animation */
+  @keyframes glassShimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+
+  /* Breathing animation for ambient elements */
+  @keyframes breathe {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.05); opacity: 0.3; }
+  }
+
+  /* Smooth reveal for bento cards */
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Custom scrollbar for gallery */
+  .sides-gallery::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .sides-gallery::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .sides-gallery::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+  }
+
+  .sides-gallery::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
   }
 }

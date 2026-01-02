@@ -251,3 +251,39 @@ textarea::placeholder {
   font-size: 14px;
   font-family: sans-serif;
 }
+
+/* Login State */
+#login-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 250px;
+  text-align: center;
+  animation: fadeIn 0.5s ease;
+}
+
+.login-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.login-icon {
+  font-size: 40px;
+  margin-bottom: 8px;
+}
+
+.login-content h2 {
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+}
+
+.login-content p {
+  font-size: 13px;
+  color: #888;
+  font-family: sans-serif;
+  margin-bottom: 8px;
+}

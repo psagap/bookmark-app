@@ -521,3 +521,69 @@ try {
 } catch (error) {
   console.warn('Could not register context menu:', error);
 }
+
+// ============================================================
+// Session Sync: Read session from main app and sync to extension
+// This runs on localhost:5173 (the main bookmark app)
+// ============================================================
+
+const EXTENSION_SESSION_KEY = 'bookmark_extension_session';
+const BOOKMARK_APP_ORIGIN = 'http://localhost:5173';
+
+// Check if we're on the bookmark app
+function isBookmarkApp() {
+  return window.location.origin === BOOKMARK_APP_ORIGIN;
+}
+
+// Sync stored session to the extension background script
+async function syncSessionFromStorage() {
+  if (!isBookmarkApp()) return;
+
+  try {
+    const sessionData = localStorage.getItem(EXTENSION_SESSION_KEY);
+    if (sessionData) {
+      const session = JSON.parse(sessionData);
+      chrome.runtime.sendMessage({ action: 'setSession', session }, (response) => {
+        if (response?.success) {
+          console.log('[Bookmark Extension] Session synced successfully');
+        }
+      });
+    } else {
+      // No session, clear extension session
+      chrome.runtime.sendMessage({ action: 'clearSession' }, () => {
+        console.log('[Bookmark Extension] Session cleared');
+      });
+    }
+  } catch (error) {
+    console.warn('[Bookmark Extension] Could not sync session:', error);
+  }
+}
+
+// Listen for session updates from the AuthContext
+if (isBookmarkApp()) {
+  // Sync on page load
+  syncSessionFromStorage();
+
+  // Listen for session updates via custom event
+  window.addEventListener('supabase-session-update', (event) => {
+    const { session } = event.detail;
+    if (session) {
+      chrome.runtime.sendMessage({ action: 'setSession', session }, (response) => {
+        if (response?.success) {
+          console.log('[Bookmark Extension] Session updated from auth change');
+        }
+      });
+    } else {
+      chrome.runtime.sendMessage({ action: 'clearSession' }, () => {
+        console.log('[Bookmark Extension] Session cleared from sign out');
+      });
+    }
+  });
+
+  // Also listen for localStorage changes (for cross-tab sync)
+  window.addEventListener('storage', (event) => {
+    if (event.key === EXTENSION_SESSION_KEY) {
+      syncSessionFromStorage();
+    }
+  });
+}

@@ -173,8 +173,8 @@ const CardMenuInline = ({ onPin, onCreateSide, onDelete, onRefresh, onEdit, isPi
             style={{
               top: menuPosition.top,
               left: menuPosition.left,
-              background: 'linear-gradient(180deg, #3c3836 0%, #282828 100%)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'linear-gradient(180deg, var(--theme-bg-light) 0%, var(--theme-bg-dark) 100%)',
+              border: '1px solid hsl(var(--border) / 0.3)',
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.2)',
             }}
           >
@@ -307,8 +307,8 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
             isSelected && "ring-2 ring-gruvbox-yellow ring-offset-2 ring-offset-gruvbox-bg-darkest"
           )}
           style={{
-            background: 'linear-gradient(165deg, rgba(40, 40, 40, 0.95) 0%, rgba(32, 32, 32, 0.98) 50%, rgba(28, 28, 28, 1) 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
+            background: 'linear-gradient(165deg, var(--theme-bg-light) 0%, var(--theme-bg) 50%, var(--theme-bg-dark) 100%)',
+            border: '1px solid hsl(var(--border) / 0.2)',
             boxShadow: '0 2px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
           }}
         >
@@ -316,7 +316,7 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
           <div
             className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
             style={{
-              background: 'radial-gradient(ellipse 80% 60% at 20% 10%, rgba(254, 128, 25, 0.06) 0%, transparent 60%)',
+              background: 'radial-gradient(ellipse 80% 60% at 20% 10%, rgba(var(--glow-color-rgb), 0.06) 0%, transparent 60%)',
             }}
           />
 
@@ -340,13 +340,13 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
                   isCardExpanded ? "max-h-[500px]" : "max-h-[200px]"
                 )}
               >
-                <div className="text-[15px] leading-relaxed text-[rgba(251,241,199,0.88)] break-words">
+                <div className="text-[15px] leading-relaxed text-foreground/90 break-words">
                   <NoteBlockRenderer content={noteContent} compact={true} />
                 </div>
               </div>
             ) : (
               <div className="py-4 text-center">
-                <p className="text-sm text-[rgba(168,153,132,0.5)]">
+                <p className="text-sm text-muted-foreground/50">
                   Empty note
                 </p>
               </div>
@@ -361,6 +361,7 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
                   key={tag}
                   tag={tag}
                   size="small"
+                  actionIcon="menu"
                   onClick={(e) => {
                     e.stopPropagation();
                     onTagClick?.(tag);
@@ -377,9 +378,9 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
           {/* Footer with date, expand button, and menu */}
           <div
             className="relative z-[1] px-4 py-2.5 border-t flex items-center justify-between"
-            style={{ borderColor: 'rgba(255, 255, 255, 0.04)' }}
+            style={{ borderColor: 'hsl(var(--border) / 0.15)' }}
           >
-            <span className="text-[11px] font-medium text-[rgba(168,153,132,0.6)] tracking-wide">
+            <span className="text-[11px] font-medium text-muted-foreground/60 tracking-wide">
               {formatNoteDate(bookmark.createdAt)}
             </span>
 
@@ -392,7 +393,7 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
                     e.stopPropagation();
                     setIsCardExpanded(!isCardExpanded);
                   }}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-[rgba(168,153,132,0.7)] hover:text-[rgba(254,128,25,0.9)] hover:bg-[rgba(254,128,25,0.1)] transition-all duration-200"
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-muted-foreground/70 hover:text-primary/90 hover:bg-primary/10 transition-all duration-200"
                 >
                   {isCardExpanded ? (
                     <>
@@ -430,7 +431,7 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
           <div
             className="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
             style={{
-              boxShadow: 'inset 0 0 0 1px rgba(254, 128, 25, 0.15), 0 4px 20px rgba(0, 0, 0, 0.2)',
+              boxShadow: 'inset 0 0 0 1px rgba(var(--glow-color-rgb), 0.15), 0 4px 20px rgba(0, 0, 0, 0.2)',
             }}
           />
         </div>
@@ -460,7 +461,7 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
           backgroundImage: hasMedia ? `url(${tweetThumbnail})` : undefined,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          backgroundColor: hasMedia ? undefined : '#15202b',
+          backgroundColor: hasMedia ? undefined : 'var(--theme-bg-dark)',
         }}
         >
           {selectionMode && (
@@ -721,6 +722,7 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
                     key={tag}
                     tag={normalizedTag}
                     size="small"
+                    actionIcon="menu"
                     onClick={(e) => {
                       e.stopPropagation();
                       onTagClick?.(normalizedTag);

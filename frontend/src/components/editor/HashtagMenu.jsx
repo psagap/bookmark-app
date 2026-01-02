@@ -130,8 +130,8 @@ HashtagMenu.displayName = 'HashtagMenu';
 
 const menuStyles = `
   .hashtag-menu {
-    background: rgba(40, 40, 40, 0.98);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--theme-bg-dark);
+    border: 1px solid hsl(var(--border) / 0.2);
     border-radius: 10px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     padding: 8px;
@@ -146,14 +146,16 @@ const menuStyles = `
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: rgba(168, 153, 132, 0.6);
+    color: var(--theme-fg-muted);
+    opacity: 0.6;
     padding: 4px 8px 8px;
   }
 
   .hashtag-menu-empty {
     padding: 12px;
     text-align: center;
-    color: rgba(168, 153, 132, 0.5);
+    color: var(--theme-fg-muted);
+    opacity: 0.5;
     font-size: 12px;
   }
 
@@ -172,7 +174,7 @@ const menuStyles = `
 
   .hashtag-menu-item:hover,
   .hashtag-menu-item.is-selected {
-    background: rgba(254, 128, 25, 0.15);
+    background: rgba(var(--glow-color-rgb), 0.15);
   }
 
   .hashtag-menu-tag {
@@ -188,7 +190,8 @@ const menuStyles = `
     align-items: center;
     gap: 6px;
     font-size: 12px;
-    color: rgba(251, 241, 199, 0.8);
+    color: var(--theme-fg);
+    opacity: 0.8;
   }
 
   .hashtag-menu-create-icon {
@@ -198,8 +201,8 @@ const menuStyles = `
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: rgba(254, 128, 25, 0.2);
-    color: #fe8019;
+    background: rgba(var(--glow-color-rgb), 0.2);
+    color: var(--theme-primary);
     font-size: 14px;
     font-weight: 600;
   }
@@ -211,9 +214,10 @@ const menuStyles = `
     gap: 8px;
     margin-top: 8px;
     padding-top: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid hsl(var(--border) / 0.1);
     font-size: 10px;
-    color: rgba(168, 153, 132, 0.4);
+    color: var(--theme-fg-muted);
+    opacity: 0.4;
   }
 
   .hashtag-menu-hint kbd {
@@ -223,13 +227,14 @@ const menuStyles = `
     min-width: 16px;
     height: 16px;
     padding: 0 4px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: hsl(var(--muted) / 0.2);
+    border: 1px solid hsl(var(--border) / 0.2);
     border-radius: 3px;
     font-family: 'Inter', sans-serif;
     font-size: 9px;
     font-weight: 600;
-    color: rgba(251, 241, 199, 0.6);
+    color: var(--theme-fg);
+    opacity: 0.6;
   }
 `;
 

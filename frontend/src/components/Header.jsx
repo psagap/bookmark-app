@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Moon, Settings, CheckSquare, X, FileText, Link2, ChevronDown } from 'lucide-react';
+import { Plus, Settings, CheckSquare, X, FileText, Link2, ChevronDown } from 'lucide-react';
 import MindSearch from './MindSearch';
 import Logo from './Logo';
 
@@ -20,6 +20,13 @@ const Header = ({
   onResultSelect,
   onFilterChange,
   activeFilters = [],
+  // Tag filter props
+  onTagFilterChange,
+  tagRefreshTrigger = 0,
+  user,
+  onLogin,
+  onSignOut,
+  onChangePassword,
 }) => {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const addMenuRef = useRef(null);
@@ -47,7 +54,7 @@ const Header = ({
           {/* Custom Logo */}
           <div className="relative">
             <Logo size={44} className="drop-shadow-lg" />
-            <div className="absolute -inset-2 rounded-xl bg-gradient-to-br from-gruvbox-yellow/15 to-gruvbox-orange/10 blur-xl -z-10 opacity-80" />
+            <div className="absolute -inset-2 rounded-xl bg-primary/10 blur-xl -z-10 opacity-80" />
           </div>
           <div className="flex flex-col">
             <h1 className="text-xl font-display tracking-wide text-gruvbox-fg-light">
@@ -64,6 +71,9 @@ const Header = ({
           onFilterChange={onFilterChange}
           activeFilters={activeFilters}
           showInlineFilters={false}
+          activeTags={activeTags}
+          onTagFilterChange={onTagFilterChange}
+          tagRefreshTrigger={tagRefreshTrigger}
         />
 
         {/* Right side actions */}
@@ -71,25 +81,20 @@ const Header = ({
           {/* Selection mode toggle */}
           <button
             onClick={onToggleSelectionMode}
-            className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 overflow-hidden ${
-              selectionMode
-                ? 'text-gruvbox-bg-darkest'
-                : 'text-gruvbox-fg-muted hover:text-gruvbox-fg'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors duration-200 ${selectionMode
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
           >
-            {selectionMode && (
-              <div className="absolute inset-0 bg-gradient-to-r from-gruvbox-yellow to-gruvbox-orange" />
-            )}
-            <div className={`absolute inset-0 bg-gruvbox-bg-lighter/50 transition-opacity duration-200 ${selectionMode ? 'opacity-0' : 'opacity-0 hover:opacity-100'}`} />
             {selectionMode ? (
               <>
-                <X className="relative w-4 h-4" />
-                <span className="relative">Cancel</span>
+                <X className="w-4 h-4" />
+                <span>Cancel</span>
               </>
             ) : (
               <>
-                <CheckSquare className="relative w-4 h-4" />
-                <span className="relative">Select</span>
+                <CheckSquare className="w-4 h-4" />
+                <span>Select</span>
               </>
             )}
           </button>
@@ -101,14 +106,11 @@ const Header = ({
           <div className="relative" ref={addMenuRef}>
             <button
               onClick={() => setAddMenuOpen(!addMenuOpen)}
-              className="relative group flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold overflow-hidden"
+              className="relative group flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold overflow-hidden bg-primary hover:bg-primary/90 active:bg-primary/80 transition-colors duration-200"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-gruvbox-yellow to-gruvbox-orange transition-all duration-300 group-hover:scale-105" />
-              <div className="absolute inset-0 bg-gradient-to-r from-gruvbox-yellow-light to-gruvbox-orange-light opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="absolute inset-0 bg-white/20 opacity-0 group-active:opacity-100 transition-opacity duration-100" />
-              <Plus className="relative w-4 h-4 text-gruvbox-bg-darkest" strokeWidth={2.5} />
-              <span className="relative text-gruvbox-bg-darkest">Add New</span>
-              <ChevronDown className={`relative w-3.5 h-3.5 text-gruvbox-bg-darkest transition-transform duration-200 ${addMenuOpen ? 'rotate-180' : ''}`} />
+              <Plus className="w-4 h-4 text-primary-foreground" strokeWidth={2.5} />
+              <span className="text-primary-foreground">Add New</span>
+              <ChevronDown className={`w-3.5 h-3.5 text-primary-foreground transition-transform duration-200 ${addMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Dropdown menu */}
@@ -144,17 +146,51 @@ const Header = ({
 
           {/* Icon buttons */}
           <div className="flex items-center gap-1">
+            {/* Auth Button */}
+            {user ? (
+              <div className="relative group/auth">
+                <button className="p-2.5 rounded-xl transition-colors duration-200 hover:bg-muted/50 flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 text-white flex items-center justify-center text-xs font-bold shadow-sm">
+                    {user.email?.[0].toUpperCase()}
+                  </div>
+                </button>
+                {/* Auth Dropdown */}
+                <div className="absolute right-0 top-full pt-2 w-48 z-50 opacity-0 invisible group-hover/auth:opacity-100 group-hover/auth:visible transition-all duration-200">
+                  <div className="bg-gruvbox-bg-light/95 backdrop-blur-md border border-gruvbox-bg-lighter rounded-xl shadow-2xl overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gruvbox-bg-lighter">
+                      <p className="text-xs text-gruvbox-fg-muted font-medium">Signed in as</p>
+                      <p className="text-sm text-gruvbox-fg truncate">{user.email}</p>
+                    </div>
+                    <button
+                      onClick={onChangePassword}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gruvbox-fg hover:bg-white/10 transition-colors text-left"
+                    >
+                      <span>Change Password</span>
+                    </button>
+                    <div className="h-px bg-white/10 mx-3" />
+                    <button
+                      onClick={onSignOut}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:text-red-500 hover:bg-red-500/10 transition-colors text-left"
+                    >
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={onLogin}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-gruvbox-fg hover:bg-muted/50 transition-colors duration-200"
+              >
+                Log In
+              </button>
+            )}
+
             <button
               onClick={onOpenSettings}
-              className="relative p-2.5 rounded-xl transition-all duration-200 group overflow-hidden"
+              className="p-2.5 rounded-xl transition-colors duration-200 hover:bg-muted/50"
             >
-              <div className="absolute inset-0 bg-gruvbox-bg-lighter/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-              <Settings className="relative w-[18px] h-[18px] text-gruvbox-fg-muted group-hover:text-gruvbox-fg transition-all duration-200 group-hover:rotate-45" strokeWidth={1.75} />
-            </button>
-
-            <button className="relative p-2.5 rounded-xl transition-all duration-200 group overflow-hidden">
-              <div className="absolute inset-0 bg-gruvbox-bg-lighter/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-              <Moon className="relative w-[18px] h-[18px] text-gruvbox-fg-muted group-hover:text-gruvbox-purple-light transition-colors duration-200" strokeWidth={1.75} />
+              <Settings className="w-[18px] h-[18px] text-muted-foreground hover:text-foreground transition-colors duration-200" strokeWidth={1.75} />
             </button>
           </div>
         </div>

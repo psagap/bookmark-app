@@ -89,7 +89,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const saveBtn = document.getElementById('save-btn');
   const cancelBtn = document.getElementById('cancel-btn');
   const retryBtn = document.getElementById('retry-btn');
+  const openAppBtn = document.getElementById('open-app-btn');
 
+  const loginState = document.getElementById('login-state');
   const inputState = document.getElementById('main-content');
   const successState = document.getElementById('success-state');
   const errorState = document.getElementById('error-state');
@@ -99,6 +101,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   const TOTAL_TIME = 7000; // 7 seconds
   let timeLeft = TOTAL_TIME;
   let isPaused = false;
+
+  // Check authentication first
+  const checkAuth = () => {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: 'checkAuth' }, (response) => {
+        resolve(response?.authenticated || false);
+      });
+    });
+  };
+
+  const isAuthenticated = await checkAuth();
+
+  if (!isAuthenticated) {
+    // Show login required state
+    loginState.classList.remove('hidden');
+    timerLine.parentElement.classList.add('hidden');
+
+    openAppBtn.addEventListener('click', () => {
+      // Open the main app for login
+      chrome.tabs.create({ url: 'http://localhost:5173' });
+      window.close();
+    });
+    return; // Don't proceed further
+  }
+
+  // User is authenticated, show main content
+  inputState.classList.remove('hidden');
 
   // Initialize
   try {

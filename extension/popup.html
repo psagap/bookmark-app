@@ -15,8 +15,20 @@
       <div id="timer-line" class="timer-line"></div>
     </div>
 
+    <!-- Login Required State -->
+    <div id="login-state" class="hidden">
+      <div class="login-content">
+        <div class="login-icon">🔐</div>
+        <h2>Sign In Required</h2>
+        <p>Please sign in via the main app to save bookmarks.</p>
+        <button id="open-app-btn" class="creepy-btn">
+          <span class="creepy-btn__content">Open App to Sign In</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Main Content -->
-    <div id="main-content">
+    <div id="main-content" class="hidden">
       <div class="header">
         <div class="site-info">
           <h1 id="page-title">Loading...</h1>
@@ -58,6 +70,9 @@
       <button id="retry-btn" class="creepy-btn">Try Again</button>
     </div>
   </div>
+  <!-- Load scripts in order -->
+  <script src="config.js"></script>
+  <script src="supabase.js"></script>
   <script src="popup.js"></script>
 </body>
 

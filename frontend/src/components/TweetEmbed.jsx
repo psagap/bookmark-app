@@ -258,15 +258,15 @@ const TweetEmbed = ({ tweetUrl }) => {
             <div
                 className="flex flex-col items-center justify-center py-10 px-6 rounded-xl"
                 style={{
-                    background: 'linear-gradient(180deg, rgba(40, 40, 40, 0.6) 0%, rgba(29, 32, 33, 0.8) 100%)',
-                    border: '1px solid rgba(204, 36, 29, 0.2)',
+                    background: 'linear-gradient(180deg, var(--theme-bg-light) 0%, var(--theme-bg-dark) 100%)',
+                    border: '1px solid rgba(var(--glow-color-rgb), 0.2)',
                 }}
             >
-                <p className="text-gruvbox-fg-muted text-sm mb-5">Could not load tweet</p>
+                <p className="text-muted-foreground text-sm mb-5">Could not load tweet</p>
                 <div className="flex gap-3">
                     <button
                         onClick={handleRetry}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-gruvbox-bg-lighter text-gruvbox-fg text-sm font-medium rounded-full hover:bg-gruvbox-bg-light transition-colors border border-gruvbox-bg-lighter"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-muted text-foreground text-sm font-medium rounded-full hover:bg-muted/80 transition-colors border border-border"
                     >
                         <RefreshCw className="w-4 h-4" />
                         Retry
@@ -275,10 +275,7 @@ const TweetEmbed = ({ tweetUrl }) => {
                         href={tweetUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-5 py-2.5 text-gruvbox-bg-darkest text-sm font-medium rounded-full transition-colors"
-                        style={{
-                            background: 'linear-gradient(135deg, #fabd2f 0%, #fe8019 100%)',
-                        }}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 text-primary-foreground text-sm font-medium rounded-full transition-colors bg-primary hover:bg-primary/90"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <ExternalLink className="w-4 h-4" />

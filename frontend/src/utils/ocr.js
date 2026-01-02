@@ -123,7 +123,7 @@ const extractTextFromImageServer = async (imageSource, timeout) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    const response = await fetch('http://127.0.0.1:3000/api/ocr', {
+    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:3000'}/api/ocr`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ imageUrl: imageSource }),
