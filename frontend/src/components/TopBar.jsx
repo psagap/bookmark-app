@@ -3,6 +3,7 @@ import { Plus, Settings, User, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import MindSearch from './MindSearch';
+import { motion, AnimatePresence } from 'framer-motion';
 
 /**
  * TopBar: Global Command Center
@@ -24,11 +25,108 @@ const TopBar = ({
     onTagFilterChange,
     tagRefreshTrigger = 0,
     mediaCounts = {},
+    sidebarCollapsed = false,
 }) => {
 
     return (
         <header className="h-20 px-8 flex items-center justify-between border-b border-border/50 bg-theme-bg-dark/80 backdrop-blur-xl sticky top-0 z-40">
-            {/* Left: MindSearch with category suggestions */}
+            {/* Left: Connected brand element - flight trail + getahead. when sidebar collapsed */}
+            <AnimatePresence mode="wait">
+                {sidebarCollapsed && (
+                    <motion.div
+                        key="getahead-connected"
+                        className="flex items-center mr-6 relative"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        style={{ marginLeft: '-24px' }} // Extend back toward sidebar
+                    >
+                        {/* Flight trail - organic wiggly path from bird */}
+                        <svg
+                            width="80"
+                            height="32"
+                            viewBox="0 0 80 32"
+                            fill="none"
+                            className="mr-2"
+                            style={{ overflow: 'visible' }}
+                        >
+                            {/* Gradient definition for trail fade */}
+                            <defs>
+                                <linearGradient id="trailGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stopColor="currentColor" stopOpacity="0" />
+                                    <stop offset="30%" stopColor="currentColor" stopOpacity="0.4" />
+                                    <stop offset="100%" stopColor="currentColor" stopOpacity="0.7" />
+                                </linearGradient>
+                            </defs>
+
+                            {/* Main flight trail - swooping curve */}
+                            <motion.path
+                                d="M0 20 Q12 20, 18 14 T36 10 T54 14 T72 8"
+                                stroke="url(#trailGradient)"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                className="text-white"
+                                fill="none"
+                                initial={{ pathLength: 0 }}
+                                animate={{ pathLength: 1 }}
+                                exit={{ pathLength: 0 }}
+                                transition={{
+                                    pathLength: { duration: 0.45, delay: 0.15, ease: [0.4, 0, 0.2, 1] }
+                                }}
+                            />
+
+                            {/* Small trailing dots for sparkle effect */}
+                            {[
+                                { cx: 24, cy: 12, delay: 0.25 },
+                                { cx: 42, cy: 11, delay: 0.35 },
+                                { cx: 60, cy: 12, delay: 0.45 },
+                            ].map((dot, i) => (
+                                <motion.circle
+                                    key={i}
+                                    cx={dot.cx}
+                                    cy={dot.cy}
+                                    r="1.5"
+                                    className="fill-white/50"
+                                    initial={{ scale: 0, opacity: 0 }}
+                                    animate={{ scale: [0, 1.5, 1], opacity: [0, 0.8, 0.4] }}
+                                    exit={{ scale: 0, opacity: 0 }}
+                                    transition={{ duration: 0.3, delay: dot.delay }}
+                                />
+                            ))}
+
+                            {/* End accent dot */}
+                            <motion.circle
+                                cx="76"
+                                cy="8"
+                                r="3"
+                                className="fill-primary"
+                                initial={{ scale: 0, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0, opacity: 0 }}
+                                transition={{ duration: 0.25, delay: 0.5, ease: "backOut" }}
+                            />
+                        </svg>
+
+                        {/* getahead. text - reveals after trail completes */}
+                        <motion.span
+                            className="text-xl font-medium text-white whitespace-nowrap"
+                            style={{
+                                fontFamily: "'Space Grotesk', sans-serif",
+                                letterSpacing: '-0.02em',
+                            }}
+                            initial={{ opacity: 0, x: -8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -8 }}
+                            transition={{ duration: 0.35, delay: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                        >
+                            getahead.
+                        </motion.span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* MindSearch with category suggestions */}
             <MindSearch
                 onFilterChange={onFilterChange}
                 activeFilters={activeFilters}

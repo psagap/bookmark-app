@@ -84,6 +84,7 @@ const AppShell = ({
                     onTagFilterChange={onTagFilterChange}
                     tagRefreshTrigger={tagRefreshTrigger}
                     mediaCounts={mediaCounts}
+                    sidebarCollapsed={sidebarCollapsed}
                 />
 
                 {/* Scrollable Page Content */}
