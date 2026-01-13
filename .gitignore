@@ -13,6 +13,9 @@ coverage/
 # Data (contains personal bookmarks)
 bookmarks.json
 
+# Media cache (videos downloaded via Cobalt API)
+media/
+
 # IDE
 .vscode/
 .idea/

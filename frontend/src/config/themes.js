@@ -8,6 +8,12 @@
  * - RGB values for rgba() opacity variations
  */
 
+const poppinsFonts = {
+  display: "'Poppins', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  body: "'Poppins', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  mono: "'JetBrains Mono', monospace",
+};
+
 export const themes = {
   // ============================================
   // GRUVBOX - Warm, retro, earthy (Current Default)
@@ -64,11 +70,7 @@ export const themes = {
       selectionBg: 'rgba(215, 153, 33, 0.3)',
       selectionText: '#fbf1c7',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '42 75% 49%',
       colorRgb: '215, 153, 33',
@@ -138,11 +140,7 @@ export const themes = {
       selectionBg: 'rgba(255, 41, 117, 0.4)',
       selectionText: '#ffffff',
     },
-    fonts: {
-      display: "'Orbitron', 'Cinzel', sans-serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '338 100% 58%',
       colorRgb: '255, 41, 117',
@@ -212,11 +210,7 @@ export const themes = {
       selectionBg: 'rgba(136, 192, 208, 0.3)',
       selectionText: '#eceff4',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '193 43% 67%',
       colorRgb: '136, 192, 208',
@@ -286,11 +280,7 @@ export const themes = {
       selectionBg: 'rgba(189, 147, 249, 0.4)',
       selectionText: '#f8f8f2',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'Fira Code', 'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '265 89% 78%',
       colorRgb: '189, 147, 249',
@@ -360,11 +350,7 @@ export const themes = {
       selectionBg: 'rgba(0, 217, 255, 0.35)',
       selectionText: '#ffffff',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '190 100% 50%',
       colorRgb: '0, 217, 255',
@@ -434,11 +420,7 @@ export const themes = {
       selectionBg: 'rgba(124, 179, 66, 0.35)',
       selectionText: '#f5fff0',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '88 48% 48%',
       colorRgb: '124, 179, 66',
@@ -508,11 +490,7 @@ export const themes = {
       selectionBg: 'rgba(255, 159, 67, 0.4)',
       selectionText: '#ffffff',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '28 100% 63%',
       colorRgb: '255, 159, 67',
@@ -582,11 +560,7 @@ export const themes = {
       selectionBg: 'rgba(99, 102, 241, 0.35)',
       selectionText: '#ffffff',
     },
-    fonts: {
-      display: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '239 84% 67%',
       colorRgb: '99, 102, 241',
@@ -656,11 +630,7 @@ export const themes = {
       selectionBg: 'rgba(232, 180, 184, 0.35)',
       selectionText: '#ffffff',
     },
-    fonts: {
-      display: "'Playfair Display', 'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '355 52% 81%',
       colorRgb: '232, 180, 184',
@@ -730,11 +700,7 @@ export const themes = {
       selectionBg: 'rgba(196, 167, 125, 0.35)',
       selectionText: '#fffaf5',
     },
-    fonts: {
-      display: "'Playfair Display', 'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '36 35% 63%',
       colorRgb: '196, 167, 125',
@@ -804,11 +770,7 @@ export const themes = {
       selectionBg: 'rgba(157, 78, 221, 0.4)',
       selectionText: '#ffffff',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '276 72% 59%',
       colorRgb: '157, 78, 221',
@@ -824,11 +786,346 @@ export const themes = {
       meshColor5: 'rgba(16, 0, 43, 0.9)',
     },
   },
+
+  // ============================================
+  // NOVA RED DARK - Exact shadcn Nova preset (Dark Mode)
+  // Colors from: oklch values converted to HSL
+  // ============================================
+  novaRedDark: {
+    id: 'novaRedDark',
+    name: 'Nova Red Dark',
+    description: 'Shadcn Nova dark with red accent - pure neutrals',
+    category: 'nova',
+    preview: {
+      primary: '#e04d30',
+      secondary: '#454045',
+      background: '#252525',
+      accent: '#5f5f5f',
+    },
+    colors: {
+      // Core semantic (HSL format) - Exact shadcn Nova Red dark theme OKLCH→HSL
+      // background: oklch(0.145 0 0) → pure neutral
+      background: '0 0% 15%',
+      // foreground: oklch(0.985 0 0)
+      foreground: '0 0% 98%',
+      // card: oklch(0.205 0 0)
+      card: '0 0% 21%',
+      cardForeground: '0 0% 98%',
+      // popover: oklch(0.205 0 0)
+      popover: '0 0% 21%',
+      popoverForeground: '0 0% 98%',
+      // primary: oklch(0.637 0.237 25.331) → red-orange ~hue 12
+      primary: '12 70% 53%',
+      primaryForeground: '12 10% 97%',
+      // secondary: oklch(0.274 0.006 286.033) → dark neutral with very slight purple
+      secondary: '286 5% 27%',
+      secondaryForeground: '0 0% 98%',
+      // muted: oklch(0.269 0 0)
+      muted: '0 0% 27%',
+      // muted-foreground: oklch(0.708 0 0)
+      mutedForeground: '0 0% 71%',
+      // accent: oklch(0.371 0 0)
+      accent: '0 0% 37%',
+      accentForeground: '0 0% 98%',
+      // destructive: oklch(0.704 0.191 22.216)
+      destructive: '12 65% 58%',
+      destructiveForeground: '12 10% 97%',
+      // border: oklch(1 0 0 / 10%) → white at 10%
+      border: '0 0% 25%',
+      // input: oklch(1 0 0 / 15%)
+      input: '0 0% 28%',
+      // ring: oklch(0.556 0 0)
+      ring: '0 0% 56%',
+      // Extended colors (HEX) - Pure neutrals only
+      bgDarkest: '#1a1a1a',
+      bgDark: '#252525',
+      bg: '#343434',
+      bgLight: '#454545',
+      bgLighter: '#5f5f5f',
+      fg: '#fafafa',
+      fgLight: '#ffffff',
+      fgMuted: '#b5b5b5',
+      // Primary red from oklch(0.637 0.237 25.331)
+      primaryHex: '#e04d30',
+      primaryLightHex: '#e8634a',
+      // Secondary is neutral gray
+      secondaryHex: '#454045',
+      secondaryLightHex: '#5a555a',
+      // All accents use the same red or neutral - no yellow
+      accent1: '#e04d30',
+      accent2: '#e8634a',
+      accent3: '#b5b5b5',
+      accent4: '#8a8a8a',
+      selectionBg: 'rgba(224, 77, 48, 0.35)',
+      selectionText: '#ffffff',
+    },
+    fonts: poppinsFonts,
+    glow: {
+      // Primary red glow only
+      color: '12 70% 53%',
+      colorRgb: '224, 77, 48',
+      secondary: '12 65% 58%',
+      secondaryRgb: '232, 99, 74',
+      intensity: '0.6',
+    },
+    effects: {
+      // Minimal mesh - just subtle red tint, no gradients
+      meshColor1: 'rgba(224, 77, 48, 0.04)',
+      meshColor2: 'rgba(224, 77, 48, 0.02)',
+      meshColor3: 'rgba(90, 90, 90, 0.03)',
+      meshColor4: 'rgba(90, 90, 90, 0.02)',
+      meshColor5: 'rgba(37, 37, 37, 0.98)',
+    },
+  },
+
+  // ============================================
+  // NOVA RED LIGHT - Exact shadcn Nova preset (Light Mode)
+  // Colors from: oklch values converted to HSL
+  // ============================================
+  novaRedLight: {
+    id: 'novaRedLight',
+    name: 'Nova Red Light',
+    description: 'Shadcn Nova light with red accent - pure neutrals',
+    category: 'nova',
+    preview: {
+      primary: '#c84528',
+      secondary: '#f7f7f7',
+      background: '#ffffff',
+      accent: '#f7f7f7',
+    },
+    colors: {
+      // Core semantic (HSL format) - Exact shadcn Nova Red light theme OKLCH→HSL
+      // background: oklch(1 0 0)
+      background: '0 0% 100%',
+      // foreground: oklch(0.145 0 0)
+      foreground: '0 0% 15%',
+      // card: oklch(1 0 0)
+      card: '0 0% 100%',
+      cardForeground: '0 0% 15%',
+      // popover: oklch(1 0 0)
+      popover: '0 0% 100%',
+      popoverForeground: '0 0% 15%',
+      // primary: oklch(0.577 0.245 27.325) → red-orange ~hue 12
+      primary: '12 76% 47%',
+      primaryForeground: '12 8% 97%',
+      // secondary: oklch(0.967 0.001 286.375) → near white
+      secondary: '286 2% 97%',
+      secondaryForeground: '286 5% 21%',
+      // muted: oklch(0.97 0 0)
+      muted: '0 0% 97%',
+      // muted-foreground: oklch(0.556 0 0)
+      mutedForeground: '0 0% 56%',
+      // accent: oklch(0.97 0 0)
+      accent: '0 0% 97%',
+      accentForeground: '0 0% 21%',
+      // destructive: oklch(0.58 0.22 27)
+      destructive: '12 76% 47%',
+      destructiveForeground: '12 8% 97%',
+      // border: oklch(0.922 0 0)
+      border: '0 0% 92%',
+      // input: oklch(0.922 0 0)
+      input: '0 0% 92%',
+      // ring: oklch(0.708 0 0)
+      ring: '0 0% 71%',
+      // Extended colors (HEX) - Pure neutrals, light mode inverted
+      bgDarkest: '#ebebeb',
+      bgDark: '#f5f5f5',
+      bg: '#fafafa',
+      bgLight: '#ffffff',
+      bgLighter: '#ffffff',
+      fg: '#252525',
+      fgLight: '#1a1a1a',
+      fgMuted: '#8f8f8f',
+      // Primary red from oklch(0.577 0.245 27.325)
+      primaryHex: '#c84528',
+      primaryLightHex: '#d95c3f',
+      // Secondary is neutral
+      secondaryHex: '#f7f7f7',
+      secondaryLightHex: '#fafafa',
+      // All accents use the same red or neutral - no yellow
+      accent1: '#c84528',
+      accent2: '#d95c3f',
+      accent3: '#8f8f8f',
+      accent4: '#c5c5c5',
+      selectionBg: 'rgba(200, 69, 40, 0.2)',
+      selectionText: '#1a1a1a',
+    },
+    fonts: poppinsFonts,
+    glow: {
+      // Minimal glow for light theme
+      color: '12 76% 47%',
+      colorRgb: '200, 69, 40',
+      secondary: '12 70% 55%',
+      secondaryRgb: '217, 92, 63',
+      intensity: '0.3',
+    },
+    effects: {
+      // Very minimal mesh for light theme - almost no effect
+      meshColor1: 'rgba(200, 69, 40, 0.02)',
+      meshColor2: 'rgba(200, 69, 40, 0.01)',
+      meshColor3: 'rgba(143, 143, 143, 0.02)',
+      meshColor4: 'rgba(143, 143, 143, 0.01)',
+      meshColor5: 'rgba(255, 255, 255, 0.99)',
+    },
+  },
+
+  // ============================================
+  // ZEN - Calm midnight blues with soft lavender accents
+  // Designed for focus, tranquility, and comfortable extended use
+  // ============================================
+  zen: {
+    id: 'zen',
+    name: 'Zen',
+    description: 'Calm midnight depths with soft lavender accents',
+    category: 'zen',
+    preview: {
+      primary: '#a5b4fc',
+      secondary: '#67e8f9',
+      background: '#0a0f1a',
+      accent: '#c4b5fd',
+    },
+    colors: {
+      // Core semantic (HSL format)
+      // Deep midnight blue background - not pure black, adds depth and warmth
+      background: '222 47% 5%',
+      foreground: '214 32% 91%',
+      card: '222 39% 8%',
+      cardForeground: '214 32% 91%',
+      popover: '222 35% 10%',
+      popoverForeground: '214 32% 91%',
+      // Primary: Soft indigo/lavender - Digital Lavender for calm tech
+      primary: '229 84% 81%',
+      primaryForeground: '222 47% 8%',
+      // Secondary: Calm slate blue-gray
+      secondary: '222 30% 14%',
+      secondaryForeground: '214 32% 91%',
+      muted: '222 28% 12%',
+      mutedForeground: '215 20% 55%',
+      // Accent: Soft cyan-teal for interactive elements
+      accent: '183 74% 69%',
+      accentForeground: '222 47% 8%',
+      destructive: '0 62% 55%',
+      destructiveForeground: '214 32% 95%',
+      border: '222 25% 16%',
+      input: '222 28% 12%',
+      ring: '229 84% 81%',
+      // Extended colors (HEX) - Carefully calibrated midnight palette
+      bgDarkest: '#020617',    // Almost black with subtle blue
+      bgDark: '#0a0f1a',       // Deep midnight
+      bg: '#0f172a',           // Slate 950 - main surface
+      bgLight: '#1e293b',      // Slate 800 - elevated surfaces
+      bgLighter: '#334155',    // Slate 700 - highest elevation
+      fg: '#e2e8f0',           // Slate 200 - primary text (soft, not harsh)
+      fgLight: '#f1f5f9',      // Slate 100 - emphasized text
+      fgMuted: '#94a3b8',      // Slate 400 - secondary text
+      // Primary: Digital Lavender - calming, modern
+      primaryHex: '#a5b4fc',   // Indigo 300
+      primaryLightHex: '#c7d2fe', // Indigo 200
+      // Secondary: Soft teal - water-inspired calm
+      secondaryHex: '#67e8f9', // Cyan 300
+      secondaryLightHex: '#a5f3fc', // Cyan 200
+      // Accents: All muted, harmonious pastels
+      accent1: '#c4b5fd',      // Violet 300 - soft purple
+      accent2: '#86efac',      // Green 300 - soft mint
+      accent3: '#fcd34d',      // Amber 300 - soft gold (sparingly)
+      accent4: '#f0abfc',      // Fuchsia 300 - soft pink
+      selectionBg: 'rgba(165, 180, 252, 0.25)',
+      selectionText: '#f1f5f9',
+    },
+    fonts: poppinsFonts,
+    glow: {
+      // Very subtle, diffused glow - not attention-grabbing
+      color: '229 84% 81%',
+      colorRgb: '165, 180, 252',
+      secondary: '183 74% 69%',
+      secondaryRgb: '103, 232, 249',
+      intensity: '0.4',
+    },
+    effects: {
+      // Extremely subtle mesh - adds depth without distraction
+      meshColor1: 'rgba(165, 180, 252, 0.04)',  // Soft lavender
+      meshColor2: 'rgba(103, 232, 249, 0.03)',  // Soft cyan
+      meshColor3: 'rgba(196, 181, 253, 0.025)', // Soft violet
+      meshColor4: 'rgba(134, 239, 172, 0.02)',  // Soft mint
+      meshColor5: 'rgba(10, 15, 26, 0.97)',     // Deep midnight overlay
+    },
+  },
+
+  // ============================================
+  // STRATA - Soft neutral layers
+  // ============================================
+  strata: {
+    id: 'strata',
+    name: 'Strata',
+    description: 'Layered limestone neutrals with soft contrast',
+    category: 'elegant',
+    preview: {
+      primary: '#b0a89c',
+      secondary: '#c3baac',
+      background: '#edece8',
+      accent: '#b0a89c',
+    },
+    colors: {
+      background: '0 0% 100%',
+      foreground: '34 11% 25%',
+      card: '48 12% 92%',
+      cardForeground: '34 11% 25%',
+      popover: '48 12% 92%',
+      popoverForeground: '34 11% 25%',
+      primary: '36 11% 65%',
+      primaryForeground: '34 11% 25%',
+      secondary: '37 16% 72%',
+      secondaryForeground: '34 11% 25%',
+      muted: '48 12% 92%',
+      mutedForeground: '35 11% 50%',
+      accent: '37 16% 72%',
+      accentForeground: '34 11% 25%',
+      destructive: '12 35% 53%',
+      destructiveForeground: '0 0% 98%',
+      border: '37 16% 72%',
+      input: '48 12% 92%',
+      ring: '36 11% 65%',
+      bgDarkest: '#b0a89c',
+      bgDark: '#c3baac',
+      bg: '#edece8',
+      bgLight: '#ffffff',
+      bgLighter: '#ffffff',
+      fg: '#474139',
+      fgLight: '#39342d',
+      fgMuted: '#8e8271',
+      primaryHex: '#b0a89c',
+      primaryLightHex: '#c3baac',
+      secondaryHex: '#c3baac',
+      secondaryLightHex: '#edece8',
+      accent1: '#b0a89c',
+      accent2: '#c3baac',
+      accent3: '#edece8',
+      accent4: '#8e8271',
+      selectionBg: 'rgba(176, 168, 156, 0.35)',
+      selectionText: '#39342d',
+    },
+    fonts: poppinsFonts,
+    glow: {
+      color: '36 11% 65%',
+      colorRgb: '176, 168, 156',
+      secondary: '37 16% 72%',
+      secondaryRgb: '195, 186, 172',
+      intensity: '0.35',
+    },
+    effects: {
+      meshColor1: 'rgba(176, 168, 156, 0.08)',
+      meshColor2: 'rgba(195, 186, 172, 0.06)',
+      meshColor3: 'rgba(237, 236, 232, 0.5)',
+      meshColor4: 'rgba(255, 255, 255, 0.6)',
+      meshColor5: 'rgba(255, 255, 255, 0.95)',
+    },
+  },
 };
 
 // Theme categories for filtering in settings
 export const themeCategories = [
   { id: 'all', label: 'All Themes' },
+  { id: 'zen', label: 'Zen & Calm' },
   { id: 'classic', label: 'Classic' },
   { id: 'neon', label: 'Neon & Cyberpunk' },
   { id: 'nature', label: 'Nature' },
@@ -837,10 +1134,11 @@ export const themeCategories = [
   { id: 'dark', label: 'Dark' },
   { id: 'minimal', label: 'Minimal' },
   { id: 'elegant', label: 'Elegant' },
+  { id: 'nova', label: 'Nova' },
 ];
 
 // Default theme ID
-export const DEFAULT_THEME_ID = 'gruvbox';
+export const DEFAULT_THEME_ID = 'strata';
 
 // Helper to get theme by ID
 export const getThemeById = (id) => themes[id] || null;

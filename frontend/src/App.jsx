@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { LayoutGroup } from 'framer-motion'
+import AppShell from '@/components/AppShell'
 import Header from '@/components/Header'
 import BookmarkCard from '@/components/BookmarkCard'
 import BookmarkDetail from '@/components/BookmarkDetail'
 import SelectionToolbar from '@/components/SelectionToolbar'
 import CollectionModal from '@/components/CollectionModal'
 import CollectionBar from '@/components/CollectionBar'
-import CollectionCards from '@/components/CollectionCards'
+import SidesGallery from '@/components/SidesGallery'
 import FolderTabs from '@/components/FolderTabs'
 import FerrisWheelLoader from '@/components/FerrisWheelLoader'
 import QuickNoteModal from '@/components/QuickNoteModal'
@@ -16,9 +17,16 @@ import { useBookmarks } from '@/hooks/useBookmarks'
 import { useCollections } from '@/hooks/useCollections'
 import { getTagColors, getTagColor } from '@/utils/tagColors';
 import { TagPill } from '@/components/TagColorPicker';
+import { extractTagsFromContent } from '@/utils/tagExtraction';
+import { parseSearchQuery, matchesSearchFilters } from '@/utils/searchParser';
 import { Plus, FileText, File, Tag, X } from 'lucide-react'
 import AddDropzoneCard from '@/components/AddDropzoneCard'
 import { InlineNoteComposer } from '@/components/NoteComposer'
+import AuthModal from '@/components/AuthModal'
+import UpdatePasswordModal from '@/components/UpdatePasswordModal'
+import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabaseClient'
+import { toDbBookmarkPatch } from '@/lib/bookmarkMapper'
 
 const AddCard = ({ onAddNote, onAddFile }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -100,17 +108,44 @@ const updateURL = (tab, collection, tags) => {
 
 function App() {
   const { bookmarks, loading, error, refetch, updateBookmark, removeBookmark } = useBookmarks();
-  const { collections, createCollection, addToCollection, refetch: refetchCollections } = useCollections();
+  const { collections, createCollection, addToCollection, deleteCollection, updateCollection, refetch: refetchCollections } = useCollections();
   const [selectedBookmark, setSelectedBookmark] = useState(null);
   const [autoPlayOnOpen, setAutoPlayOnOpen] = useState(false);
   const [activePage, setActivePage] = useState('home');
   const [showSettings, setShowSettings] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showUpdatePasswordModal, setShowUpdatePasswordModal] = useState(false);
+  const [isPasswordRecoveryFlow, setIsPasswordRecoveryFlow] = useState(false); // Track if this is from email reset vs manual change
+  const { user, signOut } = useAuth();
+
+  // Detect PASSWORD_RECOVERY event from Supabase (user clicked reset link)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // User arrived via password reset link - show update password modal
+        // Don't require current password since they verified via email
+        setIsPasswordRecoveryFlow(true);
+        setShowUpdatePasswordModal(true);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Initialize state from URL
   const initialState = getInitialStateFromURL();
   const [activeTags, setActiveTags] = useState(initialState.tags);
   const [activeCollection, setActiveCollection] = useState(initialState.collection);
   const [mainTab, setMainTab] = useState(initialState.tab);
+
+  // Tag refresh trigger - increment to refetch tags when bookmarks change
+  const [tagRefreshTrigger, setTagRefreshTrigger] = useState(0);
+
+  // Helper to refresh bookmarks and tags together
+  const refreshBookmarksAndTags = () => {
+    refetch();
+    setTagRefreshTrigger(prev => prev + 1);
+  };
 
   // Update URL when navigation state changes
   useEffect(() => {
@@ -134,28 +169,64 @@ function App() {
   // Selection state
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const lastClickedIndexRef = useRef(null); // For shift+click range selection
   const [showCollectionModal, setShowCollectionModal] = useState(false);
   const [singleBookmarkToAdd, setSingleBookmarkToAdd] = useState(null); // For adding single bookmark via menu
   const [showQuickNoteModal, setShowQuickNoteModal] = useState(false);
   const [noteToEdit, setNoteToEdit] = useState(null); // For expanded note editor modal
 
-  // Keyboard shortcuts for selection mode
+  // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Escape to exit selection mode
-      if (e.key === 'Escape' && selectionMode) {
-        setSelectionMode(false);
-        setSelectedIds(new Set());
+      // Skip if typing in an input, textarea, or contenteditable
+      const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) ||
+                       document.activeElement?.isContentEditable;
+
+      // Escape to exit selection mode or close modals
+      if (e.key === 'Escape') {
+        if (selectionMode) {
+          setSelectionMode(false);
+          setSelectedIds(new Set());
+          return;
+        }
+        if (selectedBookmark) {
+          setSelectedBookmark(null);
+          setAutoPlayOnOpen(false);
+          return;
+        }
+        if (noteToEdit) {
+          setNoteToEdit(null);
+          return;
+        }
+      }
+
+      // N to create new note (when not typing)
+      if (e.key === 'n' && !isTyping && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setShowQuickNoteModal(true);
+        return;
+      }
+
+      // Enter to focus search (when not typing and no modifiers)
+      if (e.key === 'Enter' && !isTyping && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+        e.preventDefault();
+        // Focus the search input
+        const searchInput = document.querySelector('input[aria-label="Search filters"]');
+        if (searchInput) {
+          searchInput.focus();
+        }
+        return;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectionMode]);
+  }, [selectionMode, selectedBookmark, noteToEdit]);
 
   // Power Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTypes, setActiveTypes] = useState([]);
+  const [mediaFilter, setMediaFilter] = useState(null); // Sidebar filter: 'video' | 'image' | 'note' | 'tweet' | 'article' | null
   const [activeSearchCollections, setActiveSearchCollections] = useState([]);
   const [filterChain, setFilterChain] = useState([]); // Ordered filter chain for hierarchical filtering
   const [dateFilter, setDateFilter] = useState(null); // Date preset filter (today, week, month, etc.)
@@ -213,6 +284,7 @@ function App() {
   const handleClearSelection = () => {
     setSelectedIds(new Set());
     setSelectionMode(false);
+    lastClickedIndexRef.current = null;
   };
 
   const handleBulkDelete = async () => {
@@ -220,11 +292,12 @@ function App() {
     if (!confirm(`Delete ${selectedIds.size} bookmark(s)?`)) return;
 
     try {
-      await fetch('http://127.0.0.1:3000/api/bookmarks/bulk-delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: Array.from(selectedIds) })
-      });
+      const { error } = await supabase
+        .from('bookmarks')
+        .delete()
+        .in('id', Array.from(selectedIds));
+
+      if (error) throw error;
       refetch();
       handleClearSelection();
     } catch (error) {
@@ -235,6 +308,43 @@ function App() {
   const handleAddToCollection = () => {
     if (selectedIds.size === 0) return;
     setShowCollectionModal(true);
+  };
+
+  // Bulk add tag to selected bookmarks
+  const handleBulkAddTag = async (tag) => {
+    if (selectedIds.size === 0 || !tag.trim()) return;
+    const normalizedTag = tag.trim().toLowerCase();
+
+    try {
+      // Get current bookmarks to update their tags
+      const { data: currentBookmarks, error: fetchError } = await supabase
+        .from('bookmarks')
+        .select('id, tags')
+        .in('id', Array.from(selectedIds));
+
+      if (fetchError) throw fetchError;
+
+      // Update each bookmark with the new tag (avoiding duplicates)
+      const updates = currentBookmarks.map(bm => ({
+        id: bm.id,
+        tags: [...new Set([...(bm.tags || []), normalizedTag])],
+        updated_at: new Date().toISOString()
+      }));
+
+      // Perform batch upsert
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('bookmarks')
+          .update({ tags: update.tags, updated_at: update.updated_at })
+          .eq('id', update.id);
+        if (error) throw error;
+      }
+
+      refetch();
+      handleClearSelection();
+    } catch (error) {
+      console.error('Error bulk adding tag:', error);
+    }
   };
 
   const handleCollectionSelect = async (collectionId) => {
@@ -283,12 +393,37 @@ function App() {
     }
   };
 
+  const handleDeleteCollection = async (collectionId) => {
+    if (!confirm('Delete this collection?')) return;
+    try {
+      await deleteCollection(collectionId);
+      if (activeCollection === collectionId) {
+        setActiveCollection(null);
+      }
+      refreshBookmarksAndTags();
+    } catch (error) {
+      console.error('Error deleting collection:', error);
+    }
+  };
+
+  const handleUpdateCollection = async (collectionId, updates) => {
+    try {
+      await updateCollection(collectionId, updates);
+      refetchCollections();
+    } catch (error) {
+      console.error('Error updating collection:', error);
+    }
+  };
+
   const handleDelete = async (bookmark) => {
     if (!confirm('Delete this bookmark?')) return;
     try {
-      await fetch(`http://127.0.0.1:3000/api/bookmarks/${bookmark.id}`, {
-        method: 'DELETE'
-      });
+      const { error } = await supabase
+        .from('bookmarks')
+        .delete()
+        .eq('id', bookmark.id);
+
+      if (error) throw error;
       refetch();
     } catch (error) {
       console.error('Error deleting bookmark:', error);
@@ -297,11 +432,12 @@ function App() {
 
   const handlePin = async (bookmark) => {
     try {
-      await fetch(`http://127.0.0.1:3000/api/bookmarks/${bookmark.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...bookmark, pinned: !bookmark.pinned })
-      });
+      const { error } = await supabase
+        .from('bookmarks')
+        .update({ pinned: !bookmark.pinned })
+        .eq('id', bookmark.id);
+
+      if (error) throw error;
       refetch();
     } catch (error) {
       console.error('Error pinning bookmark:', error);
@@ -314,15 +450,54 @@ function App() {
     updateBookmark(bookmark);
 
     try {
-      await fetch(`http://127.0.0.1:3000/api/bookmarks/${bookmark.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bookmark)
-      });
+      const { error } = await supabase
+        .from('bookmarks')
+        .update(toDbBookmarkPatch(bookmark))
+        .eq('id', bookmark.id);
+
+      if (error) throw error;
       // No refetch needed - local state already updated
     } catch (error) {
       console.error('Error saving bookmark:', error);
       // On error, refetch to restore correct state
+      refetch();
+    }
+  };
+
+  // Handle tag deletion from a bookmark card
+  const handleTagDelete = async (bookmark, tagToDelete) => {
+    // Get current tags (support both tags array and extracted tags from content)
+    const currentTags = bookmark.tags || [];
+    const noteContent = bookmark.notes || bookmark.content || '';
+
+    // Remove the tag from the tags array
+    const updatedTags = currentTags.filter(t => t.toLowerCase() !== tagToDelete.toLowerCase());
+
+    // Also remove the hashtag from the content if present
+    const updatedContent = noteContent.replace(
+      new RegExp(`#${tagToDelete}\\b`, 'gi'),
+      ''
+    ).replace(/\s+/g, ' ').trim();
+
+    const updatedBookmark = {
+      ...bookmark,
+      tags: updatedTags,
+      notes: bookmark.notes !== undefined ? updatedContent : bookmark.notes,
+      content: bookmark.content !== undefined ? updatedContent : bookmark.content,
+    };
+
+    // Use the same save pattern as handleSaveBookmark
+    updateBookmark(updatedBookmark);
+
+    try {
+      const { error } = await supabase
+        .from('bookmarks')
+        .update(toDbBookmarkPatch(updatedBookmark))
+        .eq('id', bookmark.id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error deleting tag:', error);
       refetch();
     }
   };
@@ -335,7 +510,7 @@ function App() {
 
   const handleRefreshBookmark = async (bookmark) => {
     try {
-      const response = await fetch(`http://127.0.0.1:3000/api/bookmarks/${bookmark.id}/refresh`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:3000'}/api/bookmarks/${bookmark.id}/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -347,6 +522,19 @@ function App() {
       }
     } catch (error) {
       console.error('Error refreshing bookmark:', error);
+    }
+  };
+
+  // Handle tag click - filter by single tag
+  const handleTagClick = (tagName) => {
+    const normalizedTag = tagName.toLowerCase();
+    // If tag is already active, clear filter; otherwise set it as the only active tag
+    if (activeTags.length === 1 && activeTags[0].toLowerCase() === normalizedTag) {
+      setActiveTags([]);
+      updateURL(mainTab, activeCollection, []);
+    } else {
+      setActiveTags([normalizedTag]);
+      updateURL(mainTab, activeCollection, [normalizedTag]);
     }
   };
 
@@ -368,12 +556,32 @@ function App() {
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
       return 'youtube';
     }
+    if (url.includes('reddit.com') || url.includes('redd.it')) {
+      return 'reddit';
+    }
+    if (url.includes('wikipedia.org')) {
+      return 'wikipedia';
+    }
     // Check for images
     if (bookmark.type === 'image' || /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url)) {
       return 'image';
     }
     return 'article';
   };
+
+  // Calculate media counts for Sidebar
+  const mediaCounts = React.useMemo(() => {
+    const counts = { video: 0, image: 0, note: 0, tweet: 0, article: 0 };
+    bookmarks.forEach(b => {
+      const type = getBookmarkType(b);
+      if (type === 'youtube') counts.video++;
+      else if (type === 'image') counts.image++;
+      else if (type === 'note') counts.note++;
+      else if (type === 'tweet') counts.tweet++;
+      else if (type === 'article' || type === 'reddit' || type === 'wikipedia') counts.article++;
+    });
+    return counts;
+  }, [bookmarks]);
 
   // Filter bookmarks based on current view + power search
   const filteredBookmarks = (() => {
@@ -385,16 +593,34 @@ function App() {
     }
 
     // Filter by tags - bookmark must have ALL selected tags (AND logic)
+    // Also check for tags extracted from note content
     if (activeTags.length > 0) {
-      filtered = filtered.filter(b =>
-        activeTags.every(tag => b.tags?.includes(tag))
-      );
+      filtered = filtered.filter(b => {
+        // Get tags from bookmark.tags array
+        const bookmarkTags = (b.tags || []).map(t => t.toLowerCase());
+        // Extract tags from note content
+        const noteContent = b.notes || b.content || '';
+        const extractedTags = extractTagsFromContent(noteContent);
+        // Combine both sources
+        const allBookmarkTags = [...new Set([...bookmarkTags, ...extractedTags])];
+        // Check if bookmark has all active tags
+        return activeTags.every(tag => allBookmarkTags.includes(tag.toLowerCase()));
+      });
     }
 
-    // Power Search filters
-    // Filter by type
+    // Filter by type (old Power Search)
     if (activeTypes.length > 0) {
       filtered = filtered.filter(b => activeTypes.includes(getBookmarkType(b)));
+    }
+
+    // Filter by Sidebar media filter
+    if (mediaFilter) {
+      filtered = filtered.filter(b => {
+        const type = getBookmarkType(b);
+        if (mediaFilter === 'video') return type === 'youtube';
+        if (mediaFilter === 'article') return type === 'article' || type === 'reddit' || type === 'wikipedia';
+        return type === mediaFilter;
+      });
     }
 
     // Filter by search collections (from power search)
@@ -402,24 +628,31 @@ function App() {
       filtered = filtered.filter(b => activeSearchCollections.includes(b.collectionId));
     }
 
-    // Filter by text search query
+    // Advanced search query parsing
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(b => {
-        const title = (b.title || '').toLowerCase();
-        const notes = (b.notes || '').toLowerCase();
-        const url = (b.url || '').toLowerCase();
-        const tags = (b.tags || []).join(' ').toLowerCase();
-        const description = (b.description || '').toLowerCase();
-        return title.includes(query) ||
-          notes.includes(query) ||
-          url.includes(query) ||
-          tags.includes(query) ||
-          description.includes(query);
-      });
+      const parsedFilters = parseSearchQuery(searchQuery);
+
+      // Apply parsed filters using the advanced search matcher
+      filtered = filtered.filter(b => matchesSearchFilters(b, parsedFilters, getBookmarkType));
+
+      // Also apply any types from the parser to activeTypes if not already set
+      if (parsedFilters.types.length > 0 && activeTypes.length === 0) {
+        // Types are already handled in matchesSearchFilters
+      }
+
+      // Apply tags from search query to tag filtering
+      if (parsedFilters.tags.length > 0) {
+        filtered = filtered.filter(b => {
+          const bookmarkTags = (b.tags || []).map(t => t.toLowerCase());
+          const noteContent = b.notes || b.content || '';
+          const extractedTags = extractTagsFromContent(noteContent);
+          const allBookmarkTags = [...new Set([...bookmarkTags, ...extractedTags])];
+          return parsedFilters.tags.every(tag => allBookmarkTags.includes(tag));
+        });
+      }
     }
 
-    // Filter by date preset
+    // Filter by date preset (external dateFilter state)
     if (dateFilter) {
       const presets = {
         today: 0,
@@ -467,31 +700,26 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen gruvbox-mesh-bg text-gruvbox-fg flex relative overflow-x-hidden">
-      <main className="flex-1 min-h-screen relative w-full max-w-full">
-        <LayoutGroup>
-        <Header
-          activePage={activePage}
-          onNavigate={handleNavigate}
-          tags={allTags.length > 0 ? allTags : ['Technology', 'Design', 'Articles', 'Videos', 'Social', 'Research']}
-          collections={enrichedCollections}
-          activeCollection={activeCollection}
-          activeTags={activeTags}
-          selectionMode={selectionMode}
-          onToggleSelectionMode={() => {
-            setSelectionMode(!selectionMode);
-            if (selectionMode) setSelectedIds(new Set());
-          }}
-          onQuickNote={() => setShowQuickNoteModal(true)}
-          onAddUrl={() => console.log('Add URL - TODO: implement URL modal')}
-          onOpenSettings={() => setShowSettings(true)}
-          // Search props
-          bookmarks={bookmarks}
-          onResultSelect={(bookmark) => setSelectedBookmark(bookmark)}
-          onFilterChange={(types) => setActiveTypes(types)}
-          activeFilters={activeTypes}
-        />
-
+    <AppShell
+      activePage={mainTab}
+      onNavigate={handleTabChange}
+      searchQuery={searchQuery}
+      onSearch={setSearchQuery}
+      onAddNew={() => setShowQuickNoteModal(true)}
+      onOpenSettings={() => setShowSettings(true)}
+      onSignOut={signOut}
+      onSignIn={() => setShowAuthModal(true)}
+      mediaCounts={mediaCounts}
+      activeFilter={mediaFilter}
+      onFilterChange={setMediaFilter}
+      // MindSearch props
+      activeFilters={activeTypes}
+      onTypeFilterChange={setActiveTypes}
+      activeTags={activeTags}
+      onTagFilterChange={setActiveTags}
+      tagRefreshTrigger={tagRefreshTrigger}
+    >
+      <LayoutGroup>
         {/* Selection Toolbar */}
         {selectionMode && selectedIds.size > 0 && (
           <SelectionToolbar
@@ -501,6 +729,7 @@ function App() {
             onClearSelection={handleClearSelection}
             onDelete={handleBulkDelete}
             onAddToCollection={handleAddToCollection}
+            onAddTag={handleBulkAddTag}
           />
         )}
 
@@ -511,7 +740,7 @@ function App() {
             activeTab={mainTab}
             onTabChange={handleTabChange}
             activeFilters={activeTypes}
-            activePillsInSearch={activeTypes}
+            bookmarks={bookmarks}
             onFilterToggle={(typeId) => {
               setActiveTypes(prev =>
                 prev.includes(typeId)
@@ -562,16 +791,16 @@ function App() {
                 )}
 
                 {/* Masonry Grid */}
-                <div className="w-full columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 [column-gap:1rem]">
-                  {/* Inline Note Composer - hide in selection mode */}
-                  {!selectionMode && (
+                <div className="w-full columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5 [column-gap:1.25rem]">
+                  {/* Inline Note Composer - use visibility:hidden in selection mode to keep space and prevent layout shift */}
+                  <div className={selectionMode ? 'invisible' : ''}>
                     <InlineNoteComposer
                       onNoteCreated={(savedNote) => {
-                        // Refresh bookmarks to show the new note
-                        refetch?.();
+                        // Refresh bookmarks and tags to show the new note
+                        refreshBookmarksAndTags();
                       }}
                     />
-                  )}
+                  </div>
 
                   {/* Bookmarks */}
                   {loading ? (
@@ -581,23 +810,9 @@ function App() {
                       </div>
                     </div>
                   ) : (
-                    sortedBookmarks.map(bookmark => (
+                    sortedBookmarks.map((bookmark, index) => (
                       <div
                         key={bookmark.id}
-                        onClick={(e) => {
-                          // Shift+Click to enter selection mode and select this card
-                          if (e.shiftKey && !selectionMode) {
-                            e.preventDefault();
-                            setSelectionMode(true);
-                            setSelectedIds(new Set([bookmark.id]));
-                          } else if (selectionMode) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleToggleSelect(bookmark.id);
-                          } else {
-                            setSelectedBookmark(bookmark);
-                          }
-                        }}
                         onMouseDown={(e) => {
                           // Prevent text selection when Shift is held
                           if (e.shiftKey) {
@@ -615,10 +830,34 @@ function App() {
                           onUpdate={handleSaveBookmark}
                           selectionMode={selectionMode}
                           isSelected={selectedIds.has(bookmark.id)}
-                          onToggleSelect={() => handleToggleSelect(bookmark.id)}
+                          onToggleSelect={() => {
+                            handleToggleSelect(bookmark.id);
+                            lastClickedIndexRef.current = index;
+                          }}
                           collection={collections.find(c => c.id === bookmark.collectionId)}
                           onCardClick={(bm, autoPlay) => { setSelectedBookmark(bm); setAutoPlayOnOpen(autoPlay || false); }}
                           onOpenEditor={(bm) => setNoteToEdit(bm)}
+                          onTagClick={handleTagClick}
+                          onTagDelete={handleTagDelete}
+                          onShiftClick={(bm) => {
+                            // Shift+Click for range selection
+                            if (!selectionMode) {
+                              // First shift+click: enter selection mode and select this card
+                              setSelectionMode(true);
+                              setSelectedIds(new Set([bm.id]));
+                              lastClickedIndexRef.current = index;
+                            } else if (lastClickedIndexRef.current !== null) {
+                              // Shift+click in selection mode: select range
+                              const start = Math.min(lastClickedIndexRef.current, index);
+                              const end = Math.max(lastClickedIndexRef.current, index);
+                              const rangeIds = sortedBookmarks.slice(start, end + 1).map(b => b.id);
+                              setSelectedIds(prev => {
+                                const newSet = new Set(prev);
+                                rangeIds.forEach(id => newSet.add(id));
+                                return newSet;
+                              });
+                            }
+                          }}
                         />
                       </div>
                     ))
@@ -629,13 +868,15 @@ function App() {
 
             {/* Collections Tab Content */}
             {mainTab === 'collections' && (
-              <CollectionCards
+              <SidesGallery
                 collections={enrichedCollections}
                 bookmarks={bookmarks}
                 selectedCollection={activeCollection}
                 onSelectCollection={setActiveCollection}
                 onBackToFolders={handleBackToFolders}
                 onCreateCollection={() => setShowCollectionModal(true)}
+                onUpdateCollection={handleUpdateCollection}
+                onDeleteCollection={handleDeleteCollection}
                 onBookmarkClick={setSelectedBookmark}
                 onDeleteBookmark={handleDelete}
                 onPinBookmark={handlePin}
@@ -646,63 +887,83 @@ function App() {
             )}
           </FolderTabs>
         </div>
-        </LayoutGroup>
+      </LayoutGroup>
 
-        <BookmarkDetail
-          bookmark={selectedBookmark}
-          open={!!selectedBookmark}
-          onOpenChange={(open) => {
-            if (!open) {
-              setSelectedBookmark(null);
-              setAutoPlayOnOpen(false);
-            }
-          }}
-          onSave={() => refetch()}
-          allTags={allTags}
-          autoPlay={autoPlayOnOpen}
-        />
+      <BookmarkDetail
+        bookmark={selectedBookmark}
+        open={!!selectedBookmark}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedBookmark(null);
+            setAutoPlayOnOpen(false);
+          }
+        }}
+        onSave={() => refreshBookmarksAndTags()}
+        allTags={allTags}
+        autoPlay={autoPlayOnOpen}
+        onTagClick={handleTagClick}
+      />
 
-        {/* Collection Modal */}
-        <CollectionModal
-          open={showCollectionModal}
-          onOpenChange={(open) => {
-            setShowCollectionModal(open);
-            if (!open) setSingleBookmarkToAdd(null);
-          }}
-          collections={collections}
-          onSelectCollection={handleCollectionSelect}
-          onCreateCollection={handleCreateCollection}
-        />
+      {/* Collection Modal */}
+      <CollectionModal
+        open={showCollectionModal}
+        onOpenChange={(open) => {
+          setShowCollectionModal(open);
+          if (!open) setSingleBookmarkToAdd(null);
+        }}
+        collections={collections}
+        onSelectCollection={handleCollectionSelect}
+        onCreateCollection={handleCreateCollection}
+      />
 
-        {/* Quick Note Modal */}
-        <QuickNoteModal
-          open={showQuickNoteModal}
-          onClose={() => setShowQuickNoteModal(false)}
-          onSave={() => {
-            refetch();
-            setShowQuickNoteModal(false);
-          }}
-          allTags={allTags}
-        />
+      {/* Quick Note Modal */}
+      <QuickNoteModal
+        open={showQuickNoteModal}
+        onClose={() => setShowQuickNoteModal(false)}
+        onSave={() => {
+          refreshBookmarksAndTags();
+          setShowQuickNoteModal(false);
+        }}
+        allTags={allTags}
+      />
 
-        {/* Note Editor Modal - for expanded note editing */}
-        <NoteEditorModal
-          isOpen={!!noteToEdit}
-          onClose={() => setNoteToEdit(null)}
-          bookmark={noteToEdit}
-          onSave={(updatedBookmark) => {
-            handleSaveBookmark(updatedBookmark);
-            setNoteToEdit(null);
-          }}
-          onDelete={(bm) => {
-            handleDelete(bm);
-            setNoteToEdit(null);
-          }}
-        />
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
 
-      </main>
-    </div>
-  )
+      <UpdatePasswordModal
+        isOpen={showUpdatePasswordModal}
+        onClose={() => {
+          setShowUpdatePasswordModal(false);
+          setIsPasswordRecoveryFlow(false);
+        }}
+        onSuccess={() => {
+          // Clear URL hash after successful password update
+          window.history.replaceState({}, document.title, window.location.pathname);
+          setIsPasswordRecoveryFlow(false);
+        }}
+        requireCurrentPassword={!isPasswordRecoveryFlow}
+      />
+
+      {/* Note Editor Modal - for expanded note editing */}
+      <NoteEditorModal
+        isOpen={!!noteToEdit}
+        onClose={() => setNoteToEdit(null)}
+        bookmark={noteToEdit}
+        onSave={(updatedBookmark) => {
+          handleSaveBookmark(updatedBookmark);
+          setNoteToEdit(null);
+        }}
+        onDelete={(bm) => {
+          handleDelete(bm);
+          setNoteToEdit(null);
+        }}
+        availableTags={allTags}
+      />
+
+    </AppShell >
+  );
 }
 
 export default App

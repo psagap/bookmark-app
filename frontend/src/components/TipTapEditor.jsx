@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useCallback, useRef, useMemo } from 'react';
 import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
@@ -10,6 +10,8 @@ import 'tippy.js/dist/tippy.css';
 
 import SlashCommandExtension, { slashCommandItems } from './editor/SlashCommandExtension';
 import CommandMenu from './editor/CommandMenu';
+import HashtagSuggestion from './editor/HashtagSuggestion';
+import HashtagMenu from './editor/HashtagMenu';
 import './editor/tiptap-styles.css';
 
 /**
@@ -20,15 +22,25 @@ const TipTapEditor = ({
   content = '',
   onChange,
   onSave,
-  placeholder = 'Start writing... Type / for commands',
+  placeholder = 'Start writing... Type / for commands, # for tags',
   autoFocus = false,
   editable = true,
   className = '',
+  availableTags = [],
+  onTagSelect,
 }) => {
   const editorRef = useRef(null);
+  const availableTagsRef = useRef(availableTags);
+  const onTagSelectRef = useRef(onTagSelect);
+
+  // Keep refs in sync
+  useEffect(() => {
+    availableTagsRef.current = availableTags;
+    onTagSelectRef.current = onTagSelect;
+  }, [availableTags, onTagSelect]);
 
   // Configure suggestion (slash commands)
-  const suggestion = {
+  const slashSuggestion = useMemo(() => ({
     items: ({ query }) => {
       return slashCommandItems.filter((item) =>
         item.title.toLowerCase().startsWith(query.toLowerCase())
@@ -89,40 +101,130 @@ const TipTapEditor = ({
         },
       };
     },
-  };
+  }), []);
+
+  // Configure hashtag suggestion
+  const hashtagSuggestion = useMemo(() => ({
+    char: '#',
+    allowSpaces: false,
+    startOfLine: false,
+    items: ({ query }) => {
+      // Use ref to get current availableTags
+      return availableTagsRef.current || [];
+    },
+    command: ({ editor, range, props }) => {
+      // Delete the # and query text
+      editor.chain().focus().deleteRange(range).run();
+      // Call the tag select callback via ref
+      onTagSelectRef.current?.(props.tag);
+    },
+    render: () => {
+      let component;
+      let popup;
+
+      return {
+        onStart: (props) => {
+          component = new ReactRenderer(HashtagMenu, {
+            props: {
+              ...props,
+              items: availableTagsRef.current || [],
+              command: (attrs) => {
+                props.command(attrs);
+              },
+            },
+            editor: props.editor,
+          });
+
+          if (!props.clientRect) {
+            return;
+          }
+
+          popup = tippy('body', {
+            getReferenceClientRect: props.clientRect,
+            appendTo: () => document.body,
+            content: component.element,
+            showOnCreate: true,
+            interactive: true,
+            trigger: 'manual',
+            placement: 'bottom-start',
+            theme: 'gruvbox',
+          });
+        },
+
+        onUpdate: (props) => {
+          component?.updateProps({
+            ...props,
+            items: availableTagsRef.current || [],
+            command: (attrs) => {
+              props.command(attrs);
+            },
+          });
+
+          if (!props.clientRect) {
+            return;
+          }
+
+          popup?.[0]?.setProps({
+            getReferenceClientRect: props.clientRect,
+          });
+        },
+
+        onKeyDown: (props) => {
+          if (props.event.key === 'Escape') {
+            popup?.[0]?.hide();
+            return true;
+          }
+
+          return component?.ref?.onKeyDown(props);
+        },
+
+        onExit: () => {
+          popup?.[0]?.destroy();
+          component?.destroy();
+        },
+      };
+    },
+  }), []);
+
+  // Memoize extensions - only recreate when placeholder changes
+  const extensions = useMemo(() => [
+    StarterKit.configure({
+      heading: {
+        levels: [1, 2, 3],
+      },
+      codeBlock: {
+        HTMLAttributes: {
+          class: 'code-block',
+        },
+      },
+    }),
+    TaskList,
+    TaskItem.configure({
+      nested: true,
+      HTMLAttributes: {
+        class: 'task-item',
+      },
+    }),
+    Placeholder.configure({
+      placeholder,
+      emptyEditorClass: 'is-editor-empty',
+    }),
+    Image.configure({
+      inline: false,
+      allowBase64: true,
+    }),
+    SlashCommandExtension.configure({
+      suggestion: slashSuggestion,
+    }),
+    // Temporarily disabled to debug crash
+    // HashtagSuggestion.configure({
+    //   suggestion: hashtagSuggestion,
+    // }),
+  ], [placeholder, slashSuggestion]);
 
   // Initialize editor
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3],
-        },
-        codeBlock: {
-          HTMLAttributes: {
-            class: 'code-block',
-          },
-        },
-      }),
-      TaskList,
-      TaskItem.configure({
-        nested: true,
-        HTMLAttributes: {
-          class: 'task-item',
-        },
-      }),
-      Placeholder.configure({
-        placeholder,
-        emptyEditorClass: 'is-editor-empty',
-      }),
-      Image.configure({
-        inline: false,
-        allowBase64: true,
-      }),
-      SlashCommandExtension.configure({
-        suggestion,
-      }),
-    ],
+    extensions,
     content,
     editable,
     autofocus: autoFocus ? 'end' : false,

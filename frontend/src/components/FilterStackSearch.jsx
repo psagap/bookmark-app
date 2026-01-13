@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Fuse from 'fuse.js';
 import {
-  Search, X, Command, Globe, StickyNote, Youtube, Twitter, Image,
+  Search, X, Command, BookOpen, StickyNote, Youtube, Image,
   FolderOpen, Tag, Calendar, Clock, ChevronDown, Loader2,
   ArrowUp, ArrowDown, CornerDownLeft, Sparkles, FileText,
   Link2, Video, Hash, MoreHorizontal
@@ -9,17 +9,39 @@ import {
 import { cn } from '@/lib/utils';
 import { getTagColor } from '@/utils/tagColors';
 
+// Custom SVG Icons for X, Reddit, Wikipedia
+const XLogo = ({ className, style, ...props }) => (
+  <svg viewBox="0 0 24 24" className={className} style={style} fill="currentColor" {...props}>
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+
+const RedditLogo = ({ className, style, ...props }) => (
+  <svg viewBox="0 0 24 24" className={className} style={style} fill="currentColor" {...props}>
+    <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z" />
+  </svg>
+);
+
+const WikipediaLogo = ({ className, style, ...props }) => (
+  <svg viewBox="0 0 24 24" className={className} style={style} fill="currentColor" {...props}>
+    <path d="M12.09 13.119c-.936 1.932-2.217 4.548-2.853 5.728-.616 1.074-1.127.931-1.532.029-1.406-3.321-4.293-9.144-5.651-12.409-.251-.601-.441-.987-.619-1.139-.181-.15-.554-.24-1.122-.271C.103 5.033 0 4.982 0 4.898v-.455l.052-.045c.924-.005 5.401 0 5.401 0l.051.045v.434c0 .119-.075.176-.225.176l-.564.031c-.485.029-.727.164-.727.436 0 .135.053.33.166.601 1.082 2.646 4.818 10.521 4.818 10.521l.136.046 2.411-4.81-.482-1.067-1.658-3.264s-.318-.654-.428-.872c-.728-1.443-.712-1.518-1.447-1.617-.207-.023-.313-.05-.313-.149v-.468l.06-.045h4.292l.113.037v.451c0 .105-.076.15-.227.15l-.308.047c-.792.061-.661.381-.136 1.422l1.582 3.252 1.758-3.504c.293-.64.233-.801.111-.947-.07-.084-.305-.22-.812-.24l-.201-.021c-.052 0-.098-.015-.145-.051-.045-.031-.067-.076-.067-.129v-.427l.061-.045c1.247-.008 4.043 0 4.043 0l.059.045v.436c0 .121-.059.178-.193.178-.646.03-.782.095-1.023.439-.12.186-.375.589-.646 1.039l-2.301 4.273-.065.135 2.792 5.712.17.048 4.396-10.438c.154-.422.129-.722-.064-.895-.197-.172-.346-.273-.857-.295l-.42-.016c-.061 0-.105-.014-.152-.045-.043-.029-.072-.075-.072-.119v-.436l.059-.045h4.961l.041.045v.437c0 .119-.074.18-.209.18-.648.03-1.127.18-1.443.421-.314.255-.557.616-.736 1.067 0 0-4.043 9.258-5.426 12.339-.525 1.007-1.053.917-1.503-.031-.571-1.171-1.773-3.786-2.646-5.71l.053-.036z" />
+  </svg>
+);
+
 // ============================================================================
 // CONSTANTS & CONFIGURATION
 // ============================================================================
 
 // Type definitions with icons, colors, and keyboard shortcuts
+// Using theme-aware color classes (gruvbox-* maps to --theme-* in tailwind.config.js)
 const BOOKMARK_TYPES = [
-  { id: 'all', label: 'All', icon: Sparkles, color: 'gruvbox-yellow', shortcut: 'A' },
-  { id: 'link', label: 'Links', icon: Globe, color: 'gruvbox-aqua', shortcut: 'L' },
-  { id: 'note', label: 'Notes', icon: StickyNote, color: 'gruvbox-yellow', shortcut: 'N' },
+  { id: 'all', label: 'All', icon: Sparkles, color: 'primary', shortcut: 'A' },
+  { id: 'article', label: 'Articles', icon: BookOpen, color: 'gruvbox-aqua', shortcut: 'L' },
+  { id: 'note', label: 'Notes', icon: StickyNote, color: 'primary', shortcut: 'N' },
   { id: 'youtube', label: 'Videos', icon: Video, color: 'gruvbox-red', shortcut: 'V' },
-  { id: 'tweet', label: 'Tweets', icon: Twitter, color: 'gruvbox-blue', shortcut: 'T' },
+  { id: 'tweet', label: 'Posts', icon: XLogo, color: 'muted-foreground', shortcut: 'X' },
+  { id: 'reddit', label: 'Posts', icon: RedditLogo, color: 'gruvbox-orange', shortcut: 'R' },
+  { id: 'wikipedia', label: 'Articles', icon: WikipediaLogo, color: 'gruvbox-aqua', shortcut: 'W' },
   { id: 'image', label: 'Images', icon: Image, color: 'gruvbox-purple', shortcut: 'I' },
 ];
 
@@ -50,18 +72,20 @@ const FUSE_OPTIONS = {
   minMatchCharLength: 2,
 };
 
-// Filter bar colors (left border accent)
+// Filter bar colors (left border accent) - using CSS variables for theme support
 const FILTER_COLORS = {
   type: {
-    link: '#83a598',      // aqua
-    note: '#fabd2f',      // yellow
-    youtube: '#fb4934',   // red
-    tweet: '#83a598',     // blue
-    image: '#d3869b',     // purple
+    article: 'var(--theme-accent-2)',   // theme accent 2
+    note: 'var(--theme-primary)',       // theme primary
+    youtube: 'var(--theme-accent-1)',   // theme accent 1 (red)
+    tweet: 'var(--theme-fg-muted)',     // muted foreground
+    reddit: 'var(--theme-secondary)',   // theme secondary
+    wikipedia: 'var(--theme-accent-2)', // theme accent 2
+    image: 'var(--theme-accent-3)',     // theme accent 3
   },
-  date: '#fe8019',        // orange
-  collection: '#d3869b',  // purple
-  tag: '#8ec07c',         // green
+  date: 'var(--theme-secondary)',       // theme secondary
+  collection: 'var(--theme-accent-3)',  // theme accent 3
+  tag: 'var(--theme-accent-2)',         // theme accent 2
 };
 
 // Pixie folder colors for collections
@@ -98,11 +122,13 @@ const getDateFromPreset = (presetId) => {
 
 const getBookmarkType = (bookmark) => {
   const url = bookmark.url || '';
-  if (url.startsWith('note://') || bookmark.category === 'Note') return 'note';
+  if (url.startsWith('note://') || bookmark.category === 'Note' || bookmark.type === 'note') return 'note';
   if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
   if (url.includes('twitter.com') || url.includes('x.com')) return 'tweet';
-  if (bookmark.category === 'Image' || /\.(jpg|jpeg|png|gif|webp)$/i.test(url)) return 'image';
-  return 'link';
+  if (url.includes('reddit.com') || url.includes('redd.it')) return 'reddit';
+  if (url.includes('wikipedia.org')) return 'wikipedia';
+  if (bookmark.category === 'Image' || bookmark.type === 'image' || /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url)) return 'image';
+  return 'article';
 };
 
 const highlightText = (text, matches, key) => {
@@ -118,7 +144,7 @@ const highlightText = (text, matches, key) => {
     const before = result.slice(0, start);
     const match = result.slice(start, end + 1);
     const after = result.slice(end + 1);
-    result = `${before}<mark class="bg-gruvbox-yellow/30 text-gruvbox-yellow-light rounded px-0.5">${match}</mark>${after}`;
+    result = `${before}<mark class="bg-primary/30 text-primary rounded px-0.5">${match}</mark>${after}`;
   });
 
   return result;
@@ -796,7 +822,7 @@ const FilterStackSearch = ({
               : "top-1/2 -translate-y-1/2 opacity-100 scale-100"
           )}
         >
-          <span className="text-gruvbox-fg-muted/40 font-light tracking-wide text-lg">
+          <span className="text-gruvbox-fg-muted/40 font-light tracking-wide text-2xl">
             {placeholder}
           </span>
         </div>
@@ -854,8 +880,8 @@ const FilterStackSearch = ({
             onFocus={() => setIsFocused(true)}
             placeholder=""
             className={cn(
-              "flex-1 py-3 px-3 bg-transparent text-sm text-gruvbox-fg placeholder:text-gruvbox-fg-muted/40 focus:outline-none",
-              hasContent && "pt-4"
+              "flex-1 py-4 px-3 bg-transparent text-lg text-gruvbox-fg placeholder:text-gruvbox-fg-muted/40 focus:outline-none",
+              hasContent && "pt-6"
             )}
             aria-label={placeholder}
           />

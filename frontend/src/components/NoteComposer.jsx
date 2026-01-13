@@ -3,6 +3,10 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { extractTagsFromContent } from '@/utils/tagExtraction';
+import { supabase } from '@/lib/supabaseClient';
+import { mapDbBookmark, toDbBookmarkPatch } from '@/lib/bookmarkMapper';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * NoteComposer - A minimal, ultra-readable note editor with satisfying save animations
@@ -501,34 +505,31 @@ const formatTime = (date) => {
  */
 const NoteComposerIntegrated = ({ onNoteCreated, className }) => {
   const handleSave = async (content) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
     const noteBookmark = {
+      user_id: user.id,
+      user_email: user.email || '',
       url: `note://${Date.now()}`,
       title: content.split('\n')[0].substring(0, 100) || 'Untitled Note',
       notes: content,
       content: content,
-      category: 'Note',
-      subCategory: 'note',
-      tags: [],
-      thumbnail: null,
+      tags: extractedTags,
       type: 'note',
-      metadata: {
-        isQuickNote: true,
-        createdAt: new Date().toISOString(),
-      }
     };
 
     try {
-      const response = await fetch('http://127.0.0.1:3000/api/bookmarks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(noteBookmark)
-      });
+      const { data, error } = await supabase
+        .from('bookmarks')
+        .insert([toDbBookmarkPatch(noteBookmark)])
+        .select()
+        .single();
 
-      if (response.ok) {
-        const savedNote = await response.json();
-        onNoteCreated?.(savedNote);
-        return savedNote;
-      }
+      if (error) throw error;
+      const mapped = mapDbBookmark(data);
+      onNoteCreated?.(mapped);
+      return mapped;
     } catch (error) {
       console.error('Error saving note:', error);
       throw error;
@@ -618,44 +619,43 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
 
     setState('saving');
 
+    // Extract tags from content
+    const extractedTags = extractTagsFromContent(content);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
     const noteBookmark = {
+      user_id: user.id,
+      user_email: user.email || '',
       url: `note://${Date.now()}`,
       title: content.split('\n')[0].substring(0, 100) || 'Untitled Note',
       notes: content,
       content: content,
-      category: 'Note',
-      subCategory: 'note',
-      tags: [],
-      thumbnail: null,
+      tags: extractedTags,
       type: 'note',
-      metadata: {
-        isQuickNote: true,
-        createdAt: new Date().toISOString(),
-      }
     };
 
     try {
-      const response = await fetch('http://127.0.0.1:3000/api/bookmarks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(noteBookmark)
-      });
+      const { data, error } = await supabase
+        .from('bookmarks')
+        .insert([toDbBookmarkPatch(noteBookmark)])
+        .select()
+        .single();
 
-      if (response.ok) {
-        const savedNote = await response.json();
+      if (error) throw error;
 
-        setState('feedback');
+      setState('feedback');
 
+      setTimeout(() => {
+        setState('resetting');
         setTimeout(() => {
-          setState('resetting');
-          setTimeout(() => {
-            setContent('');
-            setState('idle');
-            setIsExpanded(false);
-            onNoteCreated?.(savedNote);
-          }, shouldReduceMotion ? 100 : 400);
-        }, shouldReduceMotion ? 300 : 800);
-      }
+          setContent('');
+          setState('idle');
+          setIsExpanded(false);
+          onNoteCreated?.(mapDbBookmark(data));
+        }, shouldReduceMotion ? 100 : 400);
+      }, shouldReduceMotion ? 300 : 800);
     } catch (error) {
       console.error('Error saving note:', error);
       setState('dirty');
@@ -830,6 +830,9 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
           );
           border: 2px dashed rgba(255, 255, 255, 0.08);
           transition: border-color 0.2s ease, box-shadow 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .inline-composer-collapsed:hover {
@@ -852,6 +855,8 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
           justify-content: center;
           gap: 10px;
           padding: 24px 20px;
+          width: 100%;
+          min-height: 120px;
         }
 
         .inline-composer-icon {

@@ -1,18 +1,141 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Play, ExternalLink, MoreHorizontal, Pin, Layers, Trash2, RefreshCw, Check, Edit3, Maximize2, PenLine } from "lucide-react";
+import { Play, ExternalLink, MoreHorizontal, Pin, Layers, Trash2, RefreshCw, Check, Edit3, Maximize2, Minimize2, PenLine, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import GlowingCard from './GlowingCard';
-import { getTagColors } from '@/utils/tagColors';
+import { getTagColors, getTagColor } from '@/utils/tagColors';
+import { DeletableTagPill } from './TagColorPicker';
 import NoteBlockRenderer from './NoteBlockRenderer';
-
+import { extractTagsFromContent } from '@/utils/tagExtraction';
 // X Logo SVG Component
 const XLogo = ({ className }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
   </svg>
 );
+
+// YouTube Channel Name component - fetches from oEmbed API
+const YouTubeChannelName = ({ videoUrl }) => {
+  const [channelName, setChannelName] = useState(null);
+
+  useEffect(() => {
+    const fetchChannelName = async () => {
+      try {
+        const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(videoUrl)}&format=json`;
+        const response = await fetch(oembedUrl);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.author_name) {
+            setChannelName(data.author_name);
+          }
+        }
+      } catch (err) {
+        // Silently fail - channel name is optional
+      }
+    };
+    fetchChannelName();
+  }, [videoUrl]);
+
+  if (!channelName) return null;
+
+  return (
+    <p className="mt-2 text-[12px] text-white/40">
+      by <span className="text-white/55">{channelName}</span>
+    </p>
+  );
+};
+
+// TweetMedia component - Fetches media from FxTwitter
+// Uses ref-based approach to ensure video autoplay works
+// Key logic: ALWAYS use FxTwitter data to determine if media exists - don't trust stored data
+const TweetMedia = ({ tweetUrl }) => {
+  const [videoUrl, setVideoUrl] = useState(null);
+  const [imageUrl, setImageUrl] = useState(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const fetchMedia = async () => {
+      try {
+        const response = await fetch(`/api/twitter/video?url=${encodeURIComponent(tweetUrl)}`);
+        const data = await response.json();
+
+        if (data.success && data.videoUrl) {
+          // Tweet has video - show video with FxTwitter's thumbnail as poster
+          setVideoUrl(data.videoUrl);
+          setThumbnailUrl(data.thumbnail || '');
+        } else if (data.success && data.photos && data.photos.length > 0) {
+          // Tweet has photos but no video - show the first photo from FxTwitter
+          setImageUrl(data.photos[0].url);
+        } else if (data.success && data.thumbnail && !data.videoUrl) {
+          // Has thumbnail but no video URL - could be an image tweet
+          setImageUrl(data.thumbnail);
+        }
+        // If none of the above, no media to show
+      } catch (err) {
+        console.warn('FxTwitter fetch failed:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMedia();
+  }, [tweetUrl]);
+
+  // Force autoplay when video element mounts or URL changes
+  useEffect(() => {
+    if (videoRef.current && videoUrl) {
+      videoRef.current.muted = true;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [videoUrl]);
+
+  // Still loading - show nothing
+  if (loading) {
+    return null;
+  }
+
+  // Has video - autoplay it using ref to ensure muted works
+  if (videoUrl) {
+    return (
+      <div className="mt-3 rounded-xl overflow-hidden aspect-video bg-black">
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          poster={thumbnailUrl}
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="w-full h-full object-cover"
+          onLoadedData={(e) => {
+            // Force play when video data loads
+            e.target.muted = true;
+            e.target.play().catch(() => {});
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Has image but no video - show image from FxTwitter
+  if (imageUrl && !videoUrl) {
+    return (
+      <div className="mt-3 rounded-xl overflow-hidden">
+        <img
+          src={imageUrl}
+          alt=""
+          className="w-full h-auto object-cover max-h-[300px]"
+        />
+      </div>
+    );
+  }
+
+  // No media to show
+  return null;
+};
 
 // Date Badge Component - styled like the example
 const DateBadge = ({ date, variant = 'corner' }) => {
@@ -167,13 +290,19 @@ const CardMenuInline = ({ onPin, onCreateSide, onDelete, onRefresh, onEdit, isPi
             }}
           />
           <div
-            className="fixed z-[9999] min-w-[160px] bg-gruvbox-bg-light/95 backdrop-blur-md border border-gruvbox-bg-lighter rounded-lg shadow-xl overflow-hidden"
-            style={{ top: menuPosition.top, left: menuPosition.left }}
+            className="fixed z-[9999] min-w-[160px] rounded-xl overflow-hidden"
+            style={{
+              top: menuPosition.top,
+              left: menuPosition.left,
+              background: 'linear-gradient(180deg, var(--theme-bg-light) 0%, var(--theme-bg-dark) 100%)',
+              border: '1px solid hsl(var(--border) / 0.3)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.2)',
+            }}
           >
             {showEdit && onEdit && (
               <button
                 onClick={(e) => handleClick(e, onEdit)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gruvbox-fg hover:bg-gruvbox-yellow/10 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gruvbox-fg hover:bg-white/10 hover:text-gruvbox-yellow transition-all duration-150"
               >
                 <Edit3 className="w-4 h-4" />
                 <span>Edit</span>
@@ -181,7 +310,7 @@ const CardMenuInline = ({ onPin, onCreateSide, onDelete, onRefresh, onEdit, isPi
             )}
             <button
               onClick={(e) => handleClick(e, onPin)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gruvbox-fg hover:bg-gruvbox-yellow/10 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gruvbox-fg hover:bg-white/10 hover:text-gruvbox-yellow transition-all duration-150"
             >
               <Pin className={cn("w-4 h-4", isPinned && "fill-current text-gruvbox-yellow")} />
               <span>{isPinned ? 'Unpin' : 'Pin'}</span>
@@ -189,22 +318,22 @@ const CardMenuInline = ({ onPin, onCreateSide, onDelete, onRefresh, onEdit, isPi
             <button
               onClick={(e) => handleClick(e, onRefresh)}
               disabled={isRefreshing}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gruvbox-fg hover:bg-gruvbox-yellow/10 transition-colors disabled:opacity-50"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gruvbox-fg hover:bg-white/10 hover:text-gruvbox-yellow transition-all duration-150 disabled:opacity-50"
             >
               <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
               <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
             </button>
             <button
               onClick={(e) => handleClick(e, onCreateSide)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gruvbox-fg hover:bg-gruvbox-yellow/10 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gruvbox-fg hover:bg-white/10 hover:text-gruvbox-yellow transition-all duration-150"
             >
               <Layers className="w-4 h-4" />
               <span>Add to Side</span>
             </button>
-            <div className="h-px bg-gruvbox-bg-lighter mx-2" />
+            <div className="h-px bg-white/10 mx-3 my-1" />
             <button
               onClick={(e) => handleClick(e, onDelete)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gruvbox-red-light hover:bg-gruvbox-red/10 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gruvbox-red-light hover:bg-gruvbox-red/20 transition-all duration-150"
             >
               <Trash2 className="w-4 h-4" />
               <span>Delete</span>
@@ -217,7 +346,7 @@ const CardMenuInline = ({ onPin, onCreateSide, onDelete, onRefresh, onEdit, isPi
   );
 };
 
-const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUpdate, onOpenEditor, selectionMode, isSelected, onToggleSelect, collection }) => {
+const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUpdate, onOpenEditor, selectionMode, isSelected, onToggleSelect, collection, onTagClick, onTagDelete }) => {
   const { title, url, thumbnail, category, notes, content, type, metadata } = bookmark;
   // Support both 'notes' and 'content' field names
   const noteData = notes || content;
@@ -253,21 +382,32 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
     }
   };
 
-  // Note Card - Modern minimal design matching InlineNoteComposer
+  // Note Card - Warm, calm design with subtle amber accent
+  const [isCardExpanded, setIsCardExpanded] = useState(false);
+
   if (isNote) {
     const noteContent = noteData || title || '';
     const hasContent = noteContent.trim().length > 0;
 
-    // Format date simply
+    // Extract tags from note content
+    const extractedTags = extractTagsFromContent(noteContent);
+    // Also check bookmark.tags array (for manually added tags) - normalize to lowercase
+    const allTags = [...new Set([...extractedTags, ...(bookmark.tags || []).map(t => t.toLowerCase())])];
+
+    // Format date
     const formatNoteDate = (dateString) => {
       if (!dateString) return '';
       const d = new Date(dateString);
-      return d.toLocaleDateString('en-US', {
+      return d.toLocaleString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric'
       });
     };
+
+    // Check if content is long enough to need expand button
+    const contentLength = noteContent.length;
+    const needsExpand = contentLength > 300;
 
     return (
       <div
@@ -279,32 +419,18 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
           }
         }}
       >
-        <div
-          className={cn(
-            "note-card-modern group relative rounded-2xl overflow-hidden transition-all duration-200 cursor-pointer",
-            isSelected && "ring-2 ring-gruvbox-yellow ring-offset-2 ring-offset-gruvbox-bg-darkest"
-          )}
-          style={{
-            background: 'linear-gradient(165deg, rgba(40, 40, 40, 0.95) 0%, rgba(32, 32, 32, 0.98) 50%, rgba(28, 28, 28, 1) 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
-            boxShadow: '0 2px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
-          }}
-        >
-          {/* Subtle gradient overlay */}
-          <div
-            className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-            style={{
-              background: 'radial-gradient(ellipse 80% 60% at 20% 10%, rgba(254, 128, 25, 0.06) 0%, transparent 60%)',
-            }}
-          />
+        <div className={cn(
+          "group relative rounded-xl overflow-hidden transition-all duration-300 cursor-pointer h-auto",
+          "w-full bg-[#12120f]",
+          "border border-amber-900/20 hover:border-amber-700/30",
+          "hover:shadow-lg hover:shadow-amber-950/20",
+          isSelected && "ring-2 ring-amber-500 ring-offset-2 ring-offset-background"
+        )}>
+          {selectionMode && <SelectionCheckbox isSelected={isSelected} onToggle={onToggleSelect} />}
 
-          {selectionMode && (
-            <SelectionCheckbox isSelected={isSelected} onToggle={onToggleSelect} />
-          )}
-
-          {/* Menu - top right, only on hover */}
+          {/* Menu - Top Right, only on hover */}
           {!selectionMode && (
-            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
               <CardMenuInline
                 onPin={() => onPin?.(bookmark)}
                 onCreateSide={() => onCreateSide?.(bookmark)}
@@ -314,101 +440,134 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
                 isPinned={bookmark.pinned}
                 isRefreshing={isRefreshing}
                 showEdit={true}
+                variant="overlay"
               />
             </div>
           )}
 
-          {/* Pin indicator */}
-          {bookmark.pinned && !selectionMode && (
-            <div className="absolute top-3 left-3 z-10">
-              <Pin className="w-3.5 h-3.5 text-gruvbox-yellow/70 fill-gruvbox-yellow/70" />
-            </div>
-          )}
+          {/* Note icon - top left */}
+          <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
+            <PenLine className="w-6 h-6 text-amber-500/70" />
+            {bookmark.pinned && !selectionMode && (
+              <Pin className="w-4 h-4 text-amber-400/70 fill-amber-400/70" />
+            )}
+          </div>
 
           {/* Content area */}
-          <div className="relative z-[1] p-4">
+          <div className="pt-10 px-4 pb-3">
             {hasContent ? (
-              <div className="overflow-x-hidden max-h-[200px] overflow-y-auto note-scroll-area">
-                <div className="text-[15px] leading-relaxed text-[rgba(251,241,199,0.88)]">
+              <div
+                className={cn(
+                  "overflow-hidden transition-all duration-300 ease-out",
+                  isCardExpanded ? "max-h-[500px]" : "max-h-[180px]"
+                )}
+              >
+                <div className="text-[15px] leading-[1.7] text-white/85 break-words">
                   <NoteBlockRenderer content={noteContent} compact={true} />
                 </div>
               </div>
             ) : (
-              <div className="py-4 text-center">
-                <p className="text-sm text-[rgba(168,153,132,0.5)]">
-                  Empty note
-                </p>
+              <p className="text-[14px] text-white/30 italic">
+                Empty note
+              </p>
+            )}
+
+            {/* Expand button - inline */}
+            {needsExpand && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCardExpanded(!isCardExpanded);
+                }}
+                className="mt-2 flex items-center gap-1 text-[11px] font-medium text-amber-500/60 hover:text-amber-400 transition-colors"
+              >
+                {isCardExpanded ? (
+                  <>
+                    <ChevronUp className="w-3.5 h-3.5" />
+                    <span>Show less</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="w-3.5 h-3.5" />
+                    <span>Show more</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Tags */}
+            {allTags.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {allTags.map((tag) => (
+                  <DeletableTagPill
+                    key={tag}
+                    tag={tag}
+                    size="small"
+                    actionIcon="menu"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTagClick?.(tag);
+                    }}
+                    onDelete={onTagDelete ? (tagToDelete) => {
+                      onTagDelete(bookmark, tagToDelete);
+                    } : undefined}
+                    showColorPicker={true}
+                  />
+                ))}
               </div>
             )}
-          </div>
 
-          {/* Footer with date */}
-          <div
-            className="relative z-[1] px-4 py-2.5 border-t"
-            style={{ borderColor: 'rgba(255, 255, 255, 0.04)' }}
-          >
-            <span className="text-[11px] font-medium text-[rgba(168,153,132,0.6)] tracking-wide">
+            {/* Date */}
+            <p className="mt-3 text-[11px] text-white/25">
               {formatNoteDate(bookmark.createdAt)}
-            </span>
+            </p>
           </div>
-
-          {/* Hover border glow */}
-          <div
-            className="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-            style={{
-              boxShadow: 'inset 0 0 0 1px rgba(254, 128, 25, 0.15), 0 4px 20px rgba(0, 0, 0, 0.2)',
-            }}
-          />
         </div>
       </div>
     );
   }
 
-  // Tweet Card - Thumbnail preview style (click to open detail)
+  // Tweet Card - Clean black design with X logo top-left
+  // TweetMedia component always fetches from FxTwitter to get video/image
   if (isTweet) {
     const tweetData = metadata?.tweetData;
-    // Get the first image from tweet media for thumbnail
-    const tweetThumbnail = tweetData?.tweetMedia?.find(m => m.type === 'image')?.url
-      || tweetData?.tweetMedia?.find(m => m.type === 'video')?.poster
-      || tweetData?.tweetMedia?.find(m => m.type === 'video')?.thumbnail
-      || thumbnail;
-    const hasMedia = !!tweetThumbnail;
-    const isVideoTweet = tweetData?.tweetMedia?.some(m => m.type === 'video');
+
+    // Clean tweet text - extract just the tweet content
+    // Title format is often: "Author on X: "Tweet text" / X"
+    let cleanText = tweetData?.tweetText || title || '';
+
+    // Extract tweet text from title format: "Author on X: "text" / X"
+    const titleMatch = cleanText.match(/on X: [""](.+)[""] \/ X$/);
+    if (titleMatch) {
+      cleanText = titleMatch[1];
+    }
+
+    // Remove t.co links and clean up whitespace
+    cleanText = cleanText
+      .replace(/https?:\/\/t\.co\/\w+/g, '')
+      .replace(/\s+/g, ' ')
+      .trim() || 'View on X';
+
+    // Get author name from various sources
+    const authorName = tweetData?.authorName
+      || tweetData?.authorHandle?.replace(/^@/, '')
+      || url?.match(/(?:twitter|x)\.com\/(@?\w+)\/status/)?.[1]?.replace(/^@/, '')
+      || null;
 
     return (
-      <div className="break-inside-avoid mb-5">
+      <div className="break-inside-avoid mb-4">
         <div className={cn(
-          "bookmark-card bookmark-card-overlay group relative rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl cursor-pointer",
-          hasMedia ? "min-h-[320px]" : "min-h-[200px]",
-          isSelected && "ring-2 ring-gruvbox-yellow ring-offset-2 ring-offset-gruvbox-bg-darkest"
-        )}
-        style={{
-          backgroundImage: hasMedia ? `url(${tweetThumbnail})` : undefined,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundColor: hasMedia ? undefined : '#15202b',
-        }}
-        >
-          {selectionMode && (
-            <SelectionCheckbox isSelected={isSelected} onToggle={onToggleSelect} />
-          )}
-          <CollectionGlow collection={collection} />
+          "group relative rounded-xl overflow-hidden transition-all duration-300 cursor-pointer h-auto",
+          "w-full bg-[#000000]",
+          "border border-white/[0.08] hover:border-white/20",
+          "hover:shadow-xl hover:shadow-black/50",
+          isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+        )}>
+          {selectionMode && <SelectionCheckbox isSelected={isSelected} onToggle={onToggleSelect} />}
 
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
-
-          {/* Video play indicator */}
-          {isVideoTweet && (
-            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-              <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center">
-                <Play className="w-6 h-6 text-white fill-white ml-0.5" />
-              </div>
-            </div>
-          )}
-
-          {/* Menu button - top right */}
+          {/* Menu - Top Right, only on hover */}
           {!selectionMode && (
-            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+            <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
               <CardMenuInline
                 onPin={() => onPin?.(bookmark)}
                 onCreateSide={() => onCreateSide?.(bookmark)}
@@ -421,56 +580,50 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
             </div>
           )}
 
-          {/* Content at bottom */}
-          <div className="absolute bottom-0 left-0 right-0 px-4 py-4 z-10">
-            {/* Author info */}
-            {tweetData && (
-              <div className="flex items-center gap-2 mb-2">
-                {tweetData.authorAvatar && (
-                  <img
-                    src={tweetData.authorAvatar.replace('_bigger', '_normal')}
-                    alt=""
-                    className="w-8 h-8 rounded-full border border-white/20"
-                  />
-                )}
-                <div className="flex flex-col min-w-0">
-                  <span className="text-white font-medium text-sm truncate">
-                    {tweetData.authorName}
-                  </span>
-                  <span className="text-white/60 text-xs truncate">
-                    {tweetData.authorHandle}
-                  </span>
-                </div>
-                <XLogo className="w-4 h-4 text-white/70 ml-auto flex-shrink-0" />
-              </div>
+          {/* X Logo - top left */}
+          <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5">
+            <XLogo className="w-5 h-5 text-white/60" />
+            {bookmark.pinned && !selectionMode && (
+              <Pin className="w-4 h-4 text-white/70 fill-white/70" />
             )}
+          </div>
 
-            {/* Tweet text preview */}
-            <p className="text-white text-sm leading-relaxed line-clamp-2">
-              {tweetData?.tweetText?.replace(/https:\/\/t\.co\/\w+\s*$/g, '').trim() || title}
+          {/* Content area - compact, no extra space */}
+          <div className="pt-10 px-4 pb-3">
+            {/* Tweet text */}
+            <p className="text-[14px] leading-[1.6] text-white/90 whitespace-pre-wrap font-normal">
+              {cleanText}
             </p>
 
-            {/* Timestamp */}
-            {(tweetData?.tweetDate || bookmark.createdAt) && (
-              <p className="text-white/50 text-xs mt-2">
-                {formatFullTimestamp(tweetData?.tweetDate || bookmark.createdAt)}
+            {/* Tweet media - fetches from FxTwitter to get correct video/image */}
+            <TweetMedia tweetUrl={url} />
+
+            {/* Author attribution - directly after content */}
+            {authorName && (
+              <p className="mt-3 text-[11px] text-white/35">
+                by {authorName}
               </p>
             )}
           </div>
 
-          {/* No thumbnail fallback */}
-          {!hasMedia && !tweetData && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <XLogo className="w-12 h-12 text-white/30 mb-2" />
-              <span className="text-white/50 text-sm">Tweet</span>
-            </div>
-          )}
+          {/* Hover link - bottom right */}
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="absolute bottom-0 right-0 inline-flex items-center gap-2 px-3 py-2.5 rounded-tl-xl text-[11px] font-medium text-white/60 border-t border-l border-white/10 bg-white/5 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 hover:text-white hover:bg-white/10 z-20"
+          >
+            <XLogo className="w-3.5 h-3.5" />
+            <span>View on X</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
         </div>
       </div>
     );
   }
 
-  // YouTube Video Card - Improved layout with visible title and date
+  // YouTube Video Card - Dark minimal design matching X card aesthetic
   if (isVideo) {
     const getYoutubeVideoId = (url) => {
       const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -479,143 +632,105 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
     };
     const videoId = getYoutubeVideoId(url);
     const thumbnailUrl = videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : thumbnail;
-    // Clean up YouTube title
+    // Clean up YouTube title - remove notification count and " - YouTube" suffix
     const cleanTitle = title?.replace(/^\(\d+\)\s*/, '').replace(/ - YouTube$/, '').trim();
 
     return (
-      <div className="break-inside-avoid mb-5">
+      <div className="break-inside-avoid mb-4">
         <div className={cn(
-          "bookmark-card group relative rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl",
-          isSelected && "ring-2 ring-gruvbox-yellow ring-offset-2 ring-offset-gruvbox-bg-darkest"
+          "group relative rounded-xl overflow-hidden transition-all duration-300 cursor-pointer h-auto",
+          "w-full bg-[#0f0f0f]",
+          "border border-white/[0.08] hover:border-red-500/30",
+          "hover:shadow-xl hover:shadow-red-900/20",
+          isSelected && "ring-2 ring-red-500 ring-offset-2 ring-offset-background"
         )}>
-          {selectionMode && (
-            <SelectionCheckbox isSelected={isSelected} onToggle={onToggleSelect} />
-          )}
-          <CollectionGlow collection={collection} />
+          {selectionMode && <SelectionCheckbox isSelected={isSelected} onToggle={onToggleSelect} />}
 
-          {/* Thumbnail area */}
-          <div
-            className="relative aspect-video bg-gruvbox-bg-darkest"
-            style={{
-              backgroundImage: thumbnailUrl ? `url(${thumbnailUrl})` : undefined,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            }}
-          >
-            {/* Gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
-
-            {/* Play button - centered */}
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="absolute inset-0 flex items-center justify-center z-10"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="w-14 h-14 rounded-full bg-gruvbox-red/90 flex items-center justify-center shadow-2xl transform group-hover:scale-110 transition-transform">
-                <Play className="w-6 h-6 text-white fill-white ml-0.5" />
-              </div>
-            </a>
-
-            {/* Duration badge placeholder - top right of thumbnail */}
-            <div className="absolute top-2 left-2 z-10">
-              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-black/70 text-white font-medium">
-                <Play className="w-2.5 h-2.5 fill-current" />
-                YouTube
-              </span>
+          {/* Menu - Top Right, only on hover */}
+          {!selectionMode && (
+            <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+              <CardMenuInline
+                onPin={() => onPin?.(bookmark)}
+                onCreateSide={() => onCreateSide?.(bookmark)}
+                onDelete={() => onDelete?.(bookmark)}
+                onRefresh={handleRefresh}
+                isPinned={bookmark.pinned}
+                isRefreshing={isRefreshing}
+                variant="overlay"
+              />
             </div>
+          )}
 
-            {/* Menu button - top right */}
-            {!selectionMode && (
-              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                <CardMenuInline
-                  onPin={() => onPin?.(bookmark)}
-                  onCreateSide={() => onCreateSide?.(bookmark)}
-                  onDelete={() => onDelete?.(bookmark)}
-                  onRefresh={handleRefresh}
-                  isPinned={bookmark.pinned}
-                  isRefreshing={isRefreshing}
-                  variant="overlay"
-                />
-              </div>
+          {/* YouTube Logo - top left */}
+          <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
+            <svg viewBox="0 0 24 24" className="w-6 h-6 text-red-500/80" fill="currentColor">
+              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+            </svg>
+            {bookmark.pinned && !selectionMode && (
+              <Pin className="w-4 h-4 text-white/70 fill-white/70" />
             )}
           </div>
 
-          {/* Content area - always visible */}
-          <div className="bg-gruvbox-bg-light p-4">
-            {/* Title - up to 3 lines */}
-            <h3 className="text-gruvbox-fg text-sm font-medium leading-snug line-clamp-3 mb-2">
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-gruvbox-yellow transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {cleanTitle}
-              </a>
+          {/* Thumbnail with play button overlay */}
+          {thumbnailUrl && (
+            <div className="relative aspect-video mt-10 mx-3 rounded-lg overflow-hidden bg-black">
+              <img
+                src={thumbnailUrl}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+              {/* Play button overlay */}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
+                <div className="w-12 h-12 rounded-full bg-red-600/90 flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform">
+                  <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Content area */}
+          <div className="px-4 py-3">
+            {/* Video title - bold heading */}
+            <h3 className="text-[15px] leading-[1.5] text-white/95 font-medium line-clamp-2">
+              {cleanTitle}
             </h3>
 
-            {/* Timestamp and metadata row */}
-            <div className="flex items-center justify-between text-xs text-gruvbox-fg-muted">
-              <span>
-                {bookmark.createdAt && formatFullTimestamp(bookmark.createdAt)}
-              </span>
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center gap-1 text-gruvbox-red hover:text-gruvbox-red-light transition-colors"
-              >
-                <span>Watch</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-
-            {/* Description - shows on hover */}
-            {(noteData || metadata?.ogDescription) && (
-              <p className="text-gruvbox-fg-muted text-xs mt-2 line-clamp-2 opacity-0 group-hover:opacity-100 transition-opacity h-0 group-hover:h-auto overflow-hidden">
-                {noteData || metadata?.ogDescription}
-              </p>
-            )}
+            {/* Channel attribution - fetched from YouTube oEmbed */}
+            <YouTubeChannelName videoUrl={url} />
           </div>
+
+          {/* Hover link - bottom right */}
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="absolute bottom-0 right-0 inline-flex items-center gap-2 px-3 py-2.5 rounded-tl-xl text-[11px] font-medium text-white/60 border-t border-l border-white/10 bg-white/5 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 hover:text-white hover:bg-red-500/20 z-20"
+          >
+            <Play className="w-3.5 h-3.5 fill-current" />
+            <span>Watch</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
         </div>
       </div>
     );
   }
 
-  // Default Webpage Card - Style 1 (white content box with slide-up)
+  // Article/Webpage Card - Calm, minimal dark design matching X card aesthetic
   return (
-    <div className="break-inside-avoid mb-5">
+    <div className="break-inside-avoid mb-4">
       <div className={cn(
-        "bookmark-card bookmark-card-slideup group relative rounded-xl overflow-hidden min-h-[380px] transition-all duration-300",
-        isSelected && "ring-2 ring-gruvbox-yellow ring-offset-2 ring-offset-gruvbox-bg-darkest"
-      )}
-      style={{
-        backgroundImage: thumbnail ? `url(${thumbnail})` : undefined,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundColor: thumbnail ? undefined : '#3c3836',
-      }}
-      >
-        {selectionMode && (
-          <SelectionCheckbox isSelected={isSelected} onToggle={onToggleSelect} />
-        )}
-        <CollectionGlow collection={collection} />
+        "group relative rounded-xl overflow-hidden transition-all duration-300 cursor-pointer h-auto",
+        "w-full bg-[#0a0a0a]",
+        "border border-white/[0.06] hover:border-white/15",
+        "hover:shadow-lg hover:shadow-black/40",
+        isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+      )}>
+        {selectionMode && <SelectionCheckbox isSelected={isSelected} onToggle={onToggleSelect} />}
 
-        {/* Date Badge - Corner style (top left) */}
-        <DateBadge date={bookmark.createdAt} variant="corner" />
-
-        {/* Gradient overlay for readability when no thumbnail */}
-        {!thumbnail && (
-          <div className="absolute inset-0 bg-gradient-to-b from-gruvbox-bg-light to-gruvbox-bg-dark" />
-        )}
-
-        {/* Menu button - top right on cover photo */}
+        {/* Menu - Top Right, only on hover */}
         {!selectionMode && (
-          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
             <CardMenuInline
               onPin={() => onPin?.(bookmark)}
               onCreateSide={() => onCreateSide?.(bookmark)}
@@ -628,73 +743,61 @@ const BookmarkCard = ({ bookmark, onDelete, onPin, onCreateSide, onRefresh, onUp
           </div>
         )}
 
-        {/* Content area - slides up on hover */}
-        <div className="card-data absolute bottom-0 left-0 right-0 transform translate-y-[calc(100%-110px)] group-hover:translate-y-0 transition-transform duration-300 ease-out">
-          <div className="card-content bg-gruvbox-bg-light/95 backdrop-blur-sm px-6 py-5 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
-            {/* Header row: Domain + Category pill */}
-            <div className="flex items-center gap-2.5 mb-3">
-              <img
-                src={`https://www.google.com/s2/favicons?domain=${url}&sz=32`}
-                alt=""
-                className="w-4 h-4 rounded"
-              />
-              <span className="text-xs text-gruvbox-fg-muted font-medium">{getDomain(url)}</span>
-              {/* Category pill - inline with domain for clean reading flow */}
-              {category && (
-                <span className="category-pill text-[11px] px-2.5 py-1 rounded-full bg-gruvbox-bg-lighter text-gruvbox-fg-muted font-medium transition-colors duration-200 hover:bg-gruvbox-yellow hover:text-gruvbox-bg-darkest cursor-pointer">
-                  {category}
-                </span>
-              )}
-            </div>
-
-            {/* Title */}
-            <h3 className="text-gruvbox-fg text-lg font-light leading-snug line-clamp-2 pr-2">
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-gruvbox-yellow transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {title}
-              </a>
-            </h3>
-
-            {/* Timestamp - like tweets */}
-            {bookmark.createdAt && (
-              <p className="text-xs text-gruvbox-fg-muted mt-2">
-                {formatFullTimestamp(bookmark.createdAt)}
-              </p>
-            )}
-
-            {/* Description - visible on hover */}
-            <p className="card-text text-gruvbox-fg-muted text-sm mt-3 line-clamp-2 h-[40px] pr-2">
-              {noteData || metadata?.ogDescription || ''}
-            </p>
-
-            {/* Tags row */}
-            {bookmark.tags?.length > 0 && (
-              <div className="card-text flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-gruvbox-bg-lighter/50">
-                {(() => {
-                  const tagsToShow = bookmark.tags?.slice(0, 3) || [];
-                  const tagColors = getTagColors(tagsToShow);
-                  return tagsToShow.map((tag, idx) => (
-                    <span
-                      key={tag}
-                      className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                      style={{
-                        backgroundColor: tagColors[idx].bg,
-                        color: tagColors[idx].text,
-                      }}
-                    >
-                      #{tag}
-                    </span>
-                  ));
-                })()}
-              </div>
-            )}
-          </div>
+        {/* Favicon/Link icon - top left */}
+        <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
+          <img
+            src={`https://www.google.com/s2/favicons?domain=${url}&sz=64`}
+            alt=""
+            className="w-5 h-5 rounded opacity-70"
+            onError={(e) => { e.target.style.display = 'none'; }}
+          />
+          {bookmark.pinned && !selectionMode && (
+            <Pin className="w-4 h-4 text-white/70 fill-white/70" />
+          )}
         </div>
+
+        {/* Thumbnail - if available */}
+        {thumbnail && (
+          <div className="relative aspect-[16/9] mt-10 mx-3 rounded-lg overflow-hidden bg-black/50">
+            <img
+              src={thumbnail}
+              alt=""
+              className="w-full h-full object-cover opacity-90"
+            />
+          </div>
+        )}
+
+        {/* Content area */}
+        <div className={cn("px-4 pb-3", thumbnail ? "pt-3" : "pt-10")}>
+          {/* Title - bold heading */}
+          <h3 className="text-[15px] leading-[1.5] text-white/95 font-medium line-clamp-2">
+            {title}
+          </h3>
+
+          {/* Description - subtle, only if no thumbnail */}
+          {!thumbnail && (noteData || metadata?.ogDescription) && (
+            <p className="mt-2 text-[13px] leading-relaxed text-white/50 line-clamp-2">
+              {noteData || metadata?.ogDescription}
+            </p>
+          )}
+
+          {/* Source attribution */}
+          <p className="mt-2 text-[12px] text-white/35">
+            from <span className="font-medium">{getDomain(url)}</span>
+          </p>
+        </div>
+
+        {/* Hover link - bottom right */}
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute bottom-0 right-0 inline-flex items-center gap-2 px-3 py-2.5 rounded-tl-xl text-[11px] font-medium text-white/50 border-t border-l border-white/[0.06] bg-white/[0.02] backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 hover:text-white/80 hover:bg-white/5 z-20"
+        >
+          <ExternalLink className="w-3 h-3" />
+          <span>Read</span>
+        </a>
       </div>
     </div>
   );

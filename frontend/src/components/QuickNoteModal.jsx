@@ -4,6 +4,9 @@ import { X, StickyNote } from 'lucide-react';
 import NoteBlockEditor from './NoteBlockEditor';
 import { CreepyButton } from './CreepyButton';
 
+import { supabase } from '@/lib/supabaseClient';
+import { mapDbBookmark, toDbBookmarkPatch } from '@/lib/bookmarkMapper';
+
 const QuickNoteModal = ({ open, onClose, onSave, allTags = [] }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState({ blocks: null, plainText: '' });
@@ -52,7 +55,12 @@ const QuickNoteModal = ({ open, onClose, onSave, allTags = [] }) => {
 
     setSaving(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       const noteBookmark = {
+        user_id: user.id,
+        user_email: user.email || '',
         url: `note://${Date.now()}`,
         title: title.trim() || content.plainText.split('\n')[0] || 'Untitled Note',
         notes: content.plainText,
@@ -60,24 +68,18 @@ const QuickNoteModal = ({ open, onClose, onSave, allTags = [] }) => {
         category: 'Note',
         subCategory: 'note',
         tags: [],
-        thumbnail: null,
-        metadata: {
-          isQuickNote: true,
-          createdAt: new Date().toISOString(),
-        }
+        type: 'note',
       };
 
-      const response = await fetch('http://127.0.0.1:3000/api/bookmarks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(noteBookmark)
-      });
+      const { data, error } = await supabase
+        .from('bookmarks')
+        .insert([toDbBookmarkPatch(noteBookmark)])
+        .select()
+        .single();
 
-      if (response.ok) {
-        const savedNote = await response.json();
-        onSave?.(savedNote);
-        onClose();
-      }
+      if (error) throw error;
+      onSave?.(mapDbBookmark(data));
+      onClose();
     } catch (error) {
       console.error('Error saving note:', error);
     } finally {

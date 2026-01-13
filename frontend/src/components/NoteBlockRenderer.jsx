@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { getTagColor } from '@/utils/tagColors';
 
 /**
  * NoteBlockRenderer - Read-only renderer for note blocks
@@ -11,6 +12,13 @@ const isHtmlContent = (text) => {
   if (!text || typeof text !== 'string') return false;
   // Check for common HTML tags
   return /<[a-z][\s\S]*>/i.test(text);
+};
+
+// Strip hashtags from text (since they're shown in the pills section)
+const stripHashtags = (text) => {
+  if (!text || typeof text !== 'string') return text;
+  // Remove hashtags and clean up extra whitespace
+  return text.replace(/#[\w-]+/g, '').replace(/\s+/g, ' ').trim();
 };
 
 // Parse HTML to blocks (supports TipTap HTML output)
@@ -268,7 +276,9 @@ const RenderBlock = ({ block, compact }) => {
         </h3>
       );
 
-    case 'todo':
+    case 'todo': {
+      const todoContent = stripHashtags(block.content);
+      if (!todoContent) return null;
       return (
         <div className="flex items-start gap-2">
           <div className={cn(
@@ -287,46 +297,57 @@ const RenderBlock = ({ block, compact }) => {
             "text-sm text-gruvbox-fg flex-1",
             block.checked && "line-through text-gruvbox-fg-muted"
           )}>
-            {block.content}
+            {todoContent}
           </span>
         </div>
       );
+    }
 
-    case 'bullet':
+    case 'bullet': {
+      const bulletContent = stripHashtags(block.content);
+      if (!bulletContent) return null;
       return (
         <div className="flex items-start gap-2">
           <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gruvbox-fg-muted flex-shrink-0" />
           <span className="text-sm text-gruvbox-fg flex-1">
-            {block.content}
+            {bulletContent}
           </span>
         </div>
       );
+    }
 
-    case 'numbered':
+    case 'numbered': {
+      const numberedContent = stripHashtags(block.content);
+      if (!numberedContent) return null;
       return (
         <div className="flex items-start gap-2">
           <span className="text-sm text-gruvbox-fg-muted flex-shrink-0 w-5 text-right">
             {block.number}.
           </span>
           <span className="text-sm text-gruvbox-fg flex-1">
-            {block.content}
+            {numberedContent}
           </span>
         </div>
       );
+    }
 
     case 'code':
+      // Don't strip hashtags from code blocks - they might be meaningful
       return (
         <pre className="font-mono text-sm text-gruvbox-aqua bg-gruvbox-bg-dark/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words">
           {block.content || ' '}
         </pre>
       );
 
-    case 'blockquote':
+    case 'blockquote': {
+      const quoteContent = stripHashtags(block.content);
+      if (!quoteContent) return null;
       return (
         <div className="border-l-2 border-gruvbox-yellow/50 pl-3 py-1 text-sm text-gruvbox-fg-muted italic">
-          {block.content}
+          {quoteContent}
         </div>
       );
+    }
 
     case 'divider':
       return (
@@ -334,17 +355,17 @@ const RenderBlock = ({ block, compact }) => {
       );
 
     case 'tag':
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gruvbox-yellow/20 text-gruvbox-yellow">
-          {block.content}
-        </span>
-      );
+      // Tags are now rendered in the dedicated pills section, skip inline rendering
+      return null;
 
     default: // paragraph
       if (!block.content) return null;
+      // Strip hashtags from paragraph content (they're shown in pills section)
+      const strippedContent = stripHashtags(block.content);
+      if (!strippedContent) return null;
       return (
         <p className="text-sm text-gruvbox-fg leading-relaxed">
-          {block.content}
+          {strippedContent}
         </p>
       );
   }

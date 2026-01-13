@@ -11,7 +11,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 
-const API_BASE = 'http://127.0.0.1:3000';
+const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:3000';
 
 export const useSemanticSearch = (options = {}) => {
   const {

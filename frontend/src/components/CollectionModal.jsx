@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, FolderOpen, Sparkles, Check } from 'lucide-react';
+import { X, Plus, FolderOpen, ChevronRight, Check } from 'lucide-react';
 
 // Curated color palette - fewer, more distinct colors
 const COLLECTION_COLORS = [
@@ -60,17 +60,14 @@ const CollectionModal = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className={`absolute inset-0 bg-gruvbox-bg-darkest/80 backdrop-blur-md transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
         onClick={handleClose}
       />
 
       {/* Modal */}
       <div className={`relative w-full max-w-md mx-4 transition-all duration-300 ${isVisible ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4'}`}>
-        {/* Glow effect */}
-        <div className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-gruvbox-yellow/20 via-gruvbox-orange/10 to-gruvbox-purple/20 blur-2xl opacity-50" />
-
         {/* Modal content */}
-        <div className="relative bg-gruvbox-bg-light/95 backdrop-blur-xl border border-gruvbox-bg-lighter/80 rounded-2xl shadow-2xl shadow-gruvbox-bg-darkest/80 overflow-hidden">
+        <div className="relative bg-gruvbox-bg border border-gruvbox-bg-lighter rounded-2xl shadow-xl overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-gruvbox-bg-lighter/60">
             <div className="flex items-center gap-3">
@@ -107,7 +104,7 @@ const CollectionModal = ({
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
                       placeholder="Enter side name..."
-                      className="w-full pl-9 pr-4 py-3 bg-gruvbox-bg/60 border border-gruvbox-bg-lighter/80 rounded-xl text-gruvbox-fg placeholder:text-gruvbox-fg-muted/50 focus:outline-none focus:border-gruvbox-yellow/40 focus:bg-gruvbox-bg/80 transition-all duration-200"
+                      className="w-full pl-9 pr-4 py-3 bg-gruvbox-bg-dark border border-gruvbox-bg-lighter/80 rounded-xl text-gruvbox-fg placeholder:text-gruvbox-fg-muted/50 focus:outline-none focus:border-gruvbox-yellow/40 focus:bg-gruvbox-bg-dark/80 transition-all duration-200"
                       autoFocus
                     />
                   </div>
@@ -116,7 +113,7 @@ const CollectionModal = ({
                 {/* Color picker - horizontal strip */}
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-gruvbox-fg-muted mb-3">Choose Color</label>
-                  <div className="flex items-center gap-2 p-2 bg-gruvbox-bg/40 rounded-xl">
+                  <div className="flex items-center gap-2 p-2 bg-gruvbox-bg-dark rounded-xl">
                     {COLLECTION_COLORS.map((color) => (
                       <button
                         key={color.value}
@@ -155,7 +152,7 @@ const CollectionModal = ({
                     onClick={() => setIsCreating(false)}
                     className="relative flex-1 px-4 py-3 rounded-xl overflow-hidden group"
                   >
-                    <div className="absolute inset-0 bg-gruvbox-bg-lighter/50 group-hover:bg-gruvbox-bg-lighter/70 transition-colors duration-200" />
+                    <div className="absolute inset-0 bg-gruvbox-bg-lighter group-hover:bg-gruvbox-bg-lighter/80 transition-colors duration-200" />
                     <span className="relative text-gruvbox-fg-muted group-hover:text-gruvbox-fg transition-colors">Cancel</span>
                   </button>
                   <button
@@ -186,7 +183,7 @@ const CollectionModal = ({
                     <span className="font-medium text-gruvbox-yellow-light group-hover:text-gruvbox-yellow transition-colors">Create New Side</span>
                     <span className="text-xs text-gruvbox-fg-muted/60">Organize your bookmarks</span>
                   </div>
-                  <Sparkles className="relative ml-auto w-4 h-4 text-gruvbox-yellow/40 group-hover:text-gruvbox-yellow/80 transition-colors" />
+                  <ChevronRight className="relative ml-auto w-4 h-4 text-gruvbox-fg-muted/40 group-hover:text-gruvbox-fg-muted/80 transition-colors" />
                 </button>
 
                 {/* Existing collections */}

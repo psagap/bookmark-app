@@ -15,36 +15,70 @@ function isWikipediaPage(url) {
 }
 
 // Wait for tweet images to load using MutationObserver (for SPA dynamic content)
+// Only gets images from the FIRST/MAIN article (the tweet being viewed)
+// Excludes quoted tweets, card previews, and nested content
 function waitForTweetImages(timeout = 3000) {
   return new Promise((resolve) => {
     const images = [];
 
-    // Check immediately first
-    const immediateImages = document.querySelectorAll('article img[src*="pbs.twimg.com/media"]');
-    if (immediateImages.length > 0) {
-      immediateImages.forEach(img => {
-        if (!img.src.includes('profile_images')) {
-          images.push(img.src);
-        }
-      });
-      if (images.length > 0) {
-        resolve(images);
-        return;
+    // Helper to check if an element is inside quoted/nested content
+    const isInsideQuotedOrNested = (element, mainArticle) => {
+      let parent = element.parentElement;
+      while (parent && parent !== mainArticle) {
+        if (parent.getAttribute('data-testid') === 'quotedTweet') return true;
+        if (parent.getAttribute('data-testid')?.includes('card')) return true;
+        if (parent.tagName === 'ARTICLE') return true;
+        parent = parent.parentElement;
       }
+      return false;
+    };
+
+    // Helper to get images from main tweet only (excluding quoted/nested)
+    const getMainTweetImages = () => {
+      const mainArticle = document.querySelector('article');
+      if (!mainArticle) return [];
+
+      const imgs = [];
+      // Use tweetPhoto data-testid for most reliable selection
+      const photoContainers = mainArticle.querySelectorAll('[data-testid="tweetPhoto"] img');
+
+      photoContainers.forEach(img => {
+        if (isInsideQuotedOrNested(img, mainArticle)) return;
+        if (!img.src) return;
+        if (img.src.includes('profile_images')) return;
+        if (img.src.includes('emoji')) return;
+        if (imgs.includes(img.src)) return;
+        imgs.push(img.src);
+      });
+
+      // Fallback to direct media URLs if no tweetPhoto found
+      if (imgs.length === 0) {
+        const mediaImages = mainArticle.querySelectorAll('img[src*="pbs.twimg.com/media"]');
+        mediaImages.forEach(img => {
+          if (isInsideQuotedOrNested(img, mainArticle)) return;
+          if (!img.src) return;
+          if (img.src.includes('profile_images')) return;
+          if (imgs.includes(img.src)) return;
+          imgs.push(img.src);
+        });
+      }
+
+      return imgs;
+    };
+
+    // Check immediately first
+    const immediateImages = getMainTweetImages();
+    if (immediateImages.length > 0) {
+      resolve(immediateImages);
+      return;
     }
 
     // Set up observer for dynamic content
     const observer = new MutationObserver((mutations) => {
-      const newImages = document.querySelectorAll('article img[src*="pbs.twimg.com/media"]');
-      newImages.forEach(img => {
-        if (!img.src.includes('profile_images') && !images.includes(img.src)) {
-          images.push(img.src);
-        }
-      });
-
-      if (images.length > 0) {
+      const newImages = getMainTweetImages();
+      if (newImages.length > 0) {
         observer.disconnect();
-        resolve(images);
+        resolve(newImages);
       }
     });
 
@@ -82,6 +116,8 @@ async function extractTweetMetadata() {
       retweetCount: '',
       likeCount: '',
       viewCount: '',
+      cardImage: '', // Preview image from embedded links/cards
+      cardUrl: '',   // URL of the embedded link
     };
 
     // Extract author handle from URL
@@ -111,6 +147,29 @@ async function extractTweetMetadata() {
       const avatarImg = document.querySelector('article img[src*="profile_images"]');
       if (avatarImg) {
         data.authorAvatar = avatarImg.src;
+      }
+
+      // Try to get author name from DOM if not from title
+      // X displays the author name in multiple places
+      if (!data.authorName) {
+        // Try the user name display in the tweet header
+        const userNameSelectors = [
+          'article [data-testid="User-Name"] span span', // Primary selector
+          'article div[dir="ltr"] span span', // Fallback
+          'article a[role="link"][href*="/status"] span', // Link-based
+        ];
+
+        for (const selector of userNameSelectors) {
+          const nameEl = document.querySelector(selector);
+          if (nameEl && nameEl.textContent && !nameEl.textContent.startsWith('@')) {
+            const name = nameEl.textContent.trim();
+            // Filter out engagement numbers and common UI text
+            if (name && name.length > 1 && !name.match(/^\d+[KMB]?$/) && name !== 'X') {
+              data.authorName = name;
+              break;
+            }
+          }
+        }
       }
 
       // Check for verification badge
@@ -166,71 +225,212 @@ async function extractTweetMetadata() {
         data.viewCount = viewsEl.innerText.replace(' Views', '').replace(' views', '');
       }
 
-      // Extract media (images and videos) with multiple fallbacks
+      // Extract media (images and videos) from MAIN TWEET ONLY
+      // IMPORTANT: Exclude quoted tweets, embedded content, replies, and ads
       data.tweetMedia = [];
 
-      // Multiple image selectors to try
-      const imageSelectors = [
-        'article img[src*="pbs.twimg.com/media"]',  // Primary
-        'article img[src*="pbs.twimg.com"][alt]',   // Images with alt text
-        'div[data-testid="tweetPhoto"] img',        // Test ID selector
-        'a[href*="/photo/"] img'                    // Photo link wrapper
-      ];
+      // Get the first/main article - this is the tweet being viewed
+      // CRITICAL: Only get the FIRST article element, which should be the focal tweet
+      const mainTweetArticle = document.querySelector('article[data-testid="tweet"]') || document.querySelector('article');
 
-      // Try each image selector
-      for (const selector of imageSelectors) {
-        const images = document.querySelectorAll(selector);
-        images.forEach(img => {
-          if (img.src && !img.src.includes('profile_images') && !data.tweetMedia.find(m => m.url === img.src)) {
-            data.tweetMedia.push({ type: 'image', url: img.src });
+      if (mainTweetArticle) {
+        // Helper function to check if an element is inside a quoted tweet, nested content, or reply
+        const isInsideQuotedOrNested = (element) => {
+          let parent = element.parentElement;
+          let articleCount = 0;
+
+          while (parent) {
+            // Stop when we reach the main article
+            if (parent === mainTweetArticle) break;
+
+            // Check for quoted tweet containers
+            if (parent.getAttribute('data-testid') === 'quotedTweet') return true;
+            // Check for card wrappers (embedded links/previews)
+            if (parent.getAttribute('data-testid')?.includes('card')) return true;
+            // Check for nested articles (replies in thread view)
+            if (parent.tagName === 'ARTICLE') {
+              articleCount++;
+              // If we've passed through another article before reaching mainTweetArticle,
+              // this element is NOT in the main tweet
+              if (articleCount > 0) return true;
+            }
+            // Check for promoted/sponsored content
+            if (parent.getAttribute('data-testid')?.includes('promoted')) return true;
+
+            parent = parent.parentElement;
           }
-        });
-        if (data.tweetMedia.length > 0) break; // Stop if we found images
-      }
+          return false;
+        };
 
-      // Try video selectors - attempt to get real video URLs, not blob URLs
-      const videoSelectors = [
-        'article video',
-        'div[data-testid="videoPlayer"] video',
-        'div[data-testid="videoComponent"] video'
-      ];
+        // Helper to verify element is actually a child of the main article
+        const isDirectChildOfMainTweet = (element) => {
+          let parent = element.parentElement;
+          while (parent) {
+            if (parent === mainTweetArticle) return true;
+            // If we hit another article first, it's not a direct child
+            if (parent.tagName === 'ARTICLE' && parent !== mainTweetArticle) return false;
+            parent = parent.parentElement;
+          }
+          return false;
+        };
 
-      for (const selector of videoSelectors) {
-        const video = document.querySelector(selector);
-        if (video) {
-          const source = video.querySelector('source');
-          let videoUrl = source?.src || video.src || '';
+        // Get the main tweet's text element to help identify the tweet's content area
+        const tweetTextEl = mainTweetArticle.querySelector('[data-testid="tweetText"]');
 
-          // Filter out blob URLs - they don't work outside this browser session
-          // Try to extract actual video URL from various sources
-          if (videoUrl.startsWith('blob:') || !videoUrl) {
-            // Try to find mp4 URL in any video element attributes or nearby elements
-            const mp4Source = document.querySelector('source[type="video/mp4"]');
-            if (mp4Source?.src && !mp4Source.src.startsWith('blob:')) {
-              videoUrl = mp4Source.src;
+        // Find the tweet content container - media should be a sibling/near the tweet text
+        // X structures tweets as: [user info] -> [tweet text] -> [media] -> [engagement]
+        const tweetContentContainer = tweetTextEl?.parentElement?.parentElement;
+
+        // Multiple image selectors to try - scoped to main tweet only
+        const imageSelectors = [
+          '[data-testid="tweetPhoto"] img',   // Most reliable - X's photo container
+          'img[src*="pbs.twimg.com/media"]',  // Direct media URLs
+        ];
+
+        // Try each image selector within the main tweet article
+        for (const selector of imageSelectors) {
+          const images = mainTweetArticle.querySelectorAll(selector);
+          images.forEach(img => {
+            // Skip if not a direct child of main tweet
+            if (!isDirectChildOfMainTweet(img)) return;
+            // Skip if inside quoted tweet or nested content
+            if (isInsideQuotedOrNested(img)) return;
+            // Skip profile images
+            if (img.src?.includes('profile_images')) return;
+            // Skip emoji images
+            if (img.src?.includes('emoji')) return;
+            // Skip ad/sponsored images
+            if (img.src?.includes('ad_') || img.src?.includes('sponsored')) return;
+            // Skip external card preview images (not the main tweet media)
+            if (img.closest('[data-testid="card.wrapper"]') && !img.closest('[data-testid="tweetPhoto"]')) return;
+            // Skip already added
+            if (data.tweetMedia.find(m => m.url === img.src)) return;
+
+            if (img.src) {
+              data.tweetMedia.push({ type: 'image', url: img.src });
+            }
+          });
+          if (data.tweetMedia.length > 0) break; // Stop if we found images
+        }
+
+        // Try video selectors within the main tweet article (excluding quoted/nested)
+        const videoSelectors = [
+          '[data-testid="videoPlayer"] video',
+          '[data-testid="videoComponent"] video',
+          'video'
+        ];
+
+        for (const selector of videoSelectors) {
+          const videos = mainTweetArticle.querySelectorAll(selector);
+          for (const video of videos) {
+            // Skip if not a direct child of main tweet
+            if (!isDirectChildOfMainTweet(video)) continue;
+            // Skip if inside quoted tweet or nested content
+            if (isInsideQuotedOrNested(video)) continue;
+
+            const source = video.querySelector('source');
+            let videoUrl = source?.src || video.src || '';
+
+            // Filter out blob URLs - they don't work outside this browser session
+            if (videoUrl.startsWith('blob:') || !videoUrl) {
+              const mp4Source = video.parentElement?.querySelector('source[type="video/mp4"]');
+              if (mp4Source?.src && !mp4Source.src.startsWith('blob:')) {
+                videoUrl = mp4Source.src;
+              }
+            }
+
+            const posterUrl = video.poster || '';
+
+            if (videoUrl || posterUrl) {
+              data.tweetMedia.push({
+                type: 'video',
+                url: videoUrl,
+                poster: posterUrl
+              });
+              break; // Only get first video from main tweet
             }
           }
-
-          // If we still have a blob URL, note it but also save the poster
-          // The poster image can be used as a fallback display
-          const posterUrl = video.poster || '';
-
-          // Only add to media if we have something useful
-          if (videoUrl || posterUrl) {
-            data.tweetMedia.push({
-              type: 'video',
-              url: videoUrl, // May be blob or empty, frontend will handle
-              poster: posterUrl // Poster can be used as fallback
-            });
-          }
-          break;
+          if (data.tweetMedia.some(m => m.type === 'video')) break;
         }
       }
 
-      // If still no media, wait for dynamic content
+      // If still no media, wait for dynamic content (but also filter quoted tweets)
       if (data.tweetMedia.length === 0) {
         const images = await waitForTweetImages(2000);
+        // waitForTweetImages already filters to main article only
         images.forEach(url => data.tweetMedia.push({ type: 'image', url }));
+      }
+
+      // Extract card/link preview image (for tweets with embedded links)
+      // X shows preview cards for URLs in tweets - this captures that image
+      // IMPORTANT: Only extract from main tweet article, not replies
+      try {
+        if (mainTweetArticle) {
+          // Card wrapper selectors (X uses various test IDs) - scoped to main tweet
+          const cardSelectors = [
+            '[data-testid="card.wrapper"]',
+            '[data-testid="card.layoutLarge.media"]',
+            '[data-testid="card.layoutSmall.media"]',
+            '[data-testid="card.layoutSmall.detail"]',
+            'div[data-testid="tweetPhoto"]'
+          ];
+
+          for (const selector of cardSelectors) {
+            const cardEl = mainTweetArticle.querySelector(selector);
+            if (cardEl) {
+              // Try to get image from card
+              const cardImages = cardEl.querySelectorAll('img');
+              for (const cardImg of cardImages) {
+                if (cardImg.src && !cardImg.src.includes('profile_images') && !cardImg.src.includes('emoji')) {
+                  data.cardImage = cardImg.src;
+                  break;
+                }
+              }
+              if (data.cardImage) break;
+
+              // Check for background-image style on card or children
+              const bgElements = [cardEl, ...cardEl.querySelectorAll('*')];
+              for (const el of bgElements) {
+                const bgStyle = window.getComputedStyle(el).backgroundImage;
+                if (bgStyle && bgStyle !== 'none' && bgStyle.includes('url')) {
+                  const urlMatch = bgStyle.match(/url\(["']?([^"')]+)["']?\)/);
+                  if (urlMatch && urlMatch[1] && urlMatch[1].includes('twimg.com')) {
+                    data.cardImage = urlMatch[1];
+                    break;
+                  }
+                }
+              }
+              if (data.cardImage) break;
+            }
+          }
+
+          // Try to get the linked URL from the card - scoped to main tweet
+          const cardLink = mainTweetArticle.querySelector('[data-testid="card.wrapper"] a[href]');
+          if (cardLink) {
+            data.cardUrl = cardLink.href;
+          }
+
+          // If card is a quoted tweet, try to get its content - scoped to main tweet
+          const quotedTweet = mainTweetArticle.querySelector('[data-testid="quotedTweet"]');
+          if (quotedTweet) {
+            // Get images from quoted tweet
+            const quotedImages = quotedTweet.querySelectorAll('img');
+            for (const img of quotedImages) {
+              if (img.src && !img.src.includes('profile_images') && !img.src.includes('emoji')) {
+                data.cardImage = img.src;
+                break;
+              }
+            }
+
+            // Get the quoted tweet link
+            const quotedLink = quotedTweet.querySelector('a[href*="/status/"]');
+            if (quotedLink) {
+              data.cardUrl = quotedLink.href;
+            }
+          }
+        }
+      } catch (cardError) {
+        console.warn('Could not extract card data:', cardError);
       }
 
     } catch (domError) {
@@ -394,9 +594,25 @@ async function detectPageMetadata() {
       const ogImage = document.querySelector('meta[property="og:image"]');
       if (ogImage && ogImage.content) {
         metadata.ogImage = ogImage.content;
+        console.log('[Content Script] Found og:image:', metadata.ogImage);
       }
     } catch (e) {
       console.warn('Could not extract og:image:', e);
+    }
+
+    // For Twitter, also check twitter:image meta tag specifically
+    if (isTwitterPage(url)) {
+      try {
+        const twitterImage = document.querySelector('meta[name="twitter:image"], meta[property="twitter:image"]');
+        if (twitterImage && twitterImage.content) {
+          console.log('[Content Script] Found twitter:image:', twitterImage.content);
+          if (!metadata.ogImage) {
+            metadata.ogImage = twitterImage.content;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not extract twitter:image:', e);
+      }
     }
 
     // Try to get og:description
@@ -517,7 +733,98 @@ try {
   chrome.runtime.sendMessage({
     action: 'registerContextMenu',
     data: { url: window.location.href, title: document.title }
+  }, () => {
+    // Check for errors silently - this is expected to fail on non-extension pages
+    if (chrome.runtime.lastError) {
+      // Silently ignore - this is normal when the extension isn't active
+    }
   });
 } catch (error) {
-  console.warn('Could not register context menu:', error);
+  // Extension context may be invalid - this is normal on some pages
+}
+
+// ============================================================
+// Session Sync: Read session from main app and sync to extension
+// This runs on localhost:5173 (the main bookmark app)
+// ============================================================
+
+const EXTENSION_SESSION_KEY = 'bookmark_extension_session';
+const BOOKMARK_APP_ORIGIN = 'http://localhost:5173';
+
+// Check if we're on the bookmark app
+function isBookmarkApp() {
+  return window.location.origin === BOOKMARK_APP_ORIGIN;
+}
+
+// Safe sendMessage wrapper that handles errors gracefully
+function safeSendMessage(message, callback) {
+  try {
+    if (!chrome.runtime?.id) {
+      // Extension context is invalid
+      return;
+    }
+    chrome.runtime.sendMessage(message, (response) => {
+      // Always check for lastError first to prevent uncaught errors
+      if (chrome.runtime.lastError) {
+        // Silently ignore - service worker may be inactive
+        return;
+      }
+      callback?.(response);
+    });
+  } catch (error) {
+    // Extension context may be invalid - this is normal
+  }
+}
+
+// Sync stored session to the extension background script
+async function syncSessionFromStorage() {
+  if (!isBookmarkApp()) return;
+
+  try {
+    const sessionData = localStorage.getItem(EXTENSION_SESSION_KEY);
+    if (sessionData) {
+      const session = JSON.parse(sessionData);
+      safeSendMessage({ action: 'setSession', session }, (response) => {
+        if (response?.success) {
+          console.log('[Bookmark Extension] Session synced successfully');
+        }
+      });
+    } else {
+      // No session, clear extension session
+      safeSendMessage({ action: 'clearSession' }, () => {
+        console.log('[Bookmark Extension] Session cleared');
+      });
+    }
+  } catch (error) {
+    console.warn('[Bookmark Extension] Could not sync session:', error);
+  }
+}
+
+// Listen for session updates from the AuthContext
+if (isBookmarkApp()) {
+  // Sync on page load
+  syncSessionFromStorage();
+
+  // Listen for session updates via custom event
+  window.addEventListener('supabase-session-update', (event) => {
+    const { session } = event.detail;
+    if (session) {
+      safeSendMessage({ action: 'setSession', session }, (response) => {
+        if (response?.success) {
+          console.log('[Bookmark Extension] Session updated from auth change');
+        }
+      });
+    } else {
+      safeSendMessage({ action: 'clearSession' }, () => {
+        console.log('[Bookmark Extension] Session cleared from sign out');
+      });
+    }
+  });
+
+  // Also listen for localStorage changes (for cross-tab sync)
+  window.addEventListener('storage', (event) => {
+    if (event.key === EXTENSION_SESSION_KEY) {
+      syncSessionFromStorage();
+    }
+  });
 }

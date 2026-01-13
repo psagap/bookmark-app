@@ -93,9 +93,9 @@ const TwitterMetadata = ({ metadata }) => {
 const WikipediaMetadata = ({ metadata }) => {
     const wikiData = metadata?.wikipediaData;
     if (!wikiData) return null;
-    
+
     const categoryCount = wikiData.categories?.length || 0;
-    
+
     return (
         <div className="space-y-2">
             {wikiData.description && (
@@ -106,6 +106,32 @@ const WikipediaMetadata = ({ metadata }) => {
             )}
             {wikiData.lang && (
                 <MetadataRow icon={Globe} label="Language" value={wikiData.lang.toUpperCase()} />
+            )}
+        </div>
+    );
+};
+
+// Reddit metadata panel
+const RedditMetadata = ({ metadata }) => {
+    const redditData = metadata?.redditData;
+    if (!redditData) return null;
+
+    return (
+        <div className="space-y-2">
+            {redditData.subreddit && (
+                <MetadataRow icon={Hash} label="Subreddit" value={`r/${redditData.subreddit}`} />
+            )}
+            {redditData.author && (
+                <MetadataRow icon={User} label="Author" value={`u/${redditData.author}`} />
+            )}
+            {redditData.score && (
+                <MetadataRow icon={ThumbsUp} label="Score" value={formatCount(redditData.score)} />
+            )}
+            {redditData.numComments && (
+                <MetadataRow icon={MessageCircle} label="Comments" value={formatCount(redditData.numComments)} />
+            )}
+            {redditData.createdAt && (
+                <MetadataRow icon={Calendar} label="Posted" value={formatDate(redditData.createdAt)} />
             )}
         </div>
     );
@@ -162,6 +188,9 @@ const getBookmarkType = (bookmark) => {
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
         return 'youtube';
     }
+    if (url.includes('reddit.com') || url.includes('redd.it')) {
+        return 'reddit';
+    }
     if (url.includes('wikipedia.org')) {
         return 'wikipedia';
     }
@@ -186,11 +215,12 @@ const BookmarkMetadataPanel = ({ bookmark, className = '' }) => {
     // Check if there's any metadata to show
     const hasYouTubeData = type === 'youtube' && (metadata.channelTitle || metadata.duration || metadata.viewCount);
     const hasTwitterData = type === 'twitter' && metadata.tweetData;
+    const hasRedditData = type === 'reddit' && metadata.redditData;
     const hasWikiData = type === 'wikipedia' && metadata.wikipediaData;
     const hasArticleData = type === 'article' && (metadata.siteName || metadata.author || metadata.publishedDate);
     const hasImageData = type === 'image' && metadata.ocrText;
-    
-    const hasData = hasYouTubeData || hasTwitterData || hasWikiData || hasArticleData || hasImageData;
+
+    const hasData = hasYouTubeData || hasTwitterData || hasRedditData || hasWikiData || hasArticleData || hasImageData;
     
     if (!hasData) return null;
     
@@ -205,6 +235,7 @@ const BookmarkMetadataPanel = ({ bookmark, className = '' }) => {
             
             {type === 'youtube' && <YouTubeMetadata metadata={metadata} />}
             {type === 'twitter' && <TwitterMetadata metadata={metadata} />}
+            {type === 'reddit' && <RedditMetadata metadata={metadata} />}
             {type === 'wikipedia' && <WikipediaMetadata metadata={metadata} />}
             {type === 'article' && <ArticleMetadata metadata={metadata} bookmark={bookmark} />}
             {type === 'image' && <ImageMetadata metadata={metadata} />}
@@ -213,4 +244,6 @@ const BookmarkMetadataPanel = ({ bookmark, className = '' }) => {
 };
 
 export default BookmarkMetadataPanel;
+
+
 

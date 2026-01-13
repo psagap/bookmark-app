@@ -1,74 +1,118 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&family=Orbitron:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&family=Source+Serif+4:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Font Size Classes */
+html.font-size-small {
+  font-size: 14px;
+}
+
+html.font-size-default {
+  font-size: 16px;
+}
+
+html.font-size-large {
+  font-size: 18px;
+}
+
 @layer base {
   :root {
+    --font-scale: 1;
     /* ========================================
        THEME VARIABLES - Set dynamically by ThemeContext
        Default values are Gruvbox theme
        ======================================== */
 
     /* Core semantic colors (HSL format for Tailwind) */
-    --background: 20 6% 12%;
-    --foreground: 43 59% 81%;
-    --card: 20 8% 16%;
-    --card-foreground: 43 59% 81%;
-    --popover: 20 10% 20%;
-    --popover-foreground: 43 59% 81%;
-    --primary: 42 75% 49%;
-    --primary-foreground: 20 6% 12%;
-    --secondary: 20 10% 22%;
-    --secondary-foreground: 43 59% 81%;
-    --muted: 20 8% 18%;
-    --muted-foreground: 30 15% 60%;
-    --accent: 27 95% 53%;
-    --accent-foreground: 20 6% 12%;
-    --destructive: 0 75% 45%;
-    --destructive-foreground: 43 59% 90%;
-    --border: 20 10% 25%;
-    --input: 20 8% 18%;
-    --ring: 42 75% 49%;
-    --radius: 0.5rem;
+    --background: 240 5% 10%;
+    /* Zinc 900 */
+    --foreground: 240 5% 90%;
+    /* Zinc 100 */
+    --card: 240 4% 12%;
+    /* Zinc 850 */
+    --card-foreground: 240 5% 90%;
+    --popover: 240 4% 12%;
+    --popover-foreground: 240 5% 90%;
+    --primary: 35 90% 50%;
+    /* Amber 500 - Sophisticated Accent */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4% 16%;
+    /* Zinc 800 */
+    --secondary-foreground: 240 5% 90%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 55%;
+    /* Zinc 500 */
+    --accent: 240 4% 16%;
+    --accent-foreground: 240 5% 90%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 5% 18%;
+    /* Zinc 800/border */
+    --input: 240 5% 18%;
+    --ring: 35 90% 50%;
+    --radius: 0.75rem;
 
     /* Extended theme colors (HEX format) - set by ThemeContext */
-    --theme-bg-darkest: #1d2021;
-    --theme-bg-dark: #282828;
-    --theme-bg: #32302f;
-    --theme-bg-light: #3c3836;
-    --theme-bg-lighter: #504945;
-    --theme-fg: #ebdbb2;
-    --theme-fg-light: #fbf1c7;
-    --theme-fg-muted: #a89984;
-    --theme-primary: #d79921;
-    --theme-primary-light: #fabd2f;
-    --theme-secondary: #d65d0e;
-    --theme-secondary-light: #fe8019;
-    --theme-accent-1: #cc241d;
-    --theme-accent-2: #689d6a;
-    --theme-accent-3: #b16286;
-    --theme-accent-4: #458588;
+    --theme-bg-darkest: #18181b;
+    /* Zinc 950 */
+    --theme-bg-dark: #202023;
+    /* Zinc 925 (Custom) */
+    --theme-bg: #27272a;
+    /* Zinc 900 */
+    --theme-bg-light: #3f3f46;
+    /* Zinc 800 */
+    --theme-bg-lighter: #52525b;
+    /* Zinc 700 */
+    --theme-fg: #f4f4f5;
+    /* Zinc 100 */
+    --theme-fg-light: #fafafa;
+    /* Zinc 50 */
+    --theme-fg-muted: #a1a1aa;
+    /* Zinc 400 */
+    --theme-primary: #f59e0b;
+    /* Amber 500 */
+    --theme-primary-light: #fbbf24;
+    /* Amber 400 */
+    --theme-secondary: #f97316;
+    /* Orange 500 */
+    --theme-secondary-light: #fb923c;
+    /* Orange 400 */
+    --theme-accent-1: #ef4444;
+    /* Red 500 */
+    --theme-accent-2: #10b981;
+    /* Emerald 500 */
+    --theme-accent-3: #8b5cf6;
+    /* Violet 500 */
+    --theme-accent-4: #06b6d4;
+    /* Cyan 500 */
 
     /* Glow effect colors */
-    --glow-color: 42 75% 49%;
-    --glow-color-rgb: 215, 153, 33;
-    --glow-secondary: 27 95% 53%;
-    --glow-secondary-rgb: 254, 128, 25;
-    --glow-intensity: 1;
+    --glow-color: 35 90% 50%;
+    --glow-color-rgb: 245, 158, 11;
+    --glow-secondary: 27 96% 61%;
+    --glow-secondary-rgb: 249, 115, 22;
+    --glow-intensity: 0.8;
 
-    /* Mesh gradient colors */
-    --mesh-color-1: rgba(204, 36, 29, 0.15);
-    --mesh-color-2: rgba(177, 98, 134, 0.12);
-    --mesh-color-3: rgba(104, 157, 106, 0.1);
-    --mesh-color-4: rgba(254, 128, 25, 0.08);
-    --mesh-color-5: rgba(40, 40, 40, 0.9);
+    /* Mesh gradient colors - significantly subtler */
+    --mesh-color-1: rgba(245, 158, 11, 0.08);
+    /* Amber */
+    --mesh-color-2: rgba(139, 92, 246, 0.06);
+    /* Violet */
+    --mesh-color-3: rgba(16, 185, 129, 0.05);
+    /* Emerald */
+    --mesh-color-4: rgba(249, 115, 22, 0.04);
+    /* Orange */
+    --mesh-color-5: rgba(24, 24, 27, 0.95);
+    /* Zinc 950 */
 
     /* Typography */
-    --font-display: 'Cinzel', Georgia, serif;
-    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display: 'Poppins', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: 'Poppins', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
+    --font-wikipedia-display: 'Playfair Display', 'Source Serif 4', 'Georgia', serif;
+    --font-wikipedia-body: 'Source Serif 4', 'Georgia', serif;
 
     /* Selection colors */
     --selection-bg: rgba(215, 153, 33, 0.3);
@@ -91,6 +135,37 @@
     --gruvbox-aqua-light: var(--theme-accent-2);
     --gruvbox-purple: var(--theme-accent-3);
     --gruvbox-purple-light: var(--theme-accent-3);
+
+    /* ========================================
+       UI SIZE VARIABLES
+       Default to "large" size (compact)
+       ======================================== */
+    --ui-pill-px: 0.875rem;
+    --ui-pill-py: 0.375rem;
+    --ui-pill-gap: 0.5rem;
+    --ui-pill-icon: 1rem;
+    --ui-pill-text: 1rem;
+    --ui-search-text: 1.125rem;
+  }
+
+  /* UI Size: Large (default - compact) */
+  :root.ui-size-large {
+    --ui-pill-px: 0.875rem;
+    --ui-pill-py: 0.375rem;
+    --ui-pill-gap: 0.5rem;
+    --ui-pill-icon: 1rem;
+    --ui-pill-text: 1rem;
+    --ui-search-text: 1.125rem;
+  }
+
+  /* UI Size: Minimal */
+  :root.ui-size-minimal {
+    --ui-pill-px: 0.75rem;
+    --ui-pill-py: 0.375rem;
+    --ui-pill-gap: 0.375rem;
+    --ui-pill-icon: 0.875rem;
+    --ui-pill-text: 0.8125rem;
+    --ui-search-text: 0.875rem;
   }
 
   .dark {
@@ -136,6 +211,24 @@
     text-rendering: optimizeLegibility;
     letter-spacing: -0.01em;
     overflow-x: hidden;
+  }
+
+  body.theme-strata {
+    --color-1: rgb(176 168 156);
+    --color-2: rgb(195 186 172);
+    --color-3: rgb(237 236 232);
+    --color-4: rgb(255 255 255);
+    background: linear-gradient(
+      90deg,
+      var(--color-1) 0%,
+      var(--color-1) 25%,
+      var(--color-2) 25%,
+      var(--color-2) 50%,
+      var(--color-3) 50%,
+      var(--color-3) 75%,
+      var(--color-4) 75%,
+      var(--color-4) 100%
+    );
   }
 
   h1,
@@ -210,8 +303,10 @@
 
   /* Note card scroll area - hidden scrollbar by default, shows on hover */
   .note-scroll-area {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE/Edge */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE/Edge */
   }
 
   .note-scroll-area::-webkit-scrollbar {
@@ -292,15 +387,20 @@
   }
 
   @keyframes meshShift {
-    0%, 100% {
+
+    0%,
+    100% {
       background-position: 0% 0%, 50% 0%, 100% 0%, 100% 50%, 100% 100%, 50% 100%, 0% 100%, 0% 50%, 50% 50%;
     }
+
     25% {
       background-position: 10% 10%, 60% 5%, 90% 10%, 95% 60%, 90% 90%, 40% 95%, 10% 90%, 5% 40%, 55% 55%;
     }
+
     50% {
       background-position: 5% 15%, 45% 10%, 95% 5%, 90% 45%, 95% 95%, 55% 90%, 5% 95%, 10% 55%, 45% 45%;
     }
+
     75% {
       background-position: 15% 5%, 55% 15%, 85% 15%, 85% 55%, 85% 85%, 45% 85%, 15% 85%, 15% 45%, 50% 50%;
     }
@@ -372,7 +472,7 @@
     max-width: 100% !important;
   }
 
-  .tweet-card-embed > div {
+  .tweet-card-embed>div {
     margin: 0 !important;
   }
 
@@ -507,11 +607,11 @@
   }
 
   .folder-content {
-    filter: drop-shadow(0px 4px 20px rgba(0, 0, 0, 0.25));
+    /* Wrapper for elevated panel */
   }
 
   .folder-content-inner {
-    border: 1px solid var(--theme-bg-lighter);
+    /* Main container - styles applied inline for proper corner handling */
   }
 
   .folder-page {
@@ -575,32 +675,103 @@
   }
 
   /* ========================================
-     SIDES GRID
+     SIDES GRID - Modern Folder View
      ======================================== */
 
   .sides-container {
     width: 100%;
+    padding: 0 1rem;
   }
 
-  .sides-grid {
-    display: flex;
-    gap: 16px;
-    justify-content: center;
-    padding: 1rem 0;
-    max-width: 1400px;
-    margin: 0 auto;
+  /* Modern side card styling */
+  .side-card-modern {
+    width: 100%;
+    min-width: 0;
   }
 
-  .sides-grid--collapsed {
-    overflow: hidden;
+  /* Selected folder view */
+  .sides-selected-view {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
   }
 
-  .sides-grid--expanded {
-    overflow: visible;
+  .sides-selected-view--visible {
+    opacity: 1;
+    transform: translateY(0);
   }
 
   /* Inline filter pill animation */
   .inline-filter-pill {
     overflow: hidden;
+  }
+
+  /* ========================================
+     SIDES GALLERY - Crystalline Collections
+     ======================================== */
+
+  .sides-gallery {
+    min-height: 60vh;
+  }
+
+  /* Glass card hover glow animation */
+  @keyframes glassShimmer {
+    0% {
+      background-position: -200% center;
+    }
+
+    100% {
+      background-position: 200% center;
+    }
+  }
+
+  /* Breathing animation for ambient elements */
+  @keyframes breathe {
+
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 0.5;
+    }
+
+    50% {
+      transform: scale(1.05);
+      opacity: 0.3;
+    }
+  }
+
+  /* Smooth reveal for bento cards */
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Custom scrollbar for gallery */
+  .sides-gallery::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .sides-gallery::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .sides-gallery::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+  }
+
+  .sides-gallery::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  body.theme-strata .app-shell {
+    background: transparent;
   }
 }

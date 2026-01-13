@@ -1,65 +1,9 @@
 [
   {
-    "id": "1764494943133-yhph7dey2",
-    "name": "test1",
-    "color": "#6366f1",
-    "createdAt": 1764494943133,
-    "updatedAt": 1764494943133
-  },
-  {
-    "id": "1764840223842-q9tv0zqff",
-    "name": "wikis",
-    "color": "#fe8019",
-    "createdAt": 1764840223842,
-    "updatedAt": 1764840223842
-  },
-  {
-    "id": "1764840238752-kgole6r2c",
-    "name": "tweet, tweet",
-    "color": "#458588",
-    "createdAt": 1764840238752,
-    "updatedAt": 1764840238752
-  },
-  {
-    "id": "1764878990873-727rta8i8",
-    "name": "SomethingOne",
+    "id": "1766879269214-erq2l9a7w",
+    "name": "Later",
     "color": "#fb4934",
-    "createdAt": 1764878990873,
-    "updatedAt": 1764878990873
-  },
-  {
-    "id": "1764878997491-xslyjh8rf",
-    "name": "SomethingTwo",
-    "color": "#b8bb26",
-    "createdAt": 1764878997491,
-    "updatedAt": 1764878997491
-  },
-  {
-    "id": "1764879005156-kvi1qhlt7",
-    "name": "Something 4",
-    "color": "#689d6a",
-    "createdAt": 1764879005156,
-    "updatedAt": 1764879005156
-  },
-  {
-    "id": "1764879012691-g2vsmk31c",
-    "name": "SOmething 8",
-    "color": "#b16286",
-    "createdAt": 1764879012691,
-    "updatedAt": 1764879012691
-  },
-  {
-    "id": "1764879022433-rnrwy5trb",
-    "name": "HEHEHE",
-    "color": "#98971a",
-    "createdAt": 1764879022433,
-    "updatedAt": 1764879022433
-  },
-  {
-    "id": "1764879030158-dy79x5o01",
-    "name": "Okay",
-    "color": "#d79921",
-    "createdAt": 1764879030158,
-    "updatedAt": 1764879030158
+    "createdAt": 1766879269215,
+    "updatedAt": 1766879269215
   }
 ]

@@ -21,6 +21,9 @@ const springs = {
   backdrop: { duration: 0.2 },
 };
 
+import { supabase } from '@/lib/supabaseClient';
+import { mapDbBookmark, toDbBookmarkPatch } from '@/lib/bookmarkMapper';
+
 const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
   const [content, setContent] = useState('');
   const [state, setState] = useState('idle'); // idle | dirty | saving | feedback
@@ -83,40 +86,39 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
 
     setState('saving');
 
-    const noteBookmark = {
-      url: `note://${Date.now()}`,
-      title: content.split('\n')[0].substring(0, 100) || 'Untitled Note',
-      notes: content,
-      content: content,
-      category: 'Note',
-      subCategory: 'note',
-      tags: [],
-      thumbnail: null,
-      type: 'note',
-      metadata: {
-        isQuickNote: true,
-        createdAt: new Date().toISOString(),
-      }
-    };
-
     try {
-      const response = await fetch('http://127.0.0.1:3000/api/bookmarks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(noteBookmark)
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
 
-      if (response.ok) {
-        const savedNote = await response.json();
-        setState('feedback');
+      const noteBookmark = {
+        user_id: user.id,
+        user_email: user.email || '',
+        url: `note://${Date.now()}`,
+        title: content.split('\n')[0].substring(0, 100) || 'Untitled Note',
+        notes: content,
+        content: content,
+        category: 'Note',
+        subCategory: 'note',
+        tags: [],
+        type: 'note',
+      };
 
-        setTimeout(() => {
-          setContent('');
-          setState('idle');
-          onNoteCreated?.(savedNote);
-          onClose();
-        }, shouldReduceMotion ? 300 : 600);
-      }
+      const { data, error } = await supabase
+        .from('bookmarks')
+        .insert([toDbBookmarkPatch(noteBookmark)])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setState('feedback');
+
+      setTimeout(() => {
+        setContent('');
+        setState('idle');
+        onNoteCreated?.(mapDbBookmark(data));
+        onClose();
+      }, shouldReduceMotion ? 300 : 600);
     } catch (error) {
       console.error('Error saving note:', error);
       setState('dirty');
@@ -284,11 +286,11 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
           max-width: 420px;
           background: linear-gradient(
             180deg,
-            rgba(40, 40, 40, 0.98) 0%,
-            rgba(32, 32, 32, 0.99) 50%,
-            rgba(28, 28, 28, 1) 100%
+            var(--theme-bg-light) 0%,
+            var(--theme-bg) 50%,
+            var(--theme-bg-dark) 100%
           );
-          border-left: 1px solid rgba(255, 255, 255, 0.06);
+          border-left: 1px solid hsl(var(--border) / 0.2);
           box-shadow:
             -8px 0 32px rgba(0, 0, 0, 0.4),
             -2px 0 8px rgba(0, 0, 0, 0.2);
@@ -302,9 +304,9 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
           width: 3px;
           background: linear-gradient(
             180deg,
-            var(--theme-secondary, #fe8019) 0%,
-            rgba(254, 128, 25, 0.6) 50%,
-            rgba(254, 128, 25, 0.3) 100%
+            var(--theme-primary) 0%,
+            rgba(var(--glow-color-rgb), 0.6) 50%,
+            rgba(var(--glow-color-rgb), 0.3) 100%
           );
           flex-shrink: 0;
         }
@@ -322,7 +324,7 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
           align-items: center;
           justify-content: space-between;
           padding: 16px 20px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          border-bottom: 1px solid hsl(var(--border) / 0.15);
         }
 
         .note-panel-header-left {
@@ -350,8 +352,8 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
         }
 
         .note-panel-close:hover:not(:disabled) {
-          background: rgba(255, 255, 255, 0.06);
-          color: var(--theme-fg, #ebdbb2);
+          background: hsl(var(--muted) / 0.3);
+          color: var(--theme-fg);
         }
 
         .note-panel-close:disabled {
@@ -372,9 +374,9 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
           min-height: 120px;
           max-height: 400px;
           padding: 16px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
+          border: 1px solid hsl(var(--border) / 0.25);
           border-radius: 12px;
-          background: rgba(0, 0, 0, 0.2);
+          background: var(--theme-bg-darkest);
           resize: none;
           overflow-y: auto;
 
@@ -382,20 +384,21 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
           font-size: 16px;
           font-weight: 400;
           line-height: 1.6;
-          color: rgba(251, 241, 199, 0.92);
-          caret-color: var(--theme-secondary, #fe8019);
+          color: var(--theme-fg);
+          caret-color: var(--theme-primary);
 
           transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
 
         .note-panel-textarea::placeholder {
-          color: rgba(168, 153, 132, 0.5);
+          color: var(--theme-fg-muted);
+          opacity: 0.5;
         }
 
         .note-panel-textarea:focus {
           outline: none;
-          border-color: rgba(254, 128, 25, 0.4);
-          box-shadow: 0 0 0 3px rgba(254, 128, 25, 0.1);
+          border-color: rgba(var(--glow-color-rgb), 0.4);
+          box-shadow: 0 0 0 3px rgba(var(--glow-color-rgb), 0.1);
         }
 
         .note-panel-textarea:disabled {
@@ -404,7 +407,7 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
         }
 
         .note-panel-textarea::selection {
-          background: rgba(254, 128, 25, 0.25);
+          background: rgba(var(--glow-color-rgb), 0.25);
         }
 
         /* Feedback state */
@@ -416,10 +419,10 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
           padding: 32px;
           background: linear-gradient(
             135deg,
-            rgba(254, 128, 25, 0.15) 0%,
-            rgba(254, 128, 25, 0.08) 100%
+            rgba(var(--glow-color-rgb), 0.15) 0%,
+            rgba(var(--glow-color-rgb), 0.08) 100%
           );
-          border: 1px solid rgba(254, 128, 25, 0.3);
+          border: 1px solid rgba(var(--glow-color-rgb), 0.3);
           border-radius: 12px;
         }
 
@@ -427,7 +430,7 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
           font-family: 'Inter', -apple-system, sans-serif;
           font-size: 18px;
           font-weight: 500;
-          color: var(--theme-secondary, #fe8019);
+          color: var(--theme-primary);
         }
 
         /* Footer */
@@ -436,14 +439,14 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
           align-items: center;
           justify-content: space-between;
           padding: 16px 20px;
-          border-top: 1px solid rgba(255, 255, 255, 0.05);
-          background: rgba(0, 0, 0, 0.15);
+          border-top: 1px solid hsl(var(--border) / 0.15);
+          background: var(--theme-bg-darkest);
         }
 
         .note-panel-hint {
           font-family: 'Inter', -apple-system, sans-serif;
           font-size: 12px;
-          color: var(--theme-fg-muted, #a89984);
+          color: var(--theme-fg-muted);
           display: flex;
           align-items: center;
           gap: 4px;
@@ -456,13 +459,13 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
           min-width: 20px;
           height: 20px;
           padding: 0 5px;
-          background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: hsl(var(--muted) / 0.3);
+          border: 1px solid hsl(var(--border) / 0.3);
           border-radius: 4px;
           font-family: 'Inter', sans-serif;
           font-size: 11px;
           font-weight: 500;
-          color: var(--theme-fg, #ebdbb2);
+          color: var(--theme-fg);
         }
 
         .note-panel-hint-plus {
@@ -479,19 +482,19 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
           padding: 8px 16px;
           border-radius: 8px;
           background: transparent;
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          border: 1px solid hsl(var(--border) / 0.3);
           font-family: 'Inter', -apple-system, sans-serif;
           font-size: 13px;
           font-weight: 500;
-          color: var(--theme-fg-muted, #a89984);
+          color: var(--theme-fg-muted);
           cursor: pointer;
           transition: all 0.15s ease;
         }
 
         .note-panel-btn-secondary:hover:not(:disabled) {
-          background: rgba(255, 255, 255, 0.05);
-          border-color: rgba(255, 255, 255, 0.15);
-          color: var(--theme-fg, #ebdbb2);
+          background: hsl(var(--muted) / 0.2);
+          border-color: hsl(var(--border) / 0.5);
+          color: var(--theme-fg);
         }
 
         .note-panel-btn-secondary:disabled {
@@ -502,12 +505,12 @@ const NoteComposerPanel = ({ isOpen, onClose, onNoteCreated }) => {
         .note-panel-btn-primary {
           padding: 8px 20px;
           border-radius: 8px;
-          background: var(--theme-secondary, #fe8019);
+          background: var(--theme-primary);
           border: none;
           font-family: 'Inter', -apple-system, sans-serif;
           font-size: 13px;
           font-weight: 600;
-          color: rgba(29, 32, 33, 0.95);
+          color: var(--theme-bg-darkest);
           cursor: pointer;
           transition: all 0.15s ease;
         }

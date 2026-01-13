@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Palette } from 'lucide-react';
+import { Check, MoreHorizontal, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAllTagColors, getTagColor, setTagColor } from '@/utils/tagColors';
 
@@ -46,7 +46,7 @@ const ColorPickerDropdown = ({
   const dropdownRef = useRef(null);
   const colors = getAllTagColors();
 
-  // Close on click outside
+  // Close on click outside, escape, or scroll
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -60,12 +60,19 @@ const ColorPickerDropdown = ({
       }
     };
 
+    const handleScroll = () => {
+      onClose();
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
+    // Use capture phase to catch scroll events from any scrollable container
+    window.addEventListener('scroll', handleScroll, true);
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('scroll', handleScroll, true);
     };
   }, [onClose]);
 
@@ -347,6 +354,171 @@ export const TagPill = ({
           onClose={() => setIsPickerOpen(false)}
         />
       )}
+    </>
+  );
+};
+
+/**
+ * DeletableTagPill - Tag pill with animated hover-to-reveal action button
+ * Action expands from the right on hover
+ */
+export const DeletableTagPill = ({
+  tag,
+  color,
+  onClick,
+  onDelete,
+  onColorChange,
+  showColorPicker = true,
+  size = 'default', // 'small' | 'default' | 'large'
+  actionIcon = 'delete', // 'delete' | 'menu'
+  className,
+}) => {
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const pillRef = useRef(null);
+
+  // Get color from props or fetch it
+  const tagColor = color || getTagColor(tag);
+
+  const sizeClasses = {
+    small: 'text-[10px] py-0.5',
+    default: 'text-xs py-1',
+    large: 'text-sm py-1.5',
+  };
+
+  const paddingClasses = {
+    small: 'px-2',
+    default: 'px-2.5',
+    large: 'px-3',
+  };
+
+  const deleteButtonSizes = {
+    small: 'w-3.5 h-3.5 text-[9px]',
+    default: 'w-4 h-4 text-[10px]',
+    large: 'w-5 h-5 text-xs',
+  };
+  const actionIconSizes = {
+    small: 'w-3 h-3',
+    default: 'w-3.5 h-3.5',
+    large: 'w-4 h-4',
+  };
+
+  const openColorPicker = (e) => {
+    if (!showColorPicker) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = pillRef.current?.getBoundingClientRect();
+    if (rect) {
+      setPosition({
+        top: rect.bottom + 8,
+        left: rect.left,
+      });
+    }
+    setIsPickerOpen(true);
+  };
+
+  const handleContextMenu = (e) => {
+    if (!showColorPicker) return;
+    openColorPicker(e);
+  };
+
+  const handleColorSelect = (colorId) => {
+    setTagColor(tag, colorId);
+    onColorChange?.(colorId);
+  };
+
+  const handleDelete = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDelete?.(tag);
+  };
+
+  const handleActionClick = (e) => {
+    if (actionIcon === 'menu') {
+      openColorPicker(e);
+      return;
+    }
+    handleDelete(e);
+  };
+
+  const handleClick = (e) => {
+    if (onClick) {
+      onClick(e, tag);
+    }
+  };
+
+  const showActionButton = actionIcon === 'menu' ? showColorPicker : !!onDelete;
+  const actionLabel = actionIcon === 'menu'
+    ? `Change color for ${tag}`
+    : `Remove ${tag} tag`;
+
+  return (
+    <>
+      <span
+        ref={pillRef}
+        onClick={handleClick}
+        onContextMenu={handleContextMenu}
+        className={cn(
+          "deletable-tag-pill inline-flex items-center rounded-full font-medium transition-all duration-150 group",
+          showColorPicker && "cursor-context-menu",
+          onClick && "cursor-pointer",
+          sizeClasses[size],
+          className
+        )}
+        style={{
+          backgroundColor: tagColor.bg,
+          color: tagColor.text,
+          border: `1px solid ${tagColor.border}`,
+          '--tw-ring-color': tagColor.border,
+        }}
+        title={showColorPicker ? "Right-click to change color" : undefined}
+      >
+        <span className={paddingClasses[size]}>#{tag}</span>
+
+        {/* Animated delete button - expands from right on hover */}
+        {showActionButton && (
+          <span className="deletable-tag-delete-wrapper overflow-hidden transition-all duration-200 ease-out opacity-0 group-hover:opacity-100 flex items-center">
+            <button
+              onClick={handleActionClick}
+              className={cn(
+                "flex items-center justify-center rounded-full transition-all duration-150",
+                "bg-black/20 hover:bg-black/40",
+                deleteButtonSizes[size]
+              )}
+              aria-label={actionLabel}
+            >
+              {actionIcon === 'menu' ? (
+                <MoreHorizontal className={actionIconSizes[size]} />
+              ) : (
+                <span className="leading-none">×</span>
+              )}
+            </button>
+          </span>
+        )}
+      </span>
+
+      {isPickerOpen && (
+        <ColorPickerDropdown
+          tagName={tag}
+          currentColorId={tagColor.id}
+          position={position}
+          onSelect={handleColorSelect}
+          onClose={() => setIsPickerOpen(false)}
+        />
+      )}
+
+      {/* Inline styles for the animation */}
+      <style>{`
+        .deletable-tag-pill .deletable-tag-delete-wrapper {
+          max-width: 0;
+          padding-right: 0;
+          transition: max-width 0.2s ease-out, opacity 0.15s ease-out, padding 0.2s ease-out;
+        }
+        .deletable-tag-pill:hover .deletable-tag-delete-wrapper {
+          max-width: 18px;
+          padding-right: 6px;
+        }
+      `}</style>
     </>
   );
 };
