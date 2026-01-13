@@ -22,36 +22,50 @@ A simple Node.js/Express backend server for managing bookmarks with a beautiful 
 - Bookmarks saved from extension appear in dashboard
 - Real-time sync between extension and web app
 
-## Quick Start
+## Quick Start (Bun)
 
 ### Prerequisites
-- Node.js 14+ installed
-- npm or yarn
+- Bun installed (latest), Node 18+ for tooling
 
 ### Installation
 
-1. Open terminal in the web-app folder:
+1. Open terminal in the repo:
 ```bash
-cd ~/Desktop/web-app
+cd /Users/psagap/bookmark-app
 ```
 
-2. Install dependencies:
+2. Install server deps with Bun:
 ```bash
-npm install
+bun install
 ```
 
-3. Start the server:
+3. Install frontend deps:
 ```bash
-npm start
+cd frontend
+bun install
+cd ..
 ```
 
-You should see:
-```
-📑 Bookmark server running on http://localhost:3000
-Data stored in: ~/Desktop/web-app/bookmarks.json
+4. Start the backend (serves built frontend from `frontend/dist`):
+```bash
+bun run dev   # nodemon watch mode on port 3000
+# or
+bun start     # production mode
 ```
 
-4. Open your browser:
+5. Start the frontend dev server (in another terminal):
+```bash
+cd frontend
+bun run dev   # Vite dev server
+```
+
+6. Build the frontend for production:
+```bash
+cd frontend
+bun run build
+```
+
+7. Open your browser:
 ```
 http://localhost:3000
 ```

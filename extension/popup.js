@@ -238,6 +238,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Auto-detect source from URL
     const { category, subCategory, source } = detectSource(currentMetadata.url);
 
+    // Build thumbnail with comprehensive fallback chain
+    // For tweets: cardImage (embedded links) > tweetMedia > ogImage
+    // For other sites: ogImage > site-specific images
+    let thumbnail = '';
+    if (currentMetadata.tweetData) {
+      // Tweet-specific thumbnail priority:
+      // 1. Card image (embedded link preview - the user's main request)
+      // 2. First tweet media image
+      // 3. Video poster
+      // 4. OG image from meta tags
+      const tweetData = currentMetadata.tweetData;
+      const firstMedia = tweetData.tweetMedia?.[0];
+      thumbnail = tweetData.cardImage
+        || (firstMedia?.type === 'image' ? firstMedia.url : '')
+        || (firstMedia?.type === 'video' ? firstMedia.poster : '')
+        || currentMetadata.ogImage
+        || '';
+    } else {
+      thumbnail = currentMetadata.ogImage || currentMetadata.wikipediaData?.thumbnail || '';
+    }
+
     const bookmarkData = {
       url: currentMetadata.url,
       title: currentMetadata.title,
@@ -246,13 +267,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       source,
       tags,
       notes,
-      thumbnail: currentMetadata.ogImage || currentMetadata.wikipediaData?.thumbnail || '',
+      thumbnail,
       metadata: {
         ogDescription: currentMetadata.ogDescription,
         tweetData: currentMetadata.tweetData,
         wikipediaData: currentMetadata.wikipediaData
       }
     };
+
+    // DEBUG: Log what's being saved
+    console.log('[Popup] Saving bookmark:', JSON.stringify(bookmarkData, null, 2));
 
     // Send to background
     chrome.runtime.sendMessage({ action: 'saveBookmark', data: bookmarkData }, (response) => {

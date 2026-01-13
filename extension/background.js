@@ -134,7 +134,12 @@ async function saveBookmarkToSupabase(bookmark) {
     pinned: false,
     type: bookmark.category || 'Article',
     cover_image: bookmark.thumbnail || '',
+    // Include full metadata for rich content display (tweets, wikipedia, etc.)
+    metadata: bookmark.metadata || {},
   };
+
+  // DEBUG: Log what's being saved to Supabase
+  console.log('[Background] Saving to Supabase:', JSON.stringify(bookmarkData, null, 2));
 
   const response = await fetch(`${SUPABASE_URL}/rest/v1/bookmarks`, {
     method: 'POST',
@@ -219,7 +224,64 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
   }
+
+  if (request.action === 'registerContextMenu') {
+    // Context menu registration - acknowledge the message to prevent callback errors
+    sendResponse({ success: true });
+    return false; // Synchronous response
+  }
 });
+
+// Server URL for API calls (og:image fetching, video download, etc.)
+const API_SERVER_URL = 'http://localhost:3000';
+
+/**
+ * Fetch og:image from a URL via our server (to avoid CORS)
+ */
+async function fetchOgImage(url) {
+  try {
+    const response = await fetch(`${API_SERVER_URL}/api/og-image?url=${encodeURIComponent(url)}`);
+    if (!response.ok) {
+      console.warn('[Background] Failed to fetch og:image:', response.status);
+      return null;
+    }
+    const data = await response.json();
+    return data.ogImage || null;
+  } catch (error) {
+    console.warn('[Background] Error fetching og:image:', error);
+    return null;
+  }
+}
+
+/**
+ * Download video via Cobalt API (for Twitter/X video caching)
+ * This runs in background after bookmark is saved
+ */
+async function downloadVideoInBackground(url, bookmarkId) {
+  const isTwitter = url.includes('twitter.com') || url.includes('x.com');
+  if (!isTwitter) return null;
+
+  try {
+    console.log('[Background] Downloading video for tweet:', url);
+    const response = await fetch(`${API_SERVER_URL}/api/video/download`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, bookmarkId })
+    });
+
+    if (!response.ok) {
+      console.warn('[Background] Video download failed:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('[Background] Video downloaded:', data.localUrl);
+    return data.localUrl;
+  } catch (error) {
+    console.warn('[Background] Error downloading video:', error);
+    return null;
+  }
+}
 
 async function handleSaveBookmark(bookmark) {
   // Check if authenticated first
@@ -229,8 +291,39 @@ async function handleSaveBookmark(bookmark) {
   }
 
   try {
+    // If this is a tweet with an embedded link (cardUrl), fetch the og:image for that link
+    const cardUrl = bookmark.metadata?.tweetData?.cardUrl;
+    if (cardUrl && !bookmark.thumbnail) {
+      console.log('[Background] Tweet has embedded link, fetching og:image for:', cardUrl);
+      const ogImage = await fetchOgImage(cardUrl);
+      if (ogImage) {
+        console.log('[Background] Found og:image for embedded link:', ogImage);
+        bookmark.thumbnail = ogImage;
+        // Also store in metadata for the frontend to use
+        if (bookmark.metadata?.tweetData) {
+          bookmark.metadata.tweetData.cardImage = ogImage;
+        }
+      }
+    }
+
     // Try to save to Supabase
     const savedBookmark = await saveBookmarkToSupabase(bookmark);
+
+    // Check if this is a tweet with video - download it in background
+    const isTwitter = bookmark.url?.includes('twitter.com') || bookmark.url?.includes('x.com');
+    const hasVideo = bookmark.metadata?.tweetData?.tweetMedia?.some(m => m.type === 'video');
+
+    if (isTwitter && hasVideo && savedBookmark?.id) {
+      // Download video asynchronously (don't block the save)
+      downloadVideoInBackground(bookmark.url, savedBookmark.id)
+        .then(localUrl => {
+          if (localUrl) {
+            console.log('[Background] Video cached successfully:', localUrl);
+          }
+        })
+        .catch(err => console.warn('[Background] Video download failed:', err));
+    }
+
     return { source: 'supabase', bookmark: savedBookmark };
   } catch (error) {
     console.warn('Supabase unavailable, saving offline:', error);

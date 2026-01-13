@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { LayoutGroup } from 'framer-motion'
+import AppShell from '@/components/AppShell'
 import Header from '@/components/Header'
 import BookmarkCard from '@/components/BookmarkCard'
 import BookmarkDetail from '@/components/BookmarkDetail'
@@ -17,6 +18,7 @@ import { useCollections } from '@/hooks/useCollections'
 import { getTagColors, getTagColor } from '@/utils/tagColors';
 import { TagPill } from '@/components/TagColorPicker';
 import { extractTagsFromContent } from '@/utils/tagExtraction';
+import { parseSearchQuery, matchesSearchFilters } from '@/utils/searchParser';
 import { Plus, FileText, File, Tag, X } from 'lucide-react'
 import AddDropzoneCard from '@/components/AddDropzoneCard'
 import { InlineNoteComposer } from '@/components/NoteComposer'
@@ -167,28 +169,64 @@ function App() {
   // Selection state
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const lastClickedIndexRef = useRef(null); // For shift+click range selection
   const [showCollectionModal, setShowCollectionModal] = useState(false);
   const [singleBookmarkToAdd, setSingleBookmarkToAdd] = useState(null); // For adding single bookmark via menu
   const [showQuickNoteModal, setShowQuickNoteModal] = useState(false);
   const [noteToEdit, setNoteToEdit] = useState(null); // For expanded note editor modal
 
-  // Keyboard shortcuts for selection mode
+  // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Escape to exit selection mode
-      if (e.key === 'Escape' && selectionMode) {
-        setSelectionMode(false);
-        setSelectedIds(new Set());
+      // Skip if typing in an input, textarea, or contenteditable
+      const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) ||
+                       document.activeElement?.isContentEditable;
+
+      // Escape to exit selection mode or close modals
+      if (e.key === 'Escape') {
+        if (selectionMode) {
+          setSelectionMode(false);
+          setSelectedIds(new Set());
+          return;
+        }
+        if (selectedBookmark) {
+          setSelectedBookmark(null);
+          setAutoPlayOnOpen(false);
+          return;
+        }
+        if (noteToEdit) {
+          setNoteToEdit(null);
+          return;
+        }
+      }
+
+      // N to create new note (when not typing)
+      if (e.key === 'n' && !isTyping && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setShowQuickNoteModal(true);
+        return;
+      }
+
+      // Enter to focus search (when not typing and no modifiers)
+      if (e.key === 'Enter' && !isTyping && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+        e.preventDefault();
+        // Focus the search input
+        const searchInput = document.querySelector('input[aria-label="Search filters"]');
+        if (searchInput) {
+          searchInput.focus();
+        }
+        return;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectionMode]);
+  }, [selectionMode, selectedBookmark, noteToEdit]);
 
   // Power Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTypes, setActiveTypes] = useState([]);
+  const [mediaFilter, setMediaFilter] = useState(null); // Sidebar filter: 'video' | 'image' | 'note' | 'tweet' | 'article' | null
   const [activeSearchCollections, setActiveSearchCollections] = useState([]);
   const [filterChain, setFilterChain] = useState([]); // Ordered filter chain for hierarchical filtering
   const [dateFilter, setDateFilter] = useState(null); // Date preset filter (today, week, month, etc.)
@@ -246,6 +284,7 @@ function App() {
   const handleClearSelection = () => {
     setSelectedIds(new Set());
     setSelectionMode(false);
+    lastClickedIndexRef.current = null;
   };
 
   const handleBulkDelete = async () => {
@@ -269,6 +308,43 @@ function App() {
   const handleAddToCollection = () => {
     if (selectedIds.size === 0) return;
     setShowCollectionModal(true);
+  };
+
+  // Bulk add tag to selected bookmarks
+  const handleBulkAddTag = async (tag) => {
+    if (selectedIds.size === 0 || !tag.trim()) return;
+    const normalizedTag = tag.trim().toLowerCase();
+
+    try {
+      // Get current bookmarks to update their tags
+      const { data: currentBookmarks, error: fetchError } = await supabase
+        .from('bookmarks')
+        .select('id, tags')
+        .in('id', Array.from(selectedIds));
+
+      if (fetchError) throw fetchError;
+
+      // Update each bookmark with the new tag (avoiding duplicates)
+      const updates = currentBookmarks.map(bm => ({
+        id: bm.id,
+        tags: [...new Set([...(bm.tags || []), normalizedTag])],
+        updated_at: new Date().toISOString()
+      }));
+
+      // Perform batch upsert
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('bookmarks')
+          .update({ tags: update.tags, updated_at: update.updated_at })
+          .eq('id', update.id);
+        if (error) throw error;
+      }
+
+      refetch();
+      handleClearSelection();
+    } catch (error) {
+      console.error('Error bulk adding tag:', error);
+    }
   };
 
   const handleCollectionSelect = async (collectionId) => {
@@ -493,6 +569,20 @@ function App() {
     return 'article';
   };
 
+  // Calculate media counts for Sidebar
+  const mediaCounts = React.useMemo(() => {
+    const counts = { video: 0, image: 0, note: 0, tweet: 0, article: 0 };
+    bookmarks.forEach(b => {
+      const type = getBookmarkType(b);
+      if (type === 'youtube') counts.video++;
+      else if (type === 'image') counts.image++;
+      else if (type === 'note') counts.note++;
+      else if (type === 'tweet') counts.tweet++;
+      else if (type === 'article' || type === 'reddit' || type === 'wikipedia') counts.article++;
+    });
+    return counts;
+  }, [bookmarks]);
+
   // Filter bookmarks based on current view + power search
   const filteredBookmarks = (() => {
     let filtered = bookmarks;
@@ -518,10 +608,19 @@ function App() {
       });
     }
 
-    // Power Search filters
-    // Filter by type
+    // Filter by type (old Power Search)
     if (activeTypes.length > 0) {
       filtered = filtered.filter(b => activeTypes.includes(getBookmarkType(b)));
+    }
+
+    // Filter by Sidebar media filter
+    if (mediaFilter) {
+      filtered = filtered.filter(b => {
+        const type = getBookmarkType(b);
+        if (mediaFilter === 'video') return type === 'youtube';
+        if (mediaFilter === 'article') return type === 'article' || type === 'reddit' || type === 'wikipedia';
+        return type === mediaFilter;
+      });
     }
 
     // Filter by search collections (from power search)
@@ -529,24 +628,31 @@ function App() {
       filtered = filtered.filter(b => activeSearchCollections.includes(b.collectionId));
     }
 
-    // Filter by text search query
+    // Advanced search query parsing
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(b => {
-        const title = (b.title || '').toLowerCase();
-        const notes = (b.notes || '').toLowerCase();
-        const url = (b.url || '').toLowerCase();
-        const tags = (b.tags || []).join(' ').toLowerCase();
-        const description = (b.description || '').toLowerCase();
-        return title.includes(query) ||
-          notes.includes(query) ||
-          url.includes(query) ||
-          tags.includes(query) ||
-          description.includes(query);
-      });
+      const parsedFilters = parseSearchQuery(searchQuery);
+
+      // Apply parsed filters using the advanced search matcher
+      filtered = filtered.filter(b => matchesSearchFilters(b, parsedFilters, getBookmarkType));
+
+      // Also apply any types from the parser to activeTypes if not already set
+      if (parsedFilters.types.length > 0 && activeTypes.length === 0) {
+        // Types are already handled in matchesSearchFilters
+      }
+
+      // Apply tags from search query to tag filtering
+      if (parsedFilters.tags.length > 0) {
+        filtered = filtered.filter(b => {
+          const bookmarkTags = (b.tags || []).map(t => t.toLowerCase());
+          const noteContent = b.notes || b.content || '';
+          const extractedTags = extractTagsFromContent(noteContent);
+          const allBookmarkTags = [...new Set([...bookmarkTags, ...extractedTags])];
+          return parsedFilters.tags.every(tag => allBookmarkTags.includes(tag));
+        });
+      }
     }
 
-    // Filter by date preset
+    // Filter by date preset (external dateFilter state)
     if (dateFilter) {
       const presets = {
         today: 0,
@@ -594,279 +700,270 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen gruvbox-mesh-bg text-gruvbox-fg flex relative overflow-x-hidden">
-      <main className="flex-1 min-h-screen relative w-full max-w-full">
-        <LayoutGroup>
-          <Header
-            activePage={activePage}
-            onNavigate={handleNavigate}
-            tags={allTags.length > 0 ? allTags : ['Technology', 'Design', 'Articles', 'Videos', 'Social', 'Research']}
-            collections={enrichedCollections}
-            activeCollection={activeCollection}
-            activeTags={activeTags}
-            selectionMode={selectionMode}
-            onToggleSelectionMode={() => {
-              setSelectionMode(!selectionMode);
-              if (selectionMode) setSelectedIds(new Set());
-            }}
-            onQuickNote={() => setShowQuickNoteModal(true)}
-            onAddUrl={() => console.log('Add URL - TODO: implement URL modal')}
-            onOpenSettings={() => setShowSettings(true)}
-            // Auth props
-            user={user}
-            onLogin={() => setShowAuthModal(true)}
-            onSignOut={signOut}
-            onChangePassword={() => {
-              // Manual password change from settings - require current password
-              setIsPasswordRecoveryFlow(false);
-              setShowUpdatePasswordModal(true);
-            }}
-            // Search props
-            bookmarks={bookmarks}
-            onResultSelect={(bookmark) => setSelectedBookmark(bookmark)}
-            onFilterChange={(types) => setActiveTypes(types)}
-            activeFilters={activeTypes}
-            // Tag filter props
-            onTagFilterChange={setActiveTags}
-            tagRefreshTrigger={tagRefreshTrigger}
+    <AppShell
+      activePage={mainTab}
+      onNavigate={handleTabChange}
+      searchQuery={searchQuery}
+      onSearch={setSearchQuery}
+      onAddNew={() => setShowQuickNoteModal(true)}
+      onOpenSettings={() => setShowSettings(true)}
+      onSignOut={signOut}
+      onSignIn={() => setShowAuthModal(true)}
+      mediaCounts={mediaCounts}
+      activeFilter={mediaFilter}
+      onFilterChange={setMediaFilter}
+      // MindSearch props
+      activeFilters={activeTypes}
+      onTypeFilterChange={setActiveTypes}
+      activeTags={activeTags}
+      onTagFilterChange={setActiveTags}
+      tagRefreshTrigger={tagRefreshTrigger}
+    >
+      <LayoutGroup>
+        {/* Selection Toolbar */}
+        {selectionMode && selectedIds.size > 0 && (
+          <SelectionToolbar
+            selectedCount={selectedIds.size}
+            totalCount={sortedBookmarks.length}
+            onSelectAll={handleSelectAll}
+            onClearSelection={handleClearSelection}
+            onDelete={handleBulkDelete}
+            onAddToCollection={handleAddToCollection}
+            onAddTag={handleBulkAddTag}
           />
+        )}
 
-          {/* Selection Toolbar */}
-          {selectionMode && selectedIds.size > 0 && (
-            <SelectionToolbar
-              selectedCount={selectedIds.size}
-              totalCount={sortedBookmarks.length}
-              onSelectAll={handleSelectAll}
-              onClearSelection={handleClearSelection}
-              onDelete={handleBulkDelete}
-              onAddToCollection={handleAddToCollection}
-            />
-          )}
-
-          {/* Folder Tabs Navigation */}
-          <div className="px-3">
-            <FolderTabs
-              tabs={mainTabs}
-              activeTab={mainTab}
-              onTabChange={handleTabChange}
-              activeFilters={activeTypes}
-              bookmarks={bookmarks}
-              onFilterToggle={(typeId) => {
-                setActiveTypes(prev =>
-                  prev.includes(typeId)
-                    ? prev.filter(t => t !== typeId)
-                    : [...prev, typeId]
-                );
-              }}
-            >
-              {/* Lounge Tab Content - All Bookmarks */}
-              {mainTab === 'lounge' && (
-                <div>
-                  {/* Active Filter Indicator - matches nav bar tag style, supports multiple tags */}
-                  {activeTags.length > 0 && (
-                    <div className="mb-4 flex flex-wrap items-center gap-2">
-                      {activeTags.map((tag) => {
-                        const color = getTagColor(tag);
-                        return (
-                          <div
-                            key={tag}
-                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border backdrop-blur-sm transition-all duration-200 hover:scale-[1.02] group cursor-pointer"
-                            style={{
-                              backgroundColor: color.bg,
-                              color: color.text,
-                              borderColor: color.border,
-                            }}
-                          >
-                            <Tag className="w-3.5 h-3.5 opacity-80" />
-                            <TagPill
-                              tag={tag}
-                              color={color}
-                              size="default"
-                              showColorPicker={true}
-                              className="!bg-transparent !p-0 !rounded-none"
-                            />
-                            <button
-                              onClick={() => handleRemoveTag(tag)}
-                              className="ml-1 opacity-60 group-hover:opacity-100 transition-opacity hover:text-gruvbox-red"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                      <span className="text-sm text-gruvbox-fg-muted ml-1">
-                        {sortedBookmarks.length} bookmark{sortedBookmarks.length !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Masonry Grid */}
-                  <div className="w-full columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 [column-gap:1rem]">
-                    {/* Inline Note Composer - hide in selection mode */}
-                    {!selectionMode && (
-                      <InlineNoteComposer
-                        onNoteCreated={(savedNote) => {
-                          // Refresh bookmarks and tags to show the new note
-                          refreshBookmarksAndTags();
-                        }}
-                      />
-                    )}
-
-                    {/* Bookmarks */}
-                    {loading ? (
-                      <div className="col-span-full flex items-center justify-center animate-in fade-in duration-300" style={{ minHeight: '50vh' }}>
-                        <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl">
-                          <FerrisWheelLoader label="Loading Bookmarks" subtitle="GATHERING YOUR COLLECTION" size="md" />
-                        </div>
-                      </div>
-                    ) : (
-                      sortedBookmarks.map(bookmark => (
+        {/* Folder Tabs Navigation */}
+        <div className="px-3">
+          <FolderTabs
+            tabs={mainTabs}
+            activeTab={mainTab}
+            onTabChange={handleTabChange}
+            activeFilters={activeTypes}
+            bookmarks={bookmarks}
+            onFilterToggle={(typeId) => {
+              setActiveTypes(prev =>
+                prev.includes(typeId)
+                  ? prev.filter(t => t !== typeId)
+                  : [...prev, typeId]
+              );
+            }}
+          >
+            {/* Lounge Tab Content - All Bookmarks */}
+            {mainTab === 'lounge' && (
+              <div>
+                {/* Active Filter Indicator - matches nav bar tag style, supports multiple tags */}
+                {activeTags.length > 0 && (
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
+                    {activeTags.map((tag) => {
+                      const color = getTagColor(tag);
+                      return (
                         <div
-                          key={bookmark.id}
-                          onClick={(e) => {
-                            // Shift+Click to enter selection mode and select this card
-                            if (e.shiftKey && !selectionMode) {
-                              e.preventDefault();
-                              setSelectionMode(true);
-                              setSelectedIds(new Set([bookmark.id]));
-                            } else if (selectionMode) {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleToggleSelect(bookmark.id);
-                            } else {
-                              setSelectedBookmark(bookmark);
-                            }
+                          key={tag}
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border backdrop-blur-sm transition-all duration-200 hover:scale-[1.02] group cursor-pointer"
+                          style={{
+                            backgroundColor: color.bg,
+                            color: color.text,
+                            borderColor: color.border,
                           }}
-                          onMouseDown={(e) => {
-                            // Prevent text selection when Shift is held
-                            if (e.shiftKey) {
-                              e.preventDefault();
-                            }
-                          }}
-                          className={`cursor-pointer ${selectionMode ? 'select-none' : ''}`}
                         >
-                          <BookmarkCard
-                            bookmark={bookmark}
-                            onDelete={handleDelete}
-                            onPin={handlePin}
-                            onCreateSide={handleCreateSide}
-                            onRefresh={handleRefreshBookmark}
-                            onUpdate={handleSaveBookmark}
-                            selectionMode={selectionMode}
-                            isSelected={selectedIds.has(bookmark.id)}
-                            onToggleSelect={() => handleToggleSelect(bookmark.id)}
-                            collection={collections.find(c => c.id === bookmark.collectionId)}
-                            onCardClick={(bm, autoPlay) => { setSelectedBookmark(bm); setAutoPlayOnOpen(autoPlay || false); }}
-                            onOpenEditor={(bm) => setNoteToEdit(bm)}
-                            onTagClick={handleTagClick}
-                            onTagDelete={handleTagDelete}
+                          <Tag className="w-3.5 h-3.5 opacity-80" />
+                          <TagPill
+                            tag={tag}
+                            color={color}
+                            size="default"
+                            showColorPicker={true}
+                            className="!bg-transparent !p-0 !rounded-none"
                           />
+                          <button
+                            onClick={() => handleRemoveTag(tag)}
+                            className="ml-1 opacity-60 group-hover:opacity-100 transition-opacity hover:text-gruvbox-red"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                      ))
-                    )}
+                      );
+                    })}
+                    <span className="text-sm text-gruvbox-fg-muted ml-1">
+                      {sortedBookmarks.length} bookmark{sortedBookmarks.length !== 1 ? 's' : ''}
+                    </span>
                   </div>
+                )}
+
+                {/* Masonry Grid */}
+                <div className="w-full columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5 [column-gap:1.25rem]">
+                  {/* Inline Note Composer - use visibility:hidden in selection mode to keep space and prevent layout shift */}
+                  <div className={selectionMode ? 'invisible' : ''}>
+                    <InlineNoteComposer
+                      onNoteCreated={(savedNote) => {
+                        // Refresh bookmarks and tags to show the new note
+                        refreshBookmarksAndTags();
+                      }}
+                    />
+                  </div>
+
+                  {/* Bookmarks */}
+                  {loading ? (
+                    <div className="col-span-full flex items-center justify-center animate-in fade-in duration-300" style={{ minHeight: '50vh' }}>
+                      <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl">
+                        <FerrisWheelLoader label="Loading Bookmarks" subtitle="GATHERING YOUR COLLECTION" size="md" />
+                      </div>
+                    </div>
+                  ) : (
+                    sortedBookmarks.map((bookmark, index) => (
+                      <div
+                        key={bookmark.id}
+                        onMouseDown={(e) => {
+                          // Prevent text selection when Shift is held
+                          if (e.shiftKey) {
+                            e.preventDefault();
+                          }
+                        }}
+                        className={`cursor-pointer ${selectionMode ? 'select-none' : ''}`}
+                      >
+                        <BookmarkCard
+                          bookmark={bookmark}
+                          onDelete={handleDelete}
+                          onPin={handlePin}
+                          onCreateSide={handleCreateSide}
+                          onRefresh={handleRefreshBookmark}
+                          onUpdate={handleSaveBookmark}
+                          selectionMode={selectionMode}
+                          isSelected={selectedIds.has(bookmark.id)}
+                          onToggleSelect={() => {
+                            handleToggleSelect(bookmark.id);
+                            lastClickedIndexRef.current = index;
+                          }}
+                          collection={collections.find(c => c.id === bookmark.collectionId)}
+                          onCardClick={(bm, autoPlay) => { setSelectedBookmark(bm); setAutoPlayOnOpen(autoPlay || false); }}
+                          onOpenEditor={(bm) => setNoteToEdit(bm)}
+                          onTagClick={handleTagClick}
+                          onTagDelete={handleTagDelete}
+                          onShiftClick={(bm) => {
+                            // Shift+Click for range selection
+                            if (!selectionMode) {
+                              // First shift+click: enter selection mode and select this card
+                              setSelectionMode(true);
+                              setSelectedIds(new Set([bm.id]));
+                              lastClickedIndexRef.current = index;
+                            } else if (lastClickedIndexRef.current !== null) {
+                              // Shift+click in selection mode: select range
+                              const start = Math.min(lastClickedIndexRef.current, index);
+                              const end = Math.max(lastClickedIndexRef.current, index);
+                              const rangeIds = sortedBookmarks.slice(start, end + 1).map(b => b.id);
+                              setSelectedIds(prev => {
+                                const newSet = new Set(prev);
+                                rangeIds.forEach(id => newSet.add(id));
+                                return newSet;
+                              });
+                            }
+                          }}
+                        />
+                      </div>
+                    ))
+                  )}
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Collections Tab Content */}
-              {mainTab === 'collections' && (
-                <SidesGallery
-                  collections={enrichedCollections}
-                  bookmarks={bookmarks}
-                  selectedCollection={activeCollection}
-                  onSelectCollection={setActiveCollection}
-                  onBackToFolders={handleBackToFolders}
-                  onCreateCollection={() => setShowCollectionModal(true)}
-                  onUpdateCollection={handleUpdateCollection}
-                  onDeleteCollection={handleDeleteCollection}
-                  onBookmarkClick={setSelectedBookmark}
-                  onDeleteBookmark={handleDelete}
-                  onPinBookmark={handlePin}
-                  onRefreshBookmark={handleRefreshBookmark}
-                  onSaveBookmark={handleSaveBookmark}
-                  onCreateSide={handleCreateSide}
-                />
-              )}
-            </FolderTabs>
-          </div>
-        </LayoutGroup>
+            {/* Collections Tab Content */}
+            {mainTab === 'collections' && (
+              <SidesGallery
+                collections={enrichedCollections}
+                bookmarks={bookmarks}
+                selectedCollection={activeCollection}
+                onSelectCollection={setActiveCollection}
+                onBackToFolders={handleBackToFolders}
+                onCreateCollection={() => setShowCollectionModal(true)}
+                onUpdateCollection={handleUpdateCollection}
+                onDeleteCollection={handleDeleteCollection}
+                onBookmarkClick={setSelectedBookmark}
+                onDeleteBookmark={handleDelete}
+                onPinBookmark={handlePin}
+                onRefreshBookmark={handleRefreshBookmark}
+                onSaveBookmark={handleSaveBookmark}
+                onCreateSide={handleCreateSide}
+              />
+            )}
+          </FolderTabs>
+        </div>
+      </LayoutGroup>
 
-        <BookmarkDetail
-          bookmark={selectedBookmark}
-          open={!!selectedBookmark}
-          onOpenChange={(open) => {
-            if (!open) {
-              setSelectedBookmark(null);
-              setAutoPlayOnOpen(false);
-            }
-          }}
-          onSave={() => refreshBookmarksAndTags()}
-          allTags={allTags}
-          autoPlay={autoPlayOnOpen}
-          onTagClick={handleTagClick}
-        />
+      <BookmarkDetail
+        bookmark={selectedBookmark}
+        open={!!selectedBookmark}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedBookmark(null);
+            setAutoPlayOnOpen(false);
+          }
+        }}
+        onSave={() => refreshBookmarksAndTags()}
+        allTags={allTags}
+        autoPlay={autoPlayOnOpen}
+        onTagClick={handleTagClick}
+      />
 
-        {/* Collection Modal */}
-        <CollectionModal
-          open={showCollectionModal}
-          onOpenChange={(open) => {
-            setShowCollectionModal(open);
-            if (!open) setSingleBookmarkToAdd(null);
-          }}
-          collections={collections}
-          onSelectCollection={handleCollectionSelect}
-          onCreateCollection={handleCreateCollection}
-        />
+      {/* Collection Modal */}
+      <CollectionModal
+        open={showCollectionModal}
+        onOpenChange={(open) => {
+          setShowCollectionModal(open);
+          if (!open) setSingleBookmarkToAdd(null);
+        }}
+        collections={collections}
+        onSelectCollection={handleCollectionSelect}
+        onCreateCollection={handleCreateCollection}
+      />
 
-        {/* Quick Note Modal */}
-        <QuickNoteModal
-          open={showQuickNoteModal}
-          onClose={() => setShowQuickNoteModal(false)}
-          onSave={() => {
-            refreshBookmarksAndTags();
-            setShowQuickNoteModal(false);
-          }}
-          allTags={allTags}
-        />
+      {/* Quick Note Modal */}
+      <QuickNoteModal
+        open={showQuickNoteModal}
+        onClose={() => setShowQuickNoteModal(false)}
+        onSave={() => {
+          refreshBookmarksAndTags();
+          setShowQuickNoteModal(false);
+        }}
+        allTags={allTags}
+      />
 
-        <AuthModal
-          isOpen={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
-        />
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
 
-        <UpdatePasswordModal
-          isOpen={showUpdatePasswordModal}
-          onClose={() => {
-            setShowUpdatePasswordModal(false);
-            setIsPasswordRecoveryFlow(false);
-          }}
-          onSuccess={() => {
-            // Clear URL hash after successful password update
-            window.history.replaceState({}, document.title, window.location.pathname);
-            setIsPasswordRecoveryFlow(false);
-          }}
-          requireCurrentPassword={!isPasswordRecoveryFlow}
-        />
+      <UpdatePasswordModal
+        isOpen={showUpdatePasswordModal}
+        onClose={() => {
+          setShowUpdatePasswordModal(false);
+          setIsPasswordRecoveryFlow(false);
+        }}
+        onSuccess={() => {
+          // Clear URL hash after successful password update
+          window.history.replaceState({}, document.title, window.location.pathname);
+          setIsPasswordRecoveryFlow(false);
+        }}
+        requireCurrentPassword={!isPasswordRecoveryFlow}
+      />
 
-        {/* Note Editor Modal - for expanded note editing */}
-        <NoteEditorModal
-          isOpen={!!noteToEdit}
-          onClose={() => setNoteToEdit(null)}
-          bookmark={noteToEdit}
-          onSave={(updatedBookmark) => {
-            handleSaveBookmark(updatedBookmark);
-            setNoteToEdit(null);
-          }}
-          onDelete={(bm) => {
-            handleDelete(bm);
-            setNoteToEdit(null);
-          }}
-          availableTags={allTags}
-        />
+      {/* Note Editor Modal - for expanded note editing */}
+      <NoteEditorModal
+        isOpen={!!noteToEdit}
+        onClose={() => setNoteToEdit(null)}
+        bookmark={noteToEdit}
+        onSave={(updatedBookmark) => {
+          handleSaveBookmark(updatedBookmark);
+          setNoteToEdit(null);
+        }}
+        onDelete={(bm) => {
+          handleDelete(bm);
+          setNoteToEdit(null);
+        }}
+        availableTags={allTags}
+      />
 
-      </main>
-    </div>
-  )
+    </AppShell >
+  );
 }
 
 export default App
