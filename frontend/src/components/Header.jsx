@@ -23,6 +23,8 @@ const Header = ({
   // Tag filter props
   onTagFilterChange,
   tagRefreshTrigger = 0,
+  // Media counts for category suggestions
+  mediaCounts = {},
   user,
   onLogin,
   onSignOut,
@@ -50,10 +52,10 @@ const Header = ({
       {/* Main Header Row */}
       <div className="flex items-center justify-between py-5 px-8">
         {/* Logo and Title area */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
           {/* Custom Logo */}
           <div className="relative">
-            <Logo size={44} className="drop-shadow-lg" />
+            <Logo size={56} className="drop-shadow-lg" />
             <div className="absolute -inset-2 rounded-xl bg-primary/10 blur-xl -z-10 opacity-80" />
           </div>
           <div className="flex flex-col">
@@ -74,6 +76,7 @@ const Header = ({
           activeTags={activeTags}
           onTagFilterChange={onTagFilterChange}
           tagRefreshTrigger={tagRefreshTrigger}
+          mediaCounts={mediaCounts}
         />
 
         {/* Right side actions */}

@@ -8,7 +8,9 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 const PreferencesContext = createContext(null);
 
 const STORAGE_KEY = 'bookmark-app-ui-size';
+const FONT_SIZE_STORAGE_KEY = 'bookmark-app-font-size';
 const DEFAULT_SIZE = 'large';
+const DEFAULT_FONT_SIZE = 'default';
 
 // Size presets
 export const UI_SIZES = {
@@ -24,8 +26,30 @@ export const UI_SIZES = {
   },
 };
 
+// Font size presets
+export const FONT_SIZES = {
+  small: {
+    id: 'small',
+    label: 'Small',
+    description: 'Compact text for more content',
+    scale: 0.875, // 14px base
+  },
+  default: {
+    id: 'default',
+    label: 'Default',
+    description: 'Standard text size',
+    scale: 1, // 16px base
+  },
+  large: {
+    id: 'large',
+    label: 'Large',
+    description: 'Easier to read text',
+    scale: 1.125, // 18px base
+  },
+};
+
 export const PreferencesProvider = ({ children }) => {
-  // Initialize from localStorage
+  // Initialize UI size from localStorage
   const [uiSize, setUiSizeState] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -34,6 +58,17 @@ export const PreferencesProvider = ({ children }) => {
       }
     }
     return DEFAULT_SIZE;
+  });
+
+  // Initialize font size from localStorage
+  const [fontSize, setFontSizeState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(FONT_SIZE_STORAGE_KEY);
+      if (saved && FONT_SIZES[saved]) {
+        return saved;
+      }
+    }
+    return DEFAULT_FONT_SIZE;
   });
 
   // Apply size class to document root
@@ -49,6 +84,23 @@ export const PreferencesProvider = ({ children }) => {
     root.classList.add(`ui-size-${size}`);
   }, []);
 
+  // Apply font size to document root
+  const applyFontSize = useCallback((size) => {
+    const root = document.documentElement;
+    const fontConfig = FONT_SIZES[size];
+
+    // Remove all font size classes
+    Object.keys(FONT_SIZES).forEach((sizeKey) => {
+      root.classList.remove(`font-size-${sizeKey}`);
+    });
+
+    // Add current font size class
+    root.classList.add(`font-size-${size}`);
+
+    // Set CSS variable for font scale
+    root.style.setProperty('--font-scale', fontConfig.scale);
+  }, []);
+
   // Update size and persist
   const setUiSize = useCallback((size) => {
     if (UI_SIZES[size]) {
@@ -57,15 +109,31 @@ export const PreferencesProvider = ({ children }) => {
     }
   }, []);
 
+  // Update font size and persist
+  const setFontSize = useCallback((size) => {
+    if (FONT_SIZES[size]) {
+      setFontSizeState(size);
+      localStorage.setItem(FONT_SIZE_STORAGE_KEY, size);
+    }
+  }, []);
+
   // Apply size on mount and when it changes
   useEffect(() => {
     applySize(uiSize);
   }, [uiSize, applySize]);
 
+  // Apply font size on mount and when it changes
+  useEffect(() => {
+    applyFontSize(fontSize);
+  }, [fontSize, applyFontSize]);
+
   const value = {
     uiSize,
     setUiSize,
     sizes: UI_SIZES,
+    fontSize,
+    setFontSize,
+    fontSizes: FONT_SIZES,
   };
 
   return (

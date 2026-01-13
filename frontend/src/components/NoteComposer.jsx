@@ -855,8 +855,8 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
           justify-content: center;
           gap: 10px;
           padding: 24px 20px;
-          width: 545px;
-          height: 118px;
+          width: 100%;
+          min-height: 120px;
         }
 
         .inline-composer-icon {

@@ -1,5 +1,56 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trash2, FolderPlus, X, CheckSquare } from 'lucide-react';
+import { Trash2, FolderPlus, X, CheckSquare, Tag } from 'lucide-react';
+
+// Tag input popover component
+const TagInputPopover = ({ onSubmit, onClose }) => {
+  const [tagValue, setTagValue] = useState('');
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (tagValue.trim()) {
+      onSubmit(tagValue.trim());
+      onClose();
+    }
+  };
+
+  return (
+    <div className="absolute top-full left-0 mt-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+      <div className="bg-[color:var(--theme-bg-light)] border border-white/10 rounded-xl p-3 shadow-2xl shadow-black/40 backdrop-blur-xl">
+        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+          <div className="relative">
+            <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={tagValue}
+              onChange={(e) => setTagValue(e.target.value)}
+              placeholder="Enter tag name..."
+              className="w-48 pl-9 pr-3 py-2 bg-[color:var(--theme-bg-dark)] border border-white/10 rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  onClose();
+                }
+              }}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={!tagValue.trim()}
+            className="px-3 py-2 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Add
+          </button>
+        </form>
+        <p className="mt-2 text-[10px] text-muted-foreground">Press Enter to add, Escape to cancel</p>
+      </div>
+    </div>
+  );
+};
 
 // Animated counter component
 const AnimatedCounter = ({ value }) => {
@@ -37,8 +88,11 @@ const SelectionToolbar = ({
   onSelectAll,
   onClearSelection,
   onDelete,
-  onAddToCollection
+  onAddToCollection,
+  onAddTag
 }) => {
+  const [showTagInput, setShowTagInput] = useState(false);
+
   return (
     <div className="sticky top-0 z-40 mx-6 mb-5 animate-in slide-in-from-top-4 fade-in duration-300">
       <div className="relative">
@@ -85,6 +139,26 @@ const SelectionToolbar = ({
 
             {/* Right side - actions */}
             <div className="flex items-center gap-3">
+              {/* Add Tag Button */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowTagInput(!showTagInput)}
+                  className="relative group flex items-center gap-2.5 px-4 py-2.5 rounded-xl overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-primary/15 group-hover:bg-primary/25 transition-colors duration-200" />
+                  <div className="absolute inset-0 border border-primary/30 rounded-xl" />
+                  <Tag className="relative w-4 h-4 text-primary" />
+                  <span className="relative text-sm font-medium text-primary">Add Tag</span>
+                </button>
+
+                {showTagInput && (
+                  <TagInputPopover
+                    onSubmit={onAddTag}
+                    onClose={() => setShowTagInput(false)}
+                  />
+                )}
+              </div>
+
               <button
                 onClick={onAddToCollection}
                 className="relative group flex items-center gap-2.5 px-4 py-2.5 rounded-xl overflow-hidden"

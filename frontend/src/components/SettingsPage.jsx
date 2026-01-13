@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Check, Palette, Sparkles, Moon, Sun, Monitor, ChevronDown, Minimize2, Maximize2 } from 'lucide-react';
+import { ArrowLeft, Check, Palette, Sparkles, Moon, Sun, Monitor, ChevronDown, Minimize2, Maximize2, Type } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-import { usePreferences, UI_SIZES } from '../contexts/PreferencesContext';
+import { usePreferences, UI_SIZES, FONT_SIZES } from '../contexts/PreferencesContext';
 import { themeCategories } from '../config/themes';
 
 // Theme Preview Card Component
@@ -400,10 +400,83 @@ const SizeOptionCard = ({ size, isSelected, onSelect }) => {
   );
 };
 
+// Font Size Option Card
+const FontSizeOptionCard = ({ size, isSelected, onSelect }) => {
+  const previewFontSize = size.id === 'small' ? '13px' : size.id === 'large' ? '17px' : '15px';
+
+  return (
+    <button
+      onClick={() => onSelect(size.id)}
+      className={`
+        relative flex-1 p-5 rounded-xl text-left transition-all duration-200
+        ${isSelected ? 'ring-2 scale-[1.02]' : 'hover:scale-[1.01]'}
+      `}
+      style={{
+        backgroundColor: 'var(--theme-bg-light)',
+        border: `1px solid ${isSelected ? 'var(--theme-primary)' : 'var(--theme-bg-lighter)'}`,
+        ringColor: isSelected ? 'var(--theme-primary)' : 'transparent',
+      }}
+    >
+      {/* Selected indicator */}
+      {isSelected && (
+        <div
+          className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center"
+          style={{ backgroundColor: 'var(--theme-primary)' }}
+        >
+          <Check className="w-3.5 h-3.5" style={{ color: 'var(--theme-bg-darkest)' }} />
+        </div>
+      )}
+
+      {/* Icon and label */}
+      <div className="flex items-center gap-3 mb-4">
+        <div
+          className="w-10 h-10 rounded-lg flex items-center justify-center"
+          style={{ backgroundColor: `var(--theme-primary)${isSelected ? '30' : '15'}` }}
+        >
+          <Type
+            className="w-5 h-5"
+            style={{ color: isSelected ? 'var(--theme-primary)' : 'var(--theme-fg-muted)' }}
+          />
+        </div>
+        <div>
+          <h4
+            className="font-semibold"
+            style={{ color: isSelected ? 'var(--theme-primary)' : 'var(--theme-fg)' }}
+          >
+            {size.label}
+          </h4>
+          <p
+            className="text-xs"
+            style={{ color: 'var(--theme-fg-muted)' }}
+          >
+            {size.description}
+          </p>
+        </div>
+      </div>
+
+      {/* Preview text */}
+      <div
+        className="p-3 rounded-lg"
+        style={{ backgroundColor: 'var(--theme-bg-darker, var(--theme-bg-dark))' }}
+      >
+        <p
+          style={{
+            fontSize: previewFontSize,
+            color: 'var(--theme-fg)',
+            lineHeight: 1.5,
+          }}
+        >
+          The quick brown fox jumps over the lazy dog.
+        </p>
+      </div>
+    </button>
+  );
+};
+
 // Main Settings Page Component
 const SettingsPage = ({ onBack }) => {
   const { currentTheme, currentThemeId, setTheme, availableThemes } = useTheme();
-  const { uiSize, setUiSize, sizes } = usePreferences();
+  const { uiSize, setUiSize, sizes, fontSize, setFontSize, fontSizes } = usePreferences();
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -550,6 +623,24 @@ const SettingsPage = ({ onBack }) => {
                 size={size}
                 isSelected={uiSize === size.id}
                 onSelect={setUiSize}
+              />
+            ))}
+          </div>
+        </SettingsSection>
+
+        {/* Font Size Settings Section */}
+        <SettingsSection
+          title="Font Size"
+          icon={Type}
+          description="Choose your preferred text size"
+        >
+          <div className="flex gap-4 max-w-3xl">
+            {Object.values(fontSizes).map(size => (
+              <FontSizeOptionCard
+                key={size.id}
+                size={size}
+                isSelected={fontSize === size.id}
+                onSelect={setFontSize}
               />
             ))}
           </div>

@@ -195,21 +195,6 @@ const FolderTabs = ({
             );
           })}
         </div>
-
-        {/* Filter Pills - Modern & Clean */}
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <AnimatePresence mode="popLayout">
-            {inactiveCategories.map((category) => (
-              <FilterPill
-                key={category.id}
-                category={category}
-                onClick={() => onFilterToggle?.(category.id)}
-                count={categoryStats[category.id]?.count || 0}
-                hasRecent={categoryStats[category.id]?.hasRecent || false}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
       </div>
 
       {/* Content Area - Clean Surface */}

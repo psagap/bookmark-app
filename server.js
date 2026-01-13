@@ -7,7 +7,7 @@ const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
@@ -498,8 +498,16 @@ app.post('/api/bookmarks', asyncHandler(async (req, res) => {
   const url = req.body.url || '';
   const incomingTags = Array.isArray(req.body.tags) ? req.body.tags : [];
 
+  // Auto-categorize the URL
+  const { category: detectedCategory, subCategory: detectedSubCategory } = categorizeUrl(url);
+  const category = req.body.category || detectedCategory;
+  const subCategory = req.body.subCategory || req.body.subcategory || detectedSubCategory;
+
+  console.log(`Bookmark categorized as: ${category}/${subCategory} for ${url}`);
+
   // Initialize metadata
   let metadata = req.body.metadata && typeof req.body.metadata === 'object' ? req.body.metadata : {};
+  let extractedThumbnail = '';
 
   // If it's a YouTube URL, fetch video metadata (API first, then scrape fallback)
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
@@ -516,8 +524,129 @@ app.post('/api/bookmarks', asyncHandler(async (req, res) => {
       }
     }
   }
-  // For article URLs (not YouTube, Twitter, or Wikipedia), extract metadata
-  else if (!url.includes('twitter.com') && !url.includes('x.com') && !url.includes('wikipedia.org')) {
+  // For Wikipedia URLs, fetch Wikipedia-specific metadata
+  else if (url.includes('wikipedia.org')) {
+    try {
+      console.log(`Extracting Wikipedia metadata for: ${url}`);
+      const wikiData = await extractWikipediaMetadata(url);
+      if (wikiData) {
+        metadata = {
+          ...metadata,
+          wikipediaData: wikiData,
+          siteName: 'Wikipedia',
+          ogDescription: wikiData.extract
+        };
+        extractedThumbnail = wikiData.originalImage || wikiData.thumbnail || '';
+        console.log(`Wikipedia metadata extracted: ${wikiData.displayTitle}, image: ${extractedThumbnail ? 'yes' : 'no'}`);
+      }
+    } catch (err) {
+      console.log('Wikipedia metadata extraction skipped:', err.message);
+    }
+  }
+  // For X/Twitter URLs, fetch oEmbed AND video URL for reliable media display
+  else if (url.includes('twitter.com') || url.includes('x.com')) {
+    // Fetch oEmbed for embed HTML
+    try {
+      console.log(`Fetching X oEmbed for: ${url}`);
+      const twitterUrl = url.replace('x.com', 'twitter.com');
+      const params = new URLSearchParams({
+        url: twitterUrl,
+        maxwidth: '550',
+        omit_script: '1',
+        theme: 'dark',
+        hide_thread: '1',
+        hide_media: '0',
+        dnt: 'true',
+        lang: 'en'
+      });
+
+      const oembedResponse = await fetch(`https://publish.twitter.com/oembed?${params.toString()}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          'Accept': 'application/json'
+        }
+      });
+
+      if (oembedResponse.ok) {
+        const oembedData = await oembedResponse.json();
+        metadata = {
+          ...metadata,
+          tweetData: {
+            ...(metadata.tweetData || {}),
+            embedHtml: oembedData.html,
+            oembedAuthorName: oembedData.author_name,
+            oembedAuthorUrl: oembedData.author_url,
+            oembedCacheAge: parseInt(oembedData.cache_age) || 86400
+          }
+        };
+        console.log(`X oEmbed fetched: author=${oembedData.author_name}`);
+      }
+    } catch (err) {
+      console.log('X oEmbed fetch skipped:', err.message);
+    }
+
+    // Also fetch direct video URL from FxTwitter for autoplay support
+    // This is done AFTER oEmbed to get additional video-specific data
+    try {
+      console.log(`Fetching X video URL via FxTwitter for: ${url}`);
+      const videoResult = await fetchVideoFromFxTwitter(url);
+
+      if (videoResult.success && videoResult.videoUrl) {
+        // Update tweetMedia with the direct video URL
+        const existingMedia = metadata.tweetData?.tweetMedia || [];
+        const hasVideo = existingMedia.some(m => m.type === 'video');
+
+        if (hasVideo) {
+          // Update existing video entries with the direct URL
+          metadata.tweetData = {
+            ...metadata.tweetData,
+            tweetMedia: existingMedia.map(m => {
+              if (m.type === 'video') {
+                return {
+                  ...m,
+                  url: videoResult.videoUrl, // Replace blob: URL with direct URL
+                  fxTwitterUrl: videoResult.videoUrl,
+                  poster: m.poster || videoResult.thumbnail
+                };
+              }
+              return m;
+            }),
+            fxTwitterVideoUrl: videoResult.videoUrl,
+            fxTwitterThumbnail: videoResult.thumbnail
+          };
+        } else {
+          // Add video to media array
+          metadata.tweetData = {
+            ...metadata.tweetData,
+            tweetMedia: [
+              ...existingMedia,
+              {
+                type: 'video',
+                url: videoResult.videoUrl,
+                fxTwitterUrl: videoResult.videoUrl,
+                poster: videoResult.thumbnail
+              }
+            ],
+            fxTwitterVideoUrl: videoResult.videoUrl,
+            fxTwitterThumbnail: videoResult.thumbnail
+          };
+        }
+
+        // Also update thumbnail if we got one
+        if (videoResult.thumbnail && !extractedThumbnail) {
+          extractedThumbnail = videoResult.thumbnail;
+        }
+
+        console.log(`X video URL fetched via FxTwitter: ${videoResult.videoUrl.substring(0, 50)}...`);
+      } else {
+        console.log(`X FxTwitter: ${videoResult.error || 'No video found'}`);
+      }
+    } catch (err) {
+      console.log('X FxTwitter video fetch skipped:', err.message);
+    }
+  }
+  // For article/webpage URLs (not YouTube, Twitter, or Wikipedia), extract metadata
+  else {
     try {
       console.log(`Extracting article metadata for: ${url}`);
       const articleData = await extractArticleMetadata(url);
@@ -526,9 +655,12 @@ app.post('/api/bookmarks', asyncHandler(async (req, res) => {
           ...metadata,
           siteName: articleData.siteName,
           author: articleData.author,
-          publishedDate: articleData.publishedDate
+          publishedDate: articleData.publishedDate,
+          ogImage: articleData.ogImage,
+          ogDescription: articleData.ogDescription
         };
-        console.log(`Article metadata extracted: site=${articleData.siteName}, author=${articleData.author}`);
+        extractedThumbnail = articleData.ogImage || '';
+        console.log(`Article metadata extracted: site=${articleData.siteName}, author=${articleData.author}, ogImage=${articleData.ogImage ? 'yes' : 'no'}`);
       }
     } catch (err) {
       console.log('Article metadata extraction skipped:', err.message);
@@ -541,11 +673,11 @@ app.post('/api/bookmarks', asyncHandler(async (req, res) => {
     userId: 'local-user',
     url: url,
     title: cleanTitle(req.body.title),
-    thumbnail: req.body.thumbnail || req.body.ogImage || '',
+    thumbnail: req.body.thumbnail || req.body.ogImage || extractedThumbnail || '',
+    category,
+    subCategory,
     createdAt,
     updatedAt: Date.now(),
-    category: req.body.category,
-    subCategory: req.body.subcategory || req.body.subCategory,
     tags: incomingTags,
     metadata,
     notes: req.body.notes || '',
@@ -715,9 +847,15 @@ app.post('/api/bookmarks/:id/refresh', asyncHandler(async (req, res) => {
             ...updatedMetadata,
             siteName: articleData.siteName,
             author: articleData.author,
-            publishedDate: articleData.publishedDate
+            publishedDate: articleData.publishedDate,
+            ogImage: articleData.ogImage,
+            ogDescription: articleData.ogDescription
           };
-          console.log(`Article metadata refreshed: site=${articleData.siteName}, author=${articleData.author}`);
+          // Use og:image as thumbnail if we don't have one
+          if (articleData.ogImage && !thumbnail) {
+            thumbnail = articleData.ogImage;
+          }
+          console.log(`Article metadata refreshed: site=${articleData.siteName}, author=${articleData.author}, ogImage=${articleData.ogImage ? 'yes' : 'no'}`);
         }
       } catch (articleError) {
         console.warn('Article refresh failed:', articleError);
@@ -834,19 +972,20 @@ app.post('/api/youtube/backfill', asyncHandler(async (req, res) => {
   }
 }));
 
-// POST backfill article metadata for existing bookmarks missing siteName/author
+// POST backfill article metadata for existing bookmarks missing siteName/author/thumbnail
 app.post('/api/article/backfill', asyncHandler(async (req, res) => {
   try {
     let bookmarks = await loadBookmarks();
 
-    // Find article bookmarks (not YouTube, Twitter, Wikipedia) missing metadata
+    // Find article bookmarks (not YouTube, Twitter, Wikipedia) missing metadata or thumbnail
     const articleBookmarks = bookmarks.filter(b => {
       const url = b.url || '';
       const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
       const isTwitter = url.includes('twitter.com') || url.includes('x.com');
       const isWikipedia = url.includes('wikipedia.org');
       const missingMetadata = !b.metadata?.siteName && !b.metadata?.author;
-      return !isYouTube && !isTwitter && !isWikipedia && missingMetadata && url;
+      const missingThumbnail = !b.thumbnail;
+      return !isYouTube && !isTwitter && !isWikipedia && (missingMetadata || missingThumbnail) && url;
     });
 
     if (articleBookmarks.length === 0) {
@@ -867,15 +1006,24 @@ app.post('/api/article/backfill', asyncHandler(async (req, res) => {
       try {
         const articleData = await extractArticleMetadata(bookmark.url);
         if (articleData) {
-          const updated = await updateBookmarkById(bookmark.id, {
+          const updateData = {
             metadata: {
               ...bookmark.metadata,
               siteName: articleData.siteName,
               author: articleData.author,
-              publishedDate: articleData.publishedDate
+              publishedDate: articleData.publishedDate,
+              ogImage: articleData.ogImage,
+              ogDescription: articleData.ogDescription
             },
             updatedAt: Date.now()
-          });
+          };
+
+          // Add thumbnail if we got an og:image and bookmark doesn't have one
+          if (articleData.ogImage && !bookmark.thumbnail) {
+            updateData.thumbnail = articleData.ogImage;
+          }
+
+          const updated = await updateBookmarkById(bookmark.id, updateData);
 
           if (!updated) {
             failed++;
@@ -887,7 +1035,8 @@ app.post('/api/article/backfill', asyncHandler(async (req, res) => {
               title: bookmark.title,
               status: 'success',
               siteName: articleData.siteName,
-              author: articleData.author
+              author: articleData.author,
+              thumbnail: articleData.ogImage ? 'fetched' : 'none'
             });
           }
         } else {
@@ -912,6 +1061,116 @@ app.post('/api/article/backfill', asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('Article backfill error:', error);
+    res.status(500).json({ error: error.message });
+  }
+}));
+
+// POST backfill X/Twitter oEmbed data for existing bookmarks
+// This fetches oEmbed for X bookmarks that are missing embedHtml
+app.post('/api/x/backfill', asyncHandler(async (req, res) => {
+  try {
+    const bookmarks = await loadBookmarks();
+
+    // Find X/Twitter bookmarks missing oEmbed data
+    const xBookmarks = bookmarks.filter(b => {
+      const url = b.url || '';
+      const isTwitter = url.includes('twitter.com') || url.includes('x.com');
+      const hasEmbedHtml = b.metadata?.tweetData?.embedHtml;
+      return isTwitter && !hasEmbedHtml;
+    });
+
+    if (xBookmarks.length === 0) {
+      return res.json({
+        message: 'No X bookmarks need oEmbed backfilling',
+        processed: 0,
+        total: 0
+      });
+    }
+
+    console.log(`[X Backfill] Processing ${xBookmarks.length} X bookmarks for oEmbed...`);
+
+    let processed = 0;
+    let failed = 0;
+    const results = [];
+
+    // Limit concurrent requests
+    const limit = req.body.limit || 10;
+    const toProcess = xBookmarks.slice(0, limit);
+
+    for (const bookmark of toProcess) {
+      try {
+        const twitterUrl = bookmark.url.replace('x.com', 'twitter.com');
+        const params = new URLSearchParams({
+          url: twitterUrl,
+          maxwidth: '550',
+          omit_script: '1',
+          theme: 'dark',
+          hide_thread: '1',
+          hide_media: '0',
+          dnt: 'true',
+          lang: 'en'
+        });
+
+        const oembedResponse = await fetch(`https://publish.twitter.com/oembed?${params.toString()}`, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+            'Accept': 'application/json'
+          }
+        });
+
+        if (oembedResponse.ok) {
+          const oembedData = await oembedResponse.json();
+
+          const updateData = {
+            metadata: {
+              ...bookmark.metadata,
+              tweetData: {
+                ...(bookmark.metadata?.tweetData || {}),
+                embedHtml: oembedData.html,
+                oembedAuthorName: oembedData.author_name,
+                oembedAuthorUrl: oembedData.author_url,
+                oembedCacheAge: parseInt(oembedData.cache_age) || 86400,
+                // If we didn't have author info from extraction, use oEmbed data
+                authorName: bookmark.metadata?.tweetData?.authorName || oembedData.author_name
+              }
+            },
+            updatedAt: Date.now()
+          };
+
+          await updateBookmarkById(bookmark.id, updateData);
+          processed++;
+          results.push({
+            id: bookmark.id,
+            status: 'success',
+            authorName: oembedData.author_name
+          });
+        } else {
+          failed++;
+          results.push({
+            id: bookmark.id,
+            status: 'failed',
+            reason: `oEmbed returned ${oembedResponse.status}`
+          });
+        }
+      } catch (err) {
+        failed++;
+        results.push({ id: bookmark.id, status: 'failed', reason: err.message });
+      }
+
+      // Rate limit delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    res.json({
+      message: 'X oEmbed backfill complete',
+      processed,
+      failed,
+      remaining: xBookmarks.length - toProcess.length,
+      total: xBookmarks.length,
+      results
+    });
+  } catch (error) {
+    console.error('[X Backfill] Error:', error);
     res.status(500).json({ error: error.message });
   }
 }));
@@ -987,6 +1246,197 @@ app.get('/api/twitter/oembed', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('oEmbed fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// In-memory cache for FxTwitter video responses
+const fxTwitterVideoCache = new Map();
+
+// GET /api/twitter/video - Fetch direct video URL from FxTwitter
+// This is the PRIMARY method for getting autoplay-compatible video URLs
+app.get('/api/twitter/video', asyncHandler(async (req, res) => {
+  const { url } = req.query;
+
+  if (!url || !(url.includes('twitter.com') || url.includes('x.com'))) {
+    return res.status(400).json({ error: 'Invalid Twitter/X URL' });
+  }
+
+  // Check cache first (24 hour cache for videos)
+  const cached = fxTwitterVideoCache.get(url);
+  if (cached && cached.expiresAt > Date.now()) {
+    console.log('[FxTwitter] Cache hit for:', url);
+    return res.json(cached.data);
+  }
+
+  try {
+    console.log('[FxTwitter] Fetching video URL for:', url);
+    const result = await fetchVideoFromFxTwitter(url);
+
+    if (result.success) {
+      const responseData = {
+        success: true,
+        videoUrl: result.videoUrl,
+        thumbnail: result.thumbnail,
+        photos: result.photos || [],
+        hasImages: result.hasImages || false,
+        authorName: result.authorName,
+        authorHandle: result.authorHandle,
+        tweetText: result.tweetText?.substring(0, 280),
+        directDownloadUrl: getFxTwitterDirectVideoUrl(url)
+      };
+
+      // Cache successful responses for 24 hours
+      fxTwitterVideoCache.set(url, {
+        data: responseData,
+        expiresAt: Date.now() + (24 * 60 * 60 * 1000)
+      });
+
+      res.json(responseData);
+    } else {
+      // Return a fallback with the direct download URL even if API failed
+      // This allows frontend to try the d.fxtwitter.com URL directly
+      res.json({
+        success: false,
+        error: result.error,
+        directDownloadUrl: getFxTwitterDirectVideoUrl(url),
+        hasImages: result.hasImages,
+        photos: result.photos || []
+      });
+    }
+  } catch (error) {
+    console.error('[FxTwitter] Video fetch error:', error);
+    // Still provide the direct URL as fallback
+    res.json({
+      success: false,
+      error: error.message,
+      directDownloadUrl: getFxTwitterDirectVideoUrl(url)
+    });
+  }
+}));
+
+// GET /api/twitter/video/proxy - Proxy video from FxTwitter to avoid CORS
+// This streams the video through our server for autoplay support
+app.get('/api/twitter/video/proxy', asyncHandler(async (req, res) => {
+  const { url } = req.query;
+
+  if (!url || !(url.includes('twitter.com') || url.includes('x.com'))) {
+    return res.status(400).json({ error: 'Invalid Twitter/X URL' });
+  }
+
+  try {
+    // First try to get direct video URL from FxTwitter API
+    const result = await fetchVideoFromFxTwitter(url);
+
+    if (result.success && result.videoUrl) {
+      // Redirect to the actual video URL (most efficient)
+      // Twitter's CDN usually allows cross-origin requests
+      return res.redirect(result.videoUrl);
+    }
+
+    // Fallback to FxTwitter direct download URL
+    const directUrl = getFxTwitterDirectVideoUrl(url);
+    if (directUrl) {
+      return res.redirect(directUrl);
+    }
+
+    res.status(404).json({ error: 'No video found' });
+  } catch (error) {
+    console.error('[FxTwitter] Proxy error:', error);
+    res.status(500).json({ error: error.message });
+  }
+}));
+
+// GET og:image from any URL - used for embedded link previews
+// This fetches the page server-side to avoid CORS and extracts Open Graph metadata
+const ogImageCache = new Map();
+app.get('/api/og-image', async (req, res) => {
+  const { url } = req.query;
+
+  if (!url) {
+    return res.status(400).json({ error: 'URL required' });
+  }
+
+  // Validate URL
+  try {
+    new URL(url);
+  } catch {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
+
+  // Check cache first (1 hour cache)
+  const cached = ogImageCache.get(url);
+  if (cached && cached.expiresAt > Date.now()) {
+    return res.json(cached.data);
+  }
+
+  try {
+    console.log('[og-image] Fetching:', url);
+
+    // Fetch the page with a browser-like user agent
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      redirect: 'follow',
+      timeout: 10000
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch URL: ${response.status}`);
+    }
+
+    const html = await response.text();
+
+    // Extract Open Graph metadata using regex (simple and fast)
+    const extractMeta = (property) => {
+      // Try og: prefix first
+      let match = html.match(new RegExp(`<meta[^>]*property=["']og:${property}["'][^>]*content=["']([^"']+)["']`, 'i'));
+      if (!match) {
+        match = html.match(new RegExp(`<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:${property}["']`, 'i'));
+      }
+      // Try twitter: prefix as fallback
+      if (!match) {
+        match = html.match(new RegExp(`<meta[^>]*name=["']twitter:${property}["'][^>]*content=["']([^"']+)["']`, 'i'));
+      }
+      if (!match) {
+        match = html.match(new RegExp(`<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:${property}["']`, 'i'));
+      }
+      return match ? match[1] : null;
+    };
+
+    const ogImage = extractMeta('image');
+    const ogTitle = extractMeta('title');
+    const ogDescription = extractMeta('description');
+
+    // Also try to extract title from <title> tag if og:title not found
+    let title = ogTitle;
+    if (!title) {
+      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      title = titleMatch ? titleMatch[1].trim() : null;
+    }
+
+    const result = {
+      url,
+      ogImage: ogImage || null,
+      title: title || null,
+      description: ogDescription || null,
+      fetchedAt: Date.now()
+    };
+
+    console.log('[og-image] Found:', { url, ogImage: ogImage?.substring(0, 100) });
+
+    // Cache for 1 hour
+    ogImageCache.set(url, {
+      data: result,
+      expiresAt: Date.now() + (60 * 60 * 1000)
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[og-image] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1331,7 +1781,7 @@ app.get('/api/wikipedia/article', async (req, res) => {
 // In-memory cache for article content
 const articleCache = new Map();
 
-// Helper function to extract article metadata (author, date, site name)
+// Helper function to extract article metadata (author, date, site name, cover image)
 const extractArticleMetadata = async (url) => {
   try {
     const response = await fetch(url, {
@@ -1345,6 +1795,12 @@ const extractArticleMetadata = async (url) => {
     if (!response.ok) return null;
 
     const html = await response.text();
+
+    // Extract og:image (cover photo) - try multiple patterns
+    const ogImageMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) ||
+                         html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i) ||
+                         html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) ||
+                         html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
 
     // Extract author
     const authorMatch = html.match(/<meta[^>]*name="author"[^>]*content="([^"]*)"[^>]*>/i) ||
@@ -1360,19 +1816,162 @@ const extractArticleMetadata = async (url) => {
     const siteNameMatch = html.match(/<meta[^>]*property="og:site_name"[^>]*content="([^"]*)"[^>]*>/i) ||
                           html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:site_name"[^>]*>/i);
 
+    // Extract og:description
+    const descMatch = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]*)"[^>]*>/i) ||
+                      html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:description"[^>]*>/i) ||
+                      html.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"[^>]*>/i);
+
     const siteName = siteNameMatch?.[1] || new URL(url).hostname.replace('www.', '');
     const author = authorMatch?.[1] || '';
     const publishedDate = dateMatch?.[1] || '';
 
-    // Only return if we found at least some useful data
-    if (siteName || author || publishedDate) {
-      return { siteName, author, publishedDate };
+    // Process og:image - make absolute URL if relative
+    let ogImage = ogImageMatch?.[1] || '';
+    if (ogImage && !ogImage.startsWith('http')) {
+      try {
+        const urlObj = new URL(url);
+        if (ogImage.startsWith('//')) {
+          ogImage = `https:${ogImage}`;
+        } else if (ogImage.startsWith('/')) {
+          ogImage = `${urlObj.protocol}//${urlObj.host}${ogImage}`;
+        }
+      } catch (e) {
+        // Keep original value if URL parsing fails
+      }
+    }
+
+    const ogDescription = descMatch?.[1] || '';
+
+    // Return data if we found anything useful
+    if (siteName || author || publishedDate || ogImage) {
+      return { siteName, author, publishedDate, ogImage, ogDescription };
     }
     return null;
   } catch (err) {
     console.log('Article metadata extraction failed:', err.message);
     return null;
   }
+};
+
+// Helper function to extract Wikipedia metadata using Wikipedia API
+const extractWikipediaMetadata = async (url) => {
+  try {
+    // Extract article title from URL
+    const urlObj = new URL(url);
+    const pathParts = urlObj.pathname.split('/');
+    const wikiIndex = pathParts.indexOf('wiki');
+    if (wikiIndex === -1 || !pathParts[wikiIndex + 1]) {
+      return null;
+    }
+
+    const articleTitle = decodeURIComponent(pathParts[wikiIndex + 1]);
+    const lang = urlObj.hostname.split('.')[0]; // e.g., 'en' from 'en.wikipedia.org'
+
+    // Use Wikipedia REST API for page summary (includes image and extract)
+    const apiUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(articleTitle)}`;
+
+    const response = await fetch(apiUrl, {
+      headers: {
+        'User-Agent': 'BookmarkApp/1.0 (https://github.com/bookmark-app)',
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!response.ok) {
+      console.log(`Wikipedia API returned ${response.status} for ${articleTitle}`);
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Build result object
+    const result = {
+      displayTitle: data.displaytitle || data.title || articleTitle,
+      extract: data.extract || data.description || '',
+      description: data.description || '',
+      thumbnail: data.thumbnail?.source || null,
+      originalImage: data.originalimage?.source || null,
+      pageUrl: data.content_urls?.desktop?.page || url,
+      wikibaseItem: data.wikibase_item || null,
+      type: data.type || 'standard',
+    };
+
+    console.log(`Wikipedia metadata extracted: ${result.displayTitle}, image: ${result.thumbnail ? 'yes' : 'no'}`);
+    return result;
+  } catch (err) {
+    console.log('Wikipedia metadata extraction failed:', err.message);
+    return null;
+  }
+};
+
+// URL categorization helper
+const categorizeUrl = (url) => {
+  if (!url) return { category: 'webpage', subCategory: 'other' };
+
+  const urlLower = url.toLowerCase();
+
+  // Video platforms
+  if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) {
+    return { category: 'video', subCategory: urlLower.includes('/shorts/') ? 'youtube-shorts' : 'youtube-video' };
+  }
+  if (urlLower.includes('vimeo.com')) return { category: 'video', subCategory: 'vimeo-video' };
+  if (urlLower.includes('twitch.tv')) return { category: 'video', subCategory: 'twitch-stream' };
+  if (urlLower.includes('tiktok.com')) return { category: 'video', subCategory: 'tiktok-video' };
+
+  // Social media
+  if (urlLower.includes('twitter.com') || urlLower.includes('x.com')) return { category: 'social', subCategory: 'tweet' };
+
+  // Wikipedia
+  if (urlLower.includes('wikipedia.org')) return { category: 'wikipedia', subCategory: 'encyclopedia' };
+
+  // GitHub repositories
+  if (urlLower.match(/github\.com\/[^\/]+\/[^\/]+/)) return { category: 'repository', subCategory: 'github-repo' };
+  if (urlLower.includes('gitlab.com')) return { category: 'repository', subCategory: 'gitlab-repo' };
+
+  // Documentation
+  if (urlLower.includes('/docs/') || urlLower.includes('/documentation/') || urlLower.includes('docs.') || urlLower.includes('developer.')) {
+    return { category: 'documentation', subCategory: 'docs' };
+  }
+
+  // Developer tools & SaaS
+  const toolDomains = ['supabase.com', 'vercel.com', 'netlify.com', 'heroku.com', 'railway.app', 'render.com',
+    'planetscale.com', 'firebase.google.com', 'stripe.com', 'auth0.com', 'clerk.com', 'prisma.io',
+    'tailwindcss.com', 'figma.com', 'notion.so', 'slack.com', 'discord.com', 'linear.app', 'openai.com',
+    'anthropic.com', 'huggingface.co', 'npmjs.com', 'pypi.org'];
+  if (toolDomains.some(domain => urlLower.includes(domain))) {
+    return { category: 'tool', subCategory: 'saas' };
+  }
+
+  // Forums
+  if (urlLower.includes('reddit.com')) return { category: 'forum', subCategory: 'reddit' };
+  if (urlLower.includes('ycombinator.com') || urlLower.includes('news.ycombinator')) return { category: 'forum', subCategory: 'hackernews' };
+  if (urlLower.includes('stackoverflow.com')) return { category: 'forum', subCategory: 'stackoverflow' };
+
+  // Blog platforms
+  if (urlLower.includes('medium.com') || urlLower.includes('dev.to') || urlLower.includes('substack.com')) {
+    return { category: 'blog', subCategory: 'blog-post' };
+  }
+
+  // News sites
+  const newsDomains = ['nytimes.com', 'washingtonpost.com', 'theguardian.com', 'bbc.com', 'cnn.com',
+    'reuters.com', 'techcrunch.com', 'theverge.com', 'arstechnica.com', 'wired.com'];
+  if (newsDomains.some(domain => urlLower.includes(domain))) {
+    return { category: 'news', subCategory: 'tech-news' };
+  }
+
+  // Images
+  if (urlLower.match(/\.(jpg|jpeg|png|webp|svg|bmp|ico)(\?.*)?$/i)) {
+    return { category: 'image', subCategory: 'photo' };
+  }
+
+  // GIFs
+  if (urlLower.match(/\.gif(\?.*)?$/i) || urlLower.includes('giphy.com') || urlLower.includes('tenor.com')) {
+    return { category: 'gif', subCategory: 'animated' };
+  }
+
+  // Default to webpage
+  return { category: 'webpage', subCategory: 'other' };
 };
 
 // GET article content extraction
@@ -2307,6 +2906,524 @@ app.get('/api/stats', asyncHandler(async (req, res) => {
 
   res.json(stats);
 }));
+
+// ==================== MANUAL MEDIA UPDATE API ====================
+
+// PATCH /api/bookmarks/:id/media - Manually update bookmark thumbnail/media
+// Use this when automatic extraction fails
+app.patch('/api/bookmarks/:id/media', asyncHandler(async (req, res) => {
+  const { thumbnail, tweetMedia, localVideoUrl } = req.body;
+  const bookmark = await getBookmarkById(req.params.id);
+
+  if (!bookmark) {
+    return res.status(404).json({ error: 'Bookmark not found' });
+  }
+
+  const updates = { updatedAt: Date.now() };
+
+  if (thumbnail) {
+    updates.thumbnail = thumbnail;
+  }
+
+  if (tweetMedia || localVideoUrl) {
+    updates.metadata = {
+      ...bookmark.metadata,
+      tweetData: {
+        ...(bookmark.metadata?.tweetData || {}),
+        ...(tweetMedia && { tweetMedia }),
+        ...(localVideoUrl && { localVideoUrl })
+      }
+    };
+  }
+
+  const updated = await updateBookmarkById(req.params.id, updates);
+  res.json(updated);
+}));
+
+// ==================== VIDEO DOWNLOAD API (Cobalt) ====================
+
+// Media storage directory
+const MEDIA_DIR = path.join(__dirname, 'media');
+if (!fs.existsSync(MEDIA_DIR)) {
+  fs.mkdirSync(MEDIA_DIR, { recursive: true });
+  console.log('Created media storage directory:', MEDIA_DIR);
+}
+
+// Serve static media files
+app.use('/api/media', express.static(MEDIA_DIR, {
+  maxAge: '30d',
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.mp4')) {
+      res.set('Content-Type', 'video/mp4');
+    } else if (filePath.endsWith('.webm')) {
+      res.set('Content-Type', 'video/webm');
+    }
+  }
+}));
+
+// ============================================================
+// FxTwitter Video URL Fetching
+// Uses FxTwitter API to get direct video URLs for X/Twitter posts
+// This is the PRIMARY method for getting video URLs - no auth required
+// ============================================================
+
+/**
+ * Extract tweet ID and username from X/Twitter URL
+ */
+function parseTweetUrl(url) {
+  const match = url.match(/(?:twitter|x)\.com\/(\w+)\/status\/(\d+)/);
+  if (match) {
+    return { username: match[1], tweetId: match[2] };
+  }
+  return null;
+}
+
+/**
+ * Fetch video URL from FxTwitter API
+ * FxTwitter provides direct video URLs without authentication
+ * API endpoint: https://api.fxtwitter.com/{username}/status/{tweetId}
+ */
+async function fetchVideoFromFxTwitter(tweetUrl) {
+  const parsed = parseTweetUrl(tweetUrl);
+  if (!parsed) {
+    throw new Error('Invalid Twitter/X URL');
+  }
+
+  const { username, tweetId } = parsed;
+  console.log(`[FxTwitter] Fetching video for @${username}/status/${tweetId}`);
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    const apiUrl = `https://api.fxtwitter.com/${username}/status/${tweetId}`;
+    const response = await fetch(apiUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; BookmarkApp/1.0)',
+        'Accept': 'application/json'
+      },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`FxTwitter API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.code !== 200 || !data.tweet) {
+      throw new Error(data.message || 'Tweet not found');
+    }
+
+    const tweet = data.tweet;
+
+    // Extract video URL from media
+    if (tweet.media?.videos && tweet.media.videos.length > 0) {
+      const video = tweet.media.videos[0];
+      // FxTwitter provides multiple quality variants, pick the best one
+      const videoUrl = video.url || (video.variants?.length > 0
+        ? video.variants.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0]?.url
+        : null);
+
+      if (videoUrl) {
+        console.log(`[FxTwitter] Found video URL: ${videoUrl.substring(0, 50)}...`);
+        return {
+          success: true,
+          videoUrl,
+          thumbnail: video.thumbnail_url || tweet.media?.photos?.[0]?.url,
+          authorName: tweet.author?.name,
+          authorHandle: tweet.author?.screen_name,
+          tweetText: tweet.text,
+          tweetDate: tweet.created_at
+        };
+      }
+    }
+
+    // Check for GIFs (they're technically videos)
+    if (tweet.media?.videos) {
+      for (const video of tweet.media.videos) {
+        if (video.url) {
+          return {
+            success: true,
+            videoUrl: video.url,
+            thumbnail: video.thumbnail_url,
+            authorName: tweet.author?.name,
+            authorHandle: tweet.author?.screen_name,
+            tweetText: tweet.text,
+            tweetDate: tweet.created_at
+          };
+        }
+      }
+    }
+
+    // No video found - return photos if available
+    const photos = tweet.media?.photos || [];
+    return {
+      success: true,
+      videoUrl: null,
+      error: 'No video found in tweet',
+      hasImages: photos.length > 0,
+      photos: photos.map(p => ({ url: p.url, width: p.width, height: p.height })),
+      thumbnail: photos.length > 0 ? photos[0].url : null,
+      authorName: tweet.author?.name,
+      authorHandle: tweet.author?.screen_name,
+      tweetText: tweet.text,
+      tweetDate: tweet.created_at
+    };
+
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.error('[FxTwitter] Request timed out');
+      return { success: false, error: 'Request timed out' };
+    }
+    console.error('[FxTwitter] Error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Get direct video URL using FxTwitter's d. subdomain (fallback method)
+ * This constructs a URL that FxTwitter will redirect to the actual video
+ */
+function getFxTwitterDirectVideoUrl(tweetUrl) {
+  const parsed = parseTweetUrl(tweetUrl);
+  if (!parsed) return null;
+
+  const { username, tweetId } = parsed;
+  // d.fxtwitter.com/{user}/status/{id}.mp4 redirects to video
+  return `https://d.fxtwitter.com/${username}/status/${tweetId}.mp4`;
+}
+
+// Cobalt API configuration
+// Self-hosted instance recommended (public api.cobalt.tools requires auth)
+// Set COBALT_API_URL to your self-hosted instance, e.g., http://localhost:9000
+// Set COBALT_API_KEY if your instance requires authentication
+const COBALT_API_URL = process.env.COBALT_API_URL || 'https://api.cobalt.tools';
+const COBALT_API_KEY = process.env.COBALT_API_KEY || '';
+
+/**
+ * Download video from URL using Cobalt API
+ * Cobalt supports: Twitter/X, YouTube, TikTok, Instagram, etc.
+ * Note: Public api.cobalt.tools requires authentication - use self-hosted for unrestricted access
+ */
+async function downloadVideoWithCobalt(videoUrl) {
+  console.log(`[Cobalt] Downloading video from: ${videoUrl}`);
+
+  try {
+    // Build headers
+    const headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+
+    // Add auth if API key provided
+    if (COBALT_API_KEY) {
+      headers['Authorization'] = `Api-Key ${COBALT_API_KEY}`;
+    }
+
+    // Call Cobalt API with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+    const response = await fetch(`${COBALT_API_URL}/`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        url: videoUrl,
+        videoQuality: '720',  // Balance between quality and size
+        filenameStyle: 'basic',
+        downloadMode: 'auto'
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Cobalt API error: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log(`[Cobalt] Response status: ${result.status}`);
+
+    // Handle different response types
+    if (result.status === 'error') {
+      const errorCode = result.error?.code || 'Unknown Cobalt error';
+      // Check for auth errors
+      if (errorCode.includes('auth')) {
+        console.warn('[Cobalt] Auth required. Set COBALT_API_KEY or use self-hosted instance.');
+      }
+      throw new Error(errorCode);
+    }
+
+    if (result.status === 'redirect' || result.status === 'tunnel') {
+      // Direct URL to video
+      return { type: 'url', url: result.url, filename: result.filename };
+    }
+
+    if (result.status === 'picker') {
+      // Multiple options available, pick the first video
+      const videoOption = result.picker?.find(p => p.type === 'video') || result.picker?.[0];
+      if (videoOption) {
+        return { type: 'url', url: videoOption.url, filename: videoOption.filename };
+      }
+    }
+
+    throw new Error(`Unexpected Cobalt response: ${result.status}`);
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.error('[Cobalt] Request timed out');
+      throw new Error('Cobalt API request timed out');
+    }
+    console.error('[Cobalt] Download failed:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Download video file from URL and save to media directory
+ */
+async function saveVideoToMedia(videoUrl, filename) {
+  const response = await fetch(videoUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to download video: ${response.status}`);
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const filePath = path.join(MEDIA_DIR, filename);
+
+  fs.writeFileSync(filePath, buffer);
+  console.log(`[Media] Saved video: ${filename} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`);
+
+  return filename;
+}
+
+/**
+ * Generate unique filename for video
+ */
+function generateVideoFilename(url, extension = 'mp4') {
+  const timestamp = Date.now();
+  const urlHash = Buffer.from(url).toString('base64').slice(0, 10).replace(/[/+=]/g, '_');
+  return `video_${timestamp}_${urlHash}.${extension}`;
+}
+
+/**
+ * Check if video is already cached
+ */
+function findCachedVideo(urlHash) {
+  if (!fs.existsSync(MEDIA_DIR)) return null;
+
+  const files = fs.readdirSync(MEDIA_DIR);
+  const cached = files.find(f => f.includes(urlHash) && (f.endsWith('.mp4') || f.endsWith('.webm')));
+  return cached || null;
+}
+
+// POST /api/video/download - Download video and cache locally
+app.post('/api/video/download', asyncHandler(async (req, res) => {
+  const { url, bookmarkId } = req.body;
+
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required' });
+  }
+
+  // Check if URL is from a supported platform
+  const isTwitter = url.includes('twitter.com') || url.includes('x.com');
+  const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+  const isTikTok = url.includes('tiktok.com');
+  const isInstagram = url.includes('instagram.com');
+
+  if (!isTwitter && !isYouTube && !isTikTok && !isInstagram) {
+    return res.status(400).json({
+      error: 'Unsupported platform',
+      supported: ['twitter.com', 'x.com', 'youtube.com', 'tiktok.com', 'instagram.com']
+    });
+  }
+
+  try {
+    // Check cache first
+    const urlHash = Buffer.from(url).toString('base64').slice(0, 10).replace(/[/+=]/g, '_');
+    const cached = findCachedVideo(urlHash);
+
+    if (cached) {
+      console.log(`[Video] Cache hit: ${cached}`);
+      return res.json({
+        success: true,
+        cached: true,
+        filename: cached,
+        localUrl: `/api/media/${cached}`
+      });
+    }
+
+    // Download with Cobalt
+    const cobaltResult = await downloadVideoWithCobalt(url);
+
+    if (cobaltResult.type === 'url') {
+      // Generate filename and save
+      const extension = cobaltResult.url.includes('.webm') ? 'webm' : 'mp4';
+      const filename = generateVideoFilename(url, extension);
+
+      await saveVideoToMedia(cobaltResult.url, filename);
+
+      // If bookmarkId provided, update the bookmark with local video URL
+      if (bookmarkId) {
+        try {
+          const bookmark = await getBookmarkById(bookmarkId);
+          if (bookmark && bookmark.metadata?.tweetData?.tweetMedia) {
+            const updatedMedia = bookmark.metadata.tweetData.tweetMedia.map(m => {
+              if (m.type === 'video') {
+                return { ...m, localUrl: `/api/media/${filename}` };
+              }
+              return m;
+            });
+
+            await updateBookmarkById(bookmarkId, {
+              metadata: {
+                ...bookmark.metadata,
+                tweetData: {
+                  ...bookmark.metadata.tweetData,
+                  tweetMedia: updatedMedia,
+                  localVideoUrl: `/api/media/${filename}`
+                }
+              }
+            });
+            console.log(`[Video] Updated bookmark ${bookmarkId} with local video URL`);
+          }
+        } catch (updateErr) {
+          console.warn('[Video] Failed to update bookmark:', updateErr.message);
+        }
+      }
+
+      return res.json({
+        success: true,
+        cached: false,
+        filename,
+        localUrl: `/api/media/${filename}`,
+        originalUrl: cobaltResult.url
+      });
+    }
+
+    res.status(500).json({ error: 'Failed to get video URL from Cobalt' });
+  } catch (error) {
+    console.error('[Video] Download error:', error);
+    res.status(500).json({
+      error: error.message,
+      fallback: 'Video unavailable for local caching. Will play from source.'
+    });
+  }
+}));
+
+// GET /api/video/status/:filename - Check if video exists
+app.get('/api/video/status/:filename', (req, res) => {
+  const filePath = path.join(MEDIA_DIR, req.params.filename);
+
+  if (fs.existsSync(filePath)) {
+    const stats = fs.statSync(filePath);
+    res.json({
+      exists: true,
+      filename: req.params.filename,
+      size: stats.size,
+      url: `/api/media/${req.params.filename}`
+    });
+  } else {
+    res.json({ exists: false });
+  }
+});
+
+// POST /api/video/backfill - Download videos for existing tweet bookmarks
+app.post('/api/video/backfill', asyncHandler(async (req, res) => {
+  try {
+    const bookmarks = await loadBookmarks();
+
+    // Find tweet bookmarks with video media but no local video URL
+    const tweetBookmarks = bookmarks.filter(b => {
+      const url = b.url || '';
+      const isTwitter = url.includes('twitter.com') || url.includes('x.com');
+      const hasVideo = b.metadata?.tweetData?.tweetMedia?.some(m => m.type === 'video');
+      const hasLocalVideo = b.metadata?.tweetData?.localVideoUrl;
+      return isTwitter && hasVideo && !hasLocalVideo;
+    });
+
+    if (tweetBookmarks.length === 0) {
+      return res.json({
+        message: 'No tweet videos need backfilling',
+        processed: 0,
+        total: 0
+      });
+    }
+
+    console.log(`[Video Backfill] Processing ${tweetBookmarks.length} tweets with videos...`);
+
+    let processed = 0;
+    let failed = 0;
+    const results = [];
+
+    // Limit concurrent downloads
+    const limit = req.body.limit || 5;
+    const toProcess = tweetBookmarks.slice(0, limit);
+
+    for (const bookmark of toProcess) {
+      try {
+        const cobaltResult = await downloadVideoWithCobalt(bookmark.url);
+
+        if (cobaltResult.type === 'url') {
+          const extension = cobaltResult.url.includes('.webm') ? 'webm' : 'mp4';
+          const filename = generateVideoFilename(bookmark.url, extension);
+
+          await saveVideoToMedia(cobaltResult.url, filename);
+
+          // Update bookmark
+          const updatedMedia = bookmark.metadata.tweetData.tweetMedia.map(m => {
+            if (m.type === 'video') {
+              return { ...m, localUrl: `/api/media/${filename}` };
+            }
+            return m;
+          });
+
+          await updateBookmarkById(bookmark.id, {
+            metadata: {
+              ...bookmark.metadata,
+              tweetData: {
+                ...bookmark.metadata.tweetData,
+                tweetMedia: updatedMedia,
+                localVideoUrl: `/api/media/${filename}`
+              }
+            }
+          });
+
+          processed++;
+          results.push({ id: bookmark.id, status: 'success', filename });
+        }
+      } catch (err) {
+        failed++;
+        results.push({ id: bookmark.id, status: 'failed', reason: err.message });
+      }
+
+      // Rate limit delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    res.json({
+      message: 'Video backfill complete',
+      processed,
+      failed,
+      remaining: tweetBookmarks.length - toProcess.length,
+      results
+    });
+  } catch (error) {
+    console.error('[Video Backfill] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+}));
+
+// ==================== END VIDEO DOWNLOAD API ====================
 
 // SPA fallback route - serve index.html for any non-API routes (must be after all API routes)
 app.get('*', (req, res) => {

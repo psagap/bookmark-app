@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Command, BookOpen, StickyNote, Video, Image, Hash } from 'lucide-react';
+import { Search, X, BookOpen, StickyNote, Video, Image, Hash } from 'lucide-react';
 
 // X (Twitter) Logo SVG Component
 const XLogo = ({ className, style, ...props }) => (
@@ -157,6 +157,24 @@ const MIND_CATEGORIES = [
 ];
 
 // ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+// Map category IDs to mediaCounts keys
+const getCountForCategory = (categoryId, mediaCounts) => {
+  const mapping = {
+    'youtube': mediaCounts?.video || 0,
+    'image': mediaCounts?.image || 0,
+    'note': mediaCounts?.note || 0,
+    'tweet': mediaCounts?.tweet || 0,
+    'article': mediaCounts?.article || 0,
+    'reddit': mediaCounts?.article || 0, // Reddit counts toward article
+    'wikipedia': mediaCounts?.article || 0, // Wikipedia counts toward article
+  };
+  return mapping[categoryId] || 0;
+};
+
+// ============================================================================
 // UTILITY HOOKS
 // ============================================================================
 
@@ -179,6 +197,43 @@ const useGhostText = (query, categories) => {
     }
     return { ghostText: '', matchedCategory: null };
   }, [query, categories]);
+};
+
+// Hook to determine which categories to show as suggestions based on query
+const useCategorySuggestions = (query, categories, activeFilters, mediaCounts) => {
+  return useMemo(() => {
+    // Don't show if query is empty, too short, or typing a hashtag
+    if (!query || query.length < 2 || query.includes('#')) {
+      return [];
+    }
+
+    const lowerQuery = query.toLowerCase().trim();
+
+    // Find matching categories
+    const matches = categories.filter(category => {
+      // Skip if already active
+      if (activeFilters.includes(category.id)) return false;
+
+      // Check if any keyword starts with or includes the query
+      return category.keywords.some(keyword =>
+        keyword.toLowerCase().includes(lowerQuery)
+      );
+    });
+
+    // Sort by count (highest first), then by relevance
+    return matches.sort((a, b) => {
+      const countA = getCountForCategory(a.id, mediaCounts);
+      const countB = getCountForCategory(b.id, mediaCounts);
+      if (countB !== countA) return countB - countA;
+
+      // If counts are equal, prioritize exact prefix matches
+      const aHasPrefix = a.keywords.some(k => k.toLowerCase().startsWith(lowerQuery));
+      const bHasPrefix = b.keywords.some(k => k.toLowerCase().startsWith(lowerQuery));
+      if (aHasPrefix && !bHasPrefix) return -1;
+      if (!aHasPrefix && bHasPrefix) return 1;
+      return 0;
+    });
+  }, [query, categories, activeFilters, mediaCounts]);
 };
 
 // Find category by exact keyword match
@@ -271,6 +326,68 @@ const GhostTextOverlay = ({ query, ghostText }) => {
   );
 };
 
+// Category Suggestion Dropdown - shows matching categories when typing
+const CategorySuggestionDropdown = ({ categories, selectedIndex, onSelect, mediaCounts }) => {
+  if (categories.length === 0) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 500, damping: 35 }}
+      className="absolute left-0 top-full mt-2 w-72 bg-gruvbox-bg-dark rounded-xl border border-gruvbox-bg-lighter/30 shadow-2xl overflow-hidden z-50"
+    >
+      <div className="px-3 py-2 text-xs font-medium text-gruvbox-fg-muted border-b border-gruvbox-bg-lighter/20 flex items-center gap-2">
+        <Search className="w-3 h-3" />
+        Categories
+      </div>
+      <div className="max-h-64 overflow-y-auto">
+        {categories.map((category, index) => {
+          const Icon = category.icon;
+          const count = getCountForCategory(category.id, mediaCounts);
+          const isSelected = index === selectedIndex;
+
+          return (
+            <button
+              key={category.id}
+              onClick={() => onSelect(category)}
+              className={cn(
+                "w-full px-3 py-2.5 text-left flex items-center gap-3 transition-colors",
+                isSelected
+                  ? "text-gruvbox-fg"
+                  : "text-gruvbox-fg hover:bg-gruvbox-bg-lighter/20"
+              )}
+              style={isSelected ? {
+                backgroundColor: `${category.hexColor}20`,
+                color: category.hexColor
+              } : {}}
+            >
+              <Icon
+                className="w-5 h-5"
+                style={{ color: isSelected ? category.hexColor : category.hexColor + '80' }}
+              />
+              <span className="font-medium flex-1">{category.label}</span>
+              <span
+                className="text-xs px-2 py-0.5 rounded-full bg-gruvbox-bg-lighter/40 text-gruvbox-fg-muted"
+                style={isSelected ? {
+                  backgroundColor: `${category.hexColor}30`,
+                  color: category.hexColor
+                } : {}}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="px-3 py-2 text-[10px] text-gruvbox-fg-muted/50 border-t border-gruvbox-bg-lighter/20">
+        ↑↓ navigate • Enter to select • Esc to close
+      </div>
+    </motion.div>
+  );
+};
+
 // Bottom tab pill - animates out when active with shared layoutId
 // Each pill has its own hover state with subtle category color
 const TabPill = ({ category, isActive, onClick }) => {
@@ -359,6 +476,7 @@ const MindSearch = ({
   activeTags = [], // External tag filters
   onTagFilterChange, // Callback for tag filter changes
   tagRefreshTrigger = 0, // Trigger to refetch tags
+  mediaCounts = {}, // Counts for each category (video, image, note, tweet, article)
 }) => {
   // ========== STATE ==========
   const [query, setQuery] = useState('');
@@ -371,6 +489,9 @@ const MindSearch = ({
   const [isTypingTag, setIsTypingTag] = useState(false);
   const [tagQuery, setTagQuery] = useState('');
   const [selectedTagIndex, setSelectedTagIndex] = useState(0);
+
+  // Category suggestion state
+  const [categorySuggestionIndex, setCategorySuggestionIndex] = useState(0);
 
   // ========== REFS ==========
   const inputRef = useRef(null);
@@ -448,9 +569,15 @@ const MindSearch = ({
   }, [activeFilters]);
 
   const { ghostText, matchedCategory } = useGhostText(query, MIND_CATEGORIES);
+  const categorySuggestions = useCategorySuggestions(query, MIND_CATEGORIES, activeFilters, mediaCounts);
   const hasActivePills = activePills.length > 0 || activeTags.length > 0;
   const isInteracting = isFocused || isHovered || query.length > 0;
   const activeIds = useMemo(() => new Set(activePills.map(p => p.id)), [activePills]);
+
+  // Reset category suggestion index when suggestions change
+  useEffect(() => {
+    setCategorySuggestionIndex(0);
+  }, [categorySuggestions.length]);
 
   // ========== PILL MANAGEMENT ==========
   // All pill changes go through onFilterChange to update external state
@@ -483,6 +610,32 @@ const MindSearch = ({
 
   // ========== KEYBOARD HANDLING ==========
   const handleKeyDown = useCallback((e) => {
+    // Category suggestion dropdown navigation (takes precedence when visible)
+    if (categorySuggestions.length > 0 && !isTypingTag) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setCategorySuggestionIndex(prev => Math.min(prev + 1, categorySuggestions.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setCategorySuggestionIndex(prev => Math.max(prev - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addPill(categorySuggestions[categorySuggestionIndex]);
+        setCategorySuggestionIndex(0);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setQuery('');
+        setCategorySuggestionIndex(0);
+        return;
+      }
+    }
+
     // Tag dropdown navigation
     if (isTypingTag && filteredTags.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -550,7 +703,7 @@ const MindSearch = ({
       }
       return;
     }
-  }, [query, ghostText, matchedCategory, activeFilters, addPill, clearAll, onFilterChange, isTypingTag, filteredTags, selectedTagIndex, handleTagSelect]);
+  }, [query, ghostText, matchedCategory, activeFilters, addPill, clearAll, onFilterChange, isTypingTag, filteredTags, selectedTagIndex, handleTagSelect, categorySuggestions, categorySuggestionIndex]);
 
   // ========== GLOBAL KEYBOARD SHORTCUT (Cmd+K) ==========
   useEffect(() => {
@@ -693,6 +846,21 @@ const MindSearch = ({
 
           <GhostTextOverlay query={query} ghostText={ghostText} />
 
+          {/* Category Suggestion Dropdown */}
+          <AnimatePresence>
+            {categorySuggestions.length > 0 && !isTypingTag && (
+              <CategorySuggestionDropdown
+                categories={categorySuggestions}
+                selectedIndex={categorySuggestionIndex}
+                onSelect={(category) => {
+                  addPill(category);
+                  setCategorySuggestionIndex(0);
+                }}
+                mediaCounts={mediaCounts}
+              />
+            )}
+          </AnimatePresence>
+
           {/* Tag Dropdown */}
           <AnimatePresence>
             {isTypingTag && filteredTags.length > 0 && (
@@ -767,13 +935,6 @@ const MindSearch = ({
           )}
         </AnimatePresence>
 
-        {/* Keyboard Hint */}
-        {!isFocused && !hasActivePills && (
-          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-gruvbox-bg-lighter/20">
-            <Command className="w-3 h-3 text-gruvbox-fg-muted/30" />
-            <span className="text-[10px] text-gruvbox-fg-muted/30 font-medium">K</span>
-          </div>
-        )}
       </motion.div>
 
       {/* Bottom Filter Tabs */}

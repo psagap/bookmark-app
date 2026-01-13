@@ -8,6 +8,12 @@
  * - RGB values for rgba() opacity variations
  */
 
+const poppinsFonts = {
+  display: "'Poppins', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  body: "'Poppins', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  mono: "'JetBrains Mono', monospace",
+};
+
 export const themes = {
   // ============================================
   // GRUVBOX - Warm, retro, earthy (Current Default)
@@ -64,11 +70,7 @@ export const themes = {
       selectionBg: 'rgba(215, 153, 33, 0.3)',
       selectionText: '#fbf1c7',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '42 75% 49%',
       colorRgb: '215, 153, 33',
@@ -138,11 +140,7 @@ export const themes = {
       selectionBg: 'rgba(255, 41, 117, 0.4)',
       selectionText: '#ffffff',
     },
-    fonts: {
-      display: "'Orbitron', 'Cinzel', sans-serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '338 100% 58%',
       colorRgb: '255, 41, 117',
@@ -212,11 +210,7 @@ export const themes = {
       selectionBg: 'rgba(136, 192, 208, 0.3)',
       selectionText: '#eceff4',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '193 43% 67%',
       colorRgb: '136, 192, 208',
@@ -286,11 +280,7 @@ export const themes = {
       selectionBg: 'rgba(189, 147, 249, 0.4)',
       selectionText: '#f8f8f2',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'Fira Code', 'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '265 89% 78%',
       colorRgb: '189, 147, 249',
@@ -360,11 +350,7 @@ export const themes = {
       selectionBg: 'rgba(0, 217, 255, 0.35)',
       selectionText: '#ffffff',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '190 100% 50%',
       colorRgb: '0, 217, 255',
@@ -434,11 +420,7 @@ export const themes = {
       selectionBg: 'rgba(124, 179, 66, 0.35)',
       selectionText: '#f5fff0',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '88 48% 48%',
       colorRgb: '124, 179, 66',
@@ -508,11 +490,7 @@ export const themes = {
       selectionBg: 'rgba(255, 159, 67, 0.4)',
       selectionText: '#ffffff',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '28 100% 63%',
       colorRgb: '255, 159, 67',
@@ -582,11 +560,7 @@ export const themes = {
       selectionBg: 'rgba(99, 102, 241, 0.35)',
       selectionText: '#ffffff',
     },
-    fonts: {
-      display: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '239 84% 67%',
       colorRgb: '99, 102, 241',
@@ -656,11 +630,7 @@ export const themes = {
       selectionBg: 'rgba(232, 180, 184, 0.35)',
       selectionText: '#ffffff',
     },
-    fonts: {
-      display: "'Playfair Display', 'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '355 52% 81%',
       colorRgb: '232, 180, 184',
@@ -730,11 +700,7 @@ export const themes = {
       selectionBg: 'rgba(196, 167, 125, 0.35)',
       selectionText: '#fffaf5',
     },
-    fonts: {
-      display: "'Playfair Display', 'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '36 35% 63%',
       colorRgb: '196, 167, 125',
@@ -804,11 +770,7 @@ export const themes = {
       selectionBg: 'rgba(157, 78, 221, 0.4)',
       selectionText: '#ffffff',
     },
-    fonts: {
-      display: "'Cinzel', Georgia, serif",
-      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       color: '276 72% 59%',
       colorRgb: '157, 78, 221',
@@ -897,11 +859,7 @@ export const themes = {
       selectionBg: 'rgba(224, 77, 48, 0.35)',
       selectionText: '#ffffff',
     },
-    fonts: {
-      display: "'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      body: "'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       // Primary red glow only
       color: '12 70% 53%',
@@ -992,11 +950,7 @@ export const themes = {
       selectionBg: 'rgba(200, 69, 40, 0.2)',
       selectionText: '#1a1a1a',
     },
-    fonts: {
-      display: "'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      body: "'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      mono: "'JetBrains Mono', monospace",
-    },
+    fonts: poppinsFonts,
     glow: {
       // Minimal glow for light theme
       color: '12 76% 47%',
@@ -1014,11 +968,164 @@ export const themes = {
       meshColor5: 'rgba(255, 255, 255, 0.99)',
     },
   },
+
+  // ============================================
+  // ZEN - Calm midnight blues with soft lavender accents
+  // Designed for focus, tranquility, and comfortable extended use
+  // ============================================
+  zen: {
+    id: 'zen',
+    name: 'Zen',
+    description: 'Calm midnight depths with soft lavender accents',
+    category: 'zen',
+    preview: {
+      primary: '#a5b4fc',
+      secondary: '#67e8f9',
+      background: '#0a0f1a',
+      accent: '#c4b5fd',
+    },
+    colors: {
+      // Core semantic (HSL format)
+      // Deep midnight blue background - not pure black, adds depth and warmth
+      background: '222 47% 5%',
+      foreground: '214 32% 91%',
+      card: '222 39% 8%',
+      cardForeground: '214 32% 91%',
+      popover: '222 35% 10%',
+      popoverForeground: '214 32% 91%',
+      // Primary: Soft indigo/lavender - Digital Lavender for calm tech
+      primary: '229 84% 81%',
+      primaryForeground: '222 47% 8%',
+      // Secondary: Calm slate blue-gray
+      secondary: '222 30% 14%',
+      secondaryForeground: '214 32% 91%',
+      muted: '222 28% 12%',
+      mutedForeground: '215 20% 55%',
+      // Accent: Soft cyan-teal for interactive elements
+      accent: '183 74% 69%',
+      accentForeground: '222 47% 8%',
+      destructive: '0 62% 55%',
+      destructiveForeground: '214 32% 95%',
+      border: '222 25% 16%',
+      input: '222 28% 12%',
+      ring: '229 84% 81%',
+      // Extended colors (HEX) - Carefully calibrated midnight palette
+      bgDarkest: '#020617',    // Almost black with subtle blue
+      bgDark: '#0a0f1a',       // Deep midnight
+      bg: '#0f172a',           // Slate 950 - main surface
+      bgLight: '#1e293b',      // Slate 800 - elevated surfaces
+      bgLighter: '#334155',    // Slate 700 - highest elevation
+      fg: '#e2e8f0',           // Slate 200 - primary text (soft, not harsh)
+      fgLight: '#f1f5f9',      // Slate 100 - emphasized text
+      fgMuted: '#94a3b8',      // Slate 400 - secondary text
+      // Primary: Digital Lavender - calming, modern
+      primaryHex: '#a5b4fc',   // Indigo 300
+      primaryLightHex: '#c7d2fe', // Indigo 200
+      // Secondary: Soft teal - water-inspired calm
+      secondaryHex: '#67e8f9', // Cyan 300
+      secondaryLightHex: '#a5f3fc', // Cyan 200
+      // Accents: All muted, harmonious pastels
+      accent1: '#c4b5fd',      // Violet 300 - soft purple
+      accent2: '#86efac',      // Green 300 - soft mint
+      accent3: '#fcd34d',      // Amber 300 - soft gold (sparingly)
+      accent4: '#f0abfc',      // Fuchsia 300 - soft pink
+      selectionBg: 'rgba(165, 180, 252, 0.25)',
+      selectionText: '#f1f5f9',
+    },
+    fonts: poppinsFonts,
+    glow: {
+      // Very subtle, diffused glow - not attention-grabbing
+      color: '229 84% 81%',
+      colorRgb: '165, 180, 252',
+      secondary: '183 74% 69%',
+      secondaryRgb: '103, 232, 249',
+      intensity: '0.4',
+    },
+    effects: {
+      // Extremely subtle mesh - adds depth without distraction
+      meshColor1: 'rgba(165, 180, 252, 0.04)',  // Soft lavender
+      meshColor2: 'rgba(103, 232, 249, 0.03)',  // Soft cyan
+      meshColor3: 'rgba(196, 181, 253, 0.025)', // Soft violet
+      meshColor4: 'rgba(134, 239, 172, 0.02)',  // Soft mint
+      meshColor5: 'rgba(10, 15, 26, 0.97)',     // Deep midnight overlay
+    },
+  },
+
+  // ============================================
+  // STRATA - Soft neutral layers
+  // ============================================
+  strata: {
+    id: 'strata',
+    name: 'Strata',
+    description: 'Layered limestone neutrals with soft contrast',
+    category: 'elegant',
+    preview: {
+      primary: '#b0a89c',
+      secondary: '#c3baac',
+      background: '#edece8',
+      accent: '#b0a89c',
+    },
+    colors: {
+      background: '0 0% 100%',
+      foreground: '34 11% 25%',
+      card: '48 12% 92%',
+      cardForeground: '34 11% 25%',
+      popover: '48 12% 92%',
+      popoverForeground: '34 11% 25%',
+      primary: '36 11% 65%',
+      primaryForeground: '34 11% 25%',
+      secondary: '37 16% 72%',
+      secondaryForeground: '34 11% 25%',
+      muted: '48 12% 92%',
+      mutedForeground: '35 11% 50%',
+      accent: '37 16% 72%',
+      accentForeground: '34 11% 25%',
+      destructive: '12 35% 53%',
+      destructiveForeground: '0 0% 98%',
+      border: '37 16% 72%',
+      input: '48 12% 92%',
+      ring: '36 11% 65%',
+      bgDarkest: '#b0a89c',
+      bgDark: '#c3baac',
+      bg: '#edece8',
+      bgLight: '#ffffff',
+      bgLighter: '#ffffff',
+      fg: '#474139',
+      fgLight: '#39342d',
+      fgMuted: '#8e8271',
+      primaryHex: '#b0a89c',
+      primaryLightHex: '#c3baac',
+      secondaryHex: '#c3baac',
+      secondaryLightHex: '#edece8',
+      accent1: '#b0a89c',
+      accent2: '#c3baac',
+      accent3: '#edece8',
+      accent4: '#8e8271',
+      selectionBg: 'rgba(176, 168, 156, 0.35)',
+      selectionText: '#39342d',
+    },
+    fonts: poppinsFonts,
+    glow: {
+      color: '36 11% 65%',
+      colorRgb: '176, 168, 156',
+      secondary: '37 16% 72%',
+      secondaryRgb: '195, 186, 172',
+      intensity: '0.35',
+    },
+    effects: {
+      meshColor1: 'rgba(176, 168, 156, 0.08)',
+      meshColor2: 'rgba(195, 186, 172, 0.06)',
+      meshColor3: 'rgba(237, 236, 232, 0.5)',
+      meshColor4: 'rgba(255, 255, 255, 0.6)',
+      meshColor5: 'rgba(255, 255, 255, 0.95)',
+    },
+  },
 };
 
 // Theme categories for filtering in settings
 export const themeCategories = [
   { id: 'all', label: 'All Themes' },
+  { id: 'zen', label: 'Zen & Calm' },
   { id: 'classic', label: 'Classic' },
   { id: 'neon', label: 'Neon & Cyberpunk' },
   { id: 'nature', label: 'Nature' },
@@ -1031,7 +1138,7 @@ export const themeCategories = [
 ];
 
 // Default theme ID
-export const DEFAULT_THEME_ID = 'gruvbox';
+export const DEFAULT_THEME_ID = 'strata';
 
 // Helper to get theme by ID
 export const getThemeById = (id) => themes[id] || null;

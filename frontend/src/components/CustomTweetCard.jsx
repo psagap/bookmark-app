@@ -160,7 +160,11 @@ const formatCount = (count) => {
   return num.toString();
 };
 
-const TweetMedia = ({ media, url, onMediaClick, selectionMode = false }) => {
+const TweetMedia = ({ media, url, onMediaClick, selectionMode = false, fxTwitterVideoUrl, localVideoUrl }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef(null);
+
   if (!media || media.length === 0) return null;
 
   // Get the first media item (respect the order from the tweet)
@@ -170,6 +174,94 @@ const TweetMedia = ({ media, url, onMediaClick, selectionMode = false }) => {
   // If first media is a video
   if (firstMedia.type === 'video') {
     const posterUrl = firstMedia.poster || firstMedia.thumbnail;
+    // Get best video URL: local cached > fxTwitter > original (if not blob)
+    const videoUrl = localVideoUrl || firstMedia.localUrl ||
+      fxTwitterVideoUrl || firstMedia.fxTwitterUrl ||
+      (firstMedia.url && !firstMedia.url.startsWith('blob:') ? firstMedia.url : null);
+
+    // If we have a playable video URL, show inline player
+    if (videoUrl) {
+      return (
+        <div className="mt-3 relative rounded-xl overflow-hidden bg-gruvbox-bg-darkest group">
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            poster={posterUrl}
+            loop
+            muted={isMuted}
+            playsInline
+            preload="metadata"
+            className="w-full aspect-video object-cover"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (videoRef.current) {
+                if (videoRef.current.paused) {
+                  videoRef.current.play();
+                  setIsPlaying(true);
+                } else {
+                  videoRef.current.pause();
+                  setIsPlaying(false);
+                }
+              }
+            }}
+          />
+          {/* Play/Pause overlay */}
+          <div
+            className={cn(
+              "absolute inset-0 flex items-center justify-center transition-opacity duration-200",
+              isPlaying ? "opacity-0 group-hover:opacity-100" : "opacity-100"
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (videoRef.current) {
+                if (videoRef.current.paused) {
+                  videoRef.current.play();
+                  setIsPlaying(true);
+                } else {
+                  videoRef.current.pause();
+                  setIsPlaying(false);
+                }
+              }
+            }}
+          >
+            <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer">
+              {isPlaying ? (
+                <svg className="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="4" width="4" height="16" />
+                  <rect x="14" y="4" width="4" height="16" />
+                </svg>
+              ) : (
+                <Play className="w-6 h-6 text-black ml-0.5" fill="currentColor" />
+              )}
+            </div>
+          </div>
+          {/* Mute button - bottom right */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (videoRef.current) {
+                videoRef.current.muted = !videoRef.current.muted;
+                setIsMuted(videoRef.current.muted);
+              }
+            }}
+            className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+          >
+            {isMuted ? (
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+              </svg>
+            )}
+          </button>
+        </div>
+      );
+    }
+
+    // Fallback: show poster with "watch on X" message
     return (
       <a
         href={url}
@@ -265,37 +357,8 @@ const CustomTweetCard = ({
       {/* Header */}
       <div className="p-4 pb-0">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            {/* Avatar */}
-            <div className="w-10 h-10 rounded-full overflow-hidden bg-gruvbox-bg-lighter flex-shrink-0">
-              {authorAvatar ? (
-                <img
-                  src={authorAvatar.replace('_bigger', '_normal')}
-                  alt={authorName}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gruvbox-fg-muted">
-                  {authorName?.[0] || 'X'}
-                </div>
-              )}
-            </div>
-
-            {/* Author info */}
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-1">
-                <span className="font-semibold text-gruvbox-fg truncate text-sm">
-                  {authorName}
-                </span>
-                {isVerified && (
-                  <BadgeCheck className="w-4 h-4 text-[#1d9bf0] flex-shrink-0" fill="#1d9bf0" stroke="white" strokeWidth={2} />
-                )}
-              </div>
-              <span className="text-gruvbox-fg-muted text-sm truncate">
-                {authorHandle}
-              </span>
-            </div>
-          </div>
+          {/* X Logo - top left */}
+          <XLogo className="w-5 h-5 text-gruvbox-fg-muted" />
 
           {/* Menu + X Logo */}
           <div className="flex items-center gap-1.5">
@@ -332,7 +395,14 @@ const CustomTweetCard = ({
 
       {/* Media */}
       <div className="px-4">
-        <TweetMedia media={tweetMedia} url={url} onMediaClick={onMediaClick} selectionMode={selectionMode} />
+        <TweetMedia
+          media={tweetMedia}
+          url={url}
+          onMediaClick={onMediaClick}
+          selectionMode={selectionMode}
+          fxTwitterVideoUrl={tweetData?.fxTwitterVideoUrl}
+          localVideoUrl={tweetData?.localVideoUrl}
+        />
       </div>
 
       {/* Timestamp & Stats Footer */}
