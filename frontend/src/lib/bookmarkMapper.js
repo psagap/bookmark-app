@@ -8,6 +8,7 @@ export const mapDbBookmark = (row = {}) => ({
     title: row.title ?? '',
     description: row.description ?? '',
     notes: row.notes ?? '',
+    notesHtml: row.notes_html ?? row.notesHtml ?? null,
     notesBlocks: row.notes_blocks ?? row.notesBlocks ?? null,
     content: row.content ?? row.notes ?? '',
     tags: ensureArray(row.tags),
@@ -38,6 +39,7 @@ export const toDbBookmarkPatch = (bookmark = {}) => {
     assignIfDefined(payload, 'title', bookmark.title);
     assignIfDefined(payload, 'description', bookmark.description);
     assignIfDefined(payload, 'notes', bookmark.notes ?? bookmark.content);
+    assignIfDefined(payload, 'notes_html', bookmark.notes_html ?? bookmark.notesHtml);
     assignIfDefined(payload, 'notes_blocks', bookmark.notes_blocks ?? bookmark.notesBlocks);
     assignIfDefined(payload, 'content', bookmark.content ?? bookmark.notes);
     assignIfDefined(payload, 'tags', bookmark.tags);
@@ -50,5 +52,6 @@ export const toDbBookmarkPatch = (bookmark = {}) => {
     assignIfDefined(payload, 'thumbnail', bookmark.thumbnail);
     assignIfDefined(payload, 'metadata', bookmark.metadata);
     assignIfDefined(payload, 'archived', bookmark.archived);
+    assignIfDefined(payload, 'updated_at', bookmark.updated_at ?? bookmark.updatedAt);
     return payload;
 };

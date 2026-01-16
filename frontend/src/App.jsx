@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { LayoutGroup } from 'framer-motion'
+import Masonry from 'react-masonry-css'
 import AppShell from '@/components/AppShell'
 import Header from '@/components/Header'
 import BookmarkCard from '@/components/BookmarkCard'
 import BookmarkDetail from '@/components/BookmarkDetail'
+import BookmarkPopup from '@/components/BookmarkPopup'
 import SelectionToolbar from '@/components/SelectionToolbar'
 import CollectionModal from '@/components/CollectionModal'
 import CollectionBar from '@/components/CollectionBar'
@@ -12,6 +14,7 @@ import FolderTabs from '@/components/FolderTabs'
 import FerrisWheelLoader from '@/components/FerrisWheelLoader'
 import QuickNoteModal from '@/components/QuickNoteModal'
 import NoteEditorModal from '@/components/NoteEditorModal'
+import NoteModule from '@/components/NoteModule'
 import SettingsPage from '@/components/SettingsPage'
 import { useBookmarks } from '@/hooks/useBookmarks'
 import { useCollections } from '@/hooks/useCollections'
@@ -22,6 +25,7 @@ import { parseSearchQuery, matchesSearchFilters } from '@/utils/searchParser';
 import { Plus, FileText, File, Tag, X } from 'lucide-react'
 import AddDropzoneCard from '@/components/AddDropzoneCard'
 import { InlineNoteComposer } from '@/components/NoteComposer'
+import ImageDropZone from '@/components/ImageDropZone'
 import AuthModal from '@/components/AuthModal'
 import UpdatePasswordModal from '@/components/UpdatePasswordModal'
 import { useAuth } from '@/contexts/AuthContext'
@@ -107,7 +111,7 @@ const updateURL = (tab, collection, tags) => {
 };
 
 function App() {
-  const { bookmarks, loading, error, refetch, updateBookmark, removeBookmark } = useBookmarks();
+  const { bookmarks, loading, error, refetch, updateBookmark, removeBookmark, createImageBookmark, deleteBookmark } = useBookmarks();
   const { collections, createCollection, addToCollection, deleteCollection, updateCollection, refetch: refetchCollections } = useCollections();
   const [selectedBookmark, setSelectedBookmark] = useState(null);
   const [autoPlayOnOpen, setAutoPlayOnOpen] = useState(false);
@@ -174,6 +178,8 @@ function App() {
   const [singleBookmarkToAdd, setSingleBookmarkToAdd] = useState(null); // For adding single bookmark via menu
   const [showQuickNoteModal, setShowQuickNoteModal] = useState(false);
   const [noteToEdit, setNoteToEdit] = useState(null); // For expanded note editor modal
+  const [showNoteModule, setShowNoteModule] = useState(false); // New Lexical note module
+  const [noteModuleData, setNoteModuleData] = useState(null); // For editing existing notes in the module
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -203,7 +209,8 @@ function App() {
       // N to create new note (when not typing)
       if (e.key === 'n' && !isTyping && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
-        setShowQuickNoteModal(true);
+        setNoteModuleData(null); // New note
+        setShowNoteModule(true);
         return;
       }
 
@@ -464,6 +471,93 @@ function App() {
     }
   };
 
+  // Save note from NoteModule (new Lexical editor)
+  // Returns the saved note data (with ID for new notes)
+  // Saves to DB silently - homepage only updates when modal closes
+  const handleSaveNoteModule = async (noteData) => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw authError;
+      }
+      if (!user) throw new Error('Not authenticated');
+
+      let savedNote = null;
+
+      if (noteData.id) {
+        // Update existing note - save to DB only (no local state update)
+        // Homepage will update when modal closes via refetch
+        const dbPatch = {
+          title: noteData.title,
+          notes: noteData.notes,
+          tags: noteData.tags,
+          updated_at: new Date().toISOString(),
+        };
+        if (noteData.notesBlocks) dbPatch.notes_blocks = noteData.notesBlocks;
+
+        const { data, error } = await supabase
+          .from('bookmarks')
+          .update(dbPatch)
+          .eq('id', noteData.id)
+          .select();
+
+        if (error) {
+          console.error('Supabase UPDATE error:', error.message, error.code, error.details);
+          throw error;
+        }
+        savedNote = data?.[0] || { id: noteData.id };
+      } else {
+        // Create new note
+        const newNote = {
+          user_id: user.id,
+          url: `note://${Date.now()}`,
+          title: noteData.title || noteData.notes.split('\n')[0].substring(0, 100),
+          notes: noteData.notes,
+          tags: noteData.tags || [],
+          type: 'note',
+          created_at: new Date().toISOString(),
+        };
+        if (noteData.notesBlocks) newNote.notes_blocks = noteData.notesBlocks;
+
+        const { data, error } = await supabase
+          .from('bookmarks')
+          .insert([newNote])
+          .select();
+
+        if (error) {
+          console.error('Supabase INSERT error:', error.message, error.code, error.details);
+          throw error;
+        }
+        savedNote = data?.[0];
+      }
+
+      // Return saved note data (important for new notes to get their ID)
+      return savedNote;
+    } catch (error) {
+      console.error('Error saving note:', error?.message || error?.code || error);
+      console.error('Full error object:', JSON.stringify(error, null, 2));
+      console.error('Note data that failed:', JSON.stringify(noteData, null, 2));
+      throw error;
+    }
+  };
+
+  // Delete note from NoteModule
+  const handleDeleteNoteModule = async (noteId) => {
+    try {
+      const { error } = await supabase
+        .from('bookmarks')
+        .delete()
+        .eq('id', noteId);
+
+      if (error) throw error;
+      refreshBookmarksAndTags();
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      throw error;
+    }
+  };
+
   // Handle tag deletion from a bookmark card
   const handleTagDelete = async (bookmark, tagToDelete) => {
     // Get current tags (support both tags array and extracted tags from content)
@@ -547,37 +641,139 @@ function App() {
   // Helper function to determine bookmark type
   const getBookmarkType = (bookmark) => {
     const url = bookmark.url || '';
+    const metadata = bookmark.metadata || {};
+    const category = bookmark.category;
+    const subCategory = bookmark.subCategory;
+
+    // Note type
     if (bookmark.type === 'note' || url.startsWith('note://') || (!url && (bookmark.notes || bookmark.title))) {
       return 'note';
     }
+
+    // Music - Spotify, Apple Music, SoundCloud, Bandcamp
+    if (category === 'audio' ||
+        url.includes('spotify.com') ||
+        url.includes('music.apple.com') ||
+        url.includes('soundcloud.com') ||
+        url.includes('bandcamp.com')) {
+      return 'music';
+    }
+
+    // Recipe - Cooking sites or recipe metadata (check BEFORE images)
+    if (metadata?.contentType === 'recipe' ||
+        metadata?.cookTime !== undefined ||
+        metadata?.ingredients !== undefined ||
+        category === 'recipe' ||
+        subCategory === 'recipe' ||
+        // Major recipe sites
+        url.includes('allrecipes.com') ||
+        url.includes('seriouseats.com') ||
+        url.includes('epicurious.com') ||
+        url.includes('food52.com') ||
+        url.includes('bonappetit.com') ||
+        url.includes('foodnetwork.com') ||
+        url.includes('tasty.co') ||
+        url.includes('delish.com') ||
+        url.includes('simplyrecipes.com') ||
+        url.includes('cookinglight.com') ||
+        url.includes('eatingwell.com') ||
+        url.includes('myrecipes.com') ||
+        url.includes('thekitchn.com') ||
+        url.includes('food.com') ||
+        url.includes('yummly.com') ||
+        url.includes('bbcgoodfood.com') ||
+        url.includes('jamieoliver.com') ||
+        url.includes('budgetbytes.com') ||
+        url.includes('minimalistbaker.com') ||
+        url.includes('halfbakedharvest.com') ||
+        url.includes('skinnytaste.com') ||
+        url.includes('pinchofyum.com') ||
+        url.includes('sallysbakingaddiction.com') ||
+        url.includes('kingarthurbaking.com') ||
+        url.includes('recipetineats.com') ||
+        url.includes('gimmesomeoven.com') ||
+        url.includes('damndelicious.net') ||
+        url.includes('cafedelites.com') ||
+        url.includes('smittenkitchen.com') ||
+        url.includes('101cookbooks.com') ||
+        url.includes('loveandlemons.com') ||
+        url.includes('cookieandkate.com') ||
+        url.includes('hostthetoast.com') ||
+        // URL patterns that indicate recipes
+        /\/recipes?\//.test(url) ||
+        /\/cooking\//.test(url)) {
+      return 'recipe';
+    }
+
+    // Book - Goodreads, Google Books
+    if (subCategory === 'book' ||
+        metadata?.contentType === 'book' ||
+        url.includes('goodreads.com/book/') ||
+        url.includes('books.google.com')) {
+      return 'book';
+    }
+
+    // Product - Amazon, eBay, Etsy, shopping sites
+    if (category === 'product' ||
+        metadata?.contentType === 'product' ||
+        metadata?.price !== undefined ||
+        (url.includes('amazon.') && url.includes('/dp/')) ||
+        (url.includes('ebay.') && url.includes('/itm/')) ||
+        url.includes('etsy.com/listing/')) {
+      return 'product';
+    }
+
+    // Social - Twitter/X
     if (url.includes('twitter.com') || url.includes('x.com')) {
       return 'tweet';
     }
+
+    // Video - YouTube
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
       return 'youtube';
     }
+
+    // Reddit
     if (url.includes('reddit.com') || url.includes('redd.it')) {
       return 'reddit';
     }
+
+    // Wikipedia
     if (url.includes('wikipedia.org')) {
       return 'wikipedia';
     }
-    // Check for images
+
+    // Images
     if (bookmark.type === 'image' || /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url)) {
       return 'image';
     }
+
     return 'article';
   };
 
-  // Calculate media counts for Sidebar
+  // Calculate media counts for Sidebar - dynamic categories
   const mediaCounts = React.useMemo(() => {
-    const counts = { video: 0, image: 0, note: 0, tweet: 0, article: 0 };
+    const counts = {
+      video: 0,
+      image: 0,
+      note: 0,
+      tweet: 0,
+      article: 0,
+      music: 0,
+      recipe: 0,
+      book: 0,
+      product: 0
+    };
     bookmarks.forEach(b => {
       const type = getBookmarkType(b);
       if (type === 'youtube') counts.video++;
       else if (type === 'image') counts.image++;
       else if (type === 'note') counts.note++;
       else if (type === 'tweet') counts.tweet++;
+      else if (type === 'music') counts.music++;
+      else if (type === 'recipe') counts.recipe++;
+      else if (type === 'book') counts.book++;
+      else if (type === 'product') counts.product++;
       else if (type === 'article' || type === 'reddit' || type === 'wikipedia') counts.article++;
     });
     return counts;
@@ -705,7 +901,10 @@ function App() {
       onNavigate={handleTabChange}
       searchQuery={searchQuery}
       onSearch={setSearchQuery}
-      onAddNew={() => setShowQuickNoteModal(true)}
+      onAddNew={() => {
+        setNoteModuleData(null);
+        setShowNoteModule(true);
+      }}
       onOpenSettings={() => setShowSettings(true)}
       onSignOut={signOut}
       onSignIn={() => setShowAuthModal(true)}
@@ -719,8 +918,9 @@ function App() {
       onTagFilterChange={setActiveTags}
       tagRefreshTrigger={tagRefreshTrigger}
     >
-      <LayoutGroup>
-        {/* Selection Toolbar */}
+      <ImageDropZone onImageDrop={createImageBookmark} disabled={!user}>
+        <LayoutGroup>
+          {/* Selection Toolbar */}
         {selectionMode && selectedIds.size > 0 && (
           <SelectionToolbar
             selectedCount={selectedIds.size}
@@ -790,8 +990,19 @@ function App() {
                   </div>
                 )}
 
-                {/* Masonry Grid */}
-                <div className="w-full columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5 [column-gap:1.25rem]">
+                {/* Masonry Grid - horizontal flow with masonry effect */}
+                <Masonry
+                  breakpointCols={{
+                    default: 5,
+                    1536: 5,
+                    1280: 4,
+                    1024: 3,
+                    640: 2,
+                    480: 1
+                  }}
+                  className="flex w-full -ml-5"
+                  columnClassName="pl-5 bg-clip-padding"
+                >
                   {/* Inline Note Composer - use visibility:hidden in selection mode to keep space and prevent layout shift */}
                   <div className={selectionMode ? 'invisible' : ''}>
                     <InlineNoteComposer
@@ -819,6 +1030,33 @@ function App() {
                             e.preventDefault();
                           }
                         }}
+                        onClick={(e) => {
+                          // Shift+Click to toggle single card selection
+                          if (e.shiftKey) {
+                            e.preventDefault();
+                            if (!selectionMode) {
+                              // Enter selection mode and select this card
+                              setSelectionMode(true);
+                              setSelectedIds(new Set([bookmark.id]));
+                            } else {
+                              // Toggle this card's selection
+                              setSelectedIds(prev => {
+                                const newSet = new Set(prev);
+                                if (newSet.has(bookmark.id)) {
+                                  newSet.delete(bookmark.id);
+                                } else {
+                                  newSet.add(bookmark.id);
+                                }
+                                return newSet;
+                              });
+                            }
+                            return;
+                          }
+                          // Normal click: open popup (unless in selection mode)
+                          if (!selectionMode) {
+                            setSelectedBookmark(bookmark);
+                          }
+                        }}
                         className={`cursor-pointer ${selectionMode ? 'select-none' : ''}`}
                       >
                         <BookmarkCard
@@ -836,33 +1074,17 @@ function App() {
                           }}
                           collection={collections.find(c => c.id === bookmark.collectionId)}
                           onCardClick={(bm, autoPlay) => { setSelectedBookmark(bm); setAutoPlayOnOpen(autoPlay || false); }}
-                          onOpenEditor={(bm) => setNoteToEdit(bm)}
+                          onOpenEditor={(bm) => {
+                            setNoteModuleData(bm);
+                            setShowNoteModule(true);
+                          }}
                           onTagClick={handleTagClick}
                           onTagDelete={handleTagDelete}
-                          onShiftClick={(bm) => {
-                            // Shift+Click for range selection
-                            if (!selectionMode) {
-                              // First shift+click: enter selection mode and select this card
-                              setSelectionMode(true);
-                              setSelectedIds(new Set([bm.id]));
-                              lastClickedIndexRef.current = index;
-                            } else if (lastClickedIndexRef.current !== null) {
-                              // Shift+click in selection mode: select range
-                              const start = Math.min(lastClickedIndexRef.current, index);
-                              const end = Math.max(lastClickedIndexRef.current, index);
-                              const rangeIds = sortedBookmarks.slice(start, end + 1).map(b => b.id);
-                              setSelectedIds(prev => {
-                                const newSet = new Set(prev);
-                                rangeIds.forEach(id => newSet.add(id));
-                                return newSet;
-                              });
-                            }
-                          }}
                         />
                       </div>
                     ))
                   )}
-                </div>
+                </Masonry>
               </div>
             )}
 
@@ -888,19 +1110,21 @@ function App() {
           </FolderTabs>
         </div>
       </LayoutGroup>
+      </ImageDropZone>
 
-      <BookmarkDetail
+      {/* New Modern Popup */}
+      <BookmarkPopup
         bookmark={selectedBookmark}
-        open={!!selectedBookmark}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedBookmark(null);
-            setAutoPlayOnOpen(false);
-          }
+        isOpen={!!selectedBookmark}
+        onClose={() => {
+          setSelectedBookmark(null);
+          setAutoPlayOnOpen(false);
         }}
-        onSave={() => refreshBookmarksAndTags()}
-        allTags={allTags}
-        autoPlay={autoPlayOnOpen}
+        onDelete={(bm) => {
+          handleDelete(bm);
+          setSelectedBookmark(null);
+        }}
+        onPin={handlePin}
         onTagClick={handleTagClick}
       />
 
@@ -916,7 +1140,7 @@ function App() {
         onCreateCollection={handleCreateCollection}
       />
 
-      {/* Quick Note Modal */}
+      {/* Quick Note Modal (legacy) */}
       <QuickNoteModal
         open={showQuickNoteModal}
         onClose={() => setShowQuickNoteModal(false)}
@@ -925,6 +1149,20 @@ function App() {
           setShowQuickNoteModal(false);
         }}
         allTags={allTags}
+      />
+
+      {/* New Note Module - Lexical Editor */}
+      <NoteModule
+        isOpen={showNoteModule}
+        onClose={() => {
+          setShowNoteModule(false);
+          setNoteModuleData(null);
+          // Refresh bookmarks to show final changes from the note editor
+          refetch();
+        }}
+        onSave={handleSaveNoteModule}
+        onDelete={handleDeleteNoteModule}
+        initialNote={noteModuleData}
       />
 
       <AuthModal
