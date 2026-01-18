@@ -25,6 +25,7 @@ const TopBar = ({
     tagRefreshTrigger = 0,
     mediaCounts = {},
 }) => {
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
 
     return (
         <header className="h-20 px-8 flex items-center justify-between border-b border-border/50 bg-theme-bg-dark/80 backdrop-blur-xl sticky top-0 z-40">
@@ -62,33 +63,59 @@ const TopBar = ({
 
                 {/* User Profile or Sign In */}
                 {user ? (
-                    <div className="relative group/profile">
-                        <button className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-secondary transition-colors">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 border border-white/10 flex items-center justify-center shadow-inner">
-                                <span className="text-xs font-medium text-white">
+                    <div className="relative">
+                        <button
+                            onClick={() => setIsProfileOpen(!isProfileOpen)}
+                            className="flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-secondary transition-colors"
+                        >
+                            {/* Display name above avatar */}
+                            <span className="hidden sm:block text-sm font-medium text-foreground">
+                                {user?.user_metadata?.full_name ||
+                                 user?.user_metadata?.name ||
+                                 user?.email?.split('@')[0] ||
+                                 'User'}
+                            </span>
+                            {/* Avatar circle with orange gradient */}
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 border border-white/20 flex items-center justify-center shadow-lg">
+                                <span className="text-sm font-semibold text-white">
                                     {user?.email?.[0].toUpperCase() || <User className="w-4 h-4" />}
                                 </span>
                             </div>
                         </button>
 
-                        {/* Simple Dropdown */}
-                        <div className="absolute right-0 top-full mt-2 w-48 py-1 rounded-xl border border-border bg-popover/95 backdrop-blur-xl shadow-xl opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-200 z-50 transform origin-top-right">
-                            <div className="px-4 py-2 border-b border-border/50">
-                                <p className="text-xs font-medium text-muted-foreground truncate">{user?.email}</p>
-                            </div>
-                            <button
-                                onClick={onOpenSettings}
-                                className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-secondary/80 flex items-center gap-2"
-                            >
-                                <Settings className="w-4 h-4" /> Settings
-                            </button>
-                            <button
-                                onClick={onSignOut}
-                                className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2"
-                            >
-                                <LogOut className="w-4 h-4" /> Sign Out
-                            </button>
-                        </div>
+                        {/* Dropdown - click to toggle */}
+                        {isProfileOpen && (
+                            <>
+                                {/* Backdrop to close on outside click */}
+                                <div
+                                    className="fixed inset-0 z-40"
+                                    onClick={() => setIsProfileOpen(false)}
+                                />
+                                <div className="absolute right-0 top-full mt-2 w-48 py-1 rounded-xl border border-border bg-popover/95 backdrop-blur-xl shadow-xl z-50 transform origin-top-right">
+                                    <div className="px-4 py-2 border-b border-border/50">
+                                        <p className="text-xs font-medium text-muted-foreground truncate">{user?.email}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            setIsProfileOpen(false);
+                                            onOpenSettings();
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-secondary/80 flex items-center gap-2"
+                                    >
+                                        <Settings className="w-4 h-4" /> Settings
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsProfileOpen(false);
+                                            onSignOut();
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2"
+                                    >
+                                        <LogOut className="w-4 h-4" /> Sign Out
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 ) : (
                     <button
