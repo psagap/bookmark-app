@@ -1,79 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Save to Mind</title>
+  <title>Thinkback</title>
   <link rel="stylesheet" href="popup.css">
 </head>
-
 <body>
-  <div class="container">
-    <!-- Timer Line -->
-    <div class="timer-container">
-      <div id="timer-line" class="timer-line"></div>
-    </div>
+  <div class="slide-in" id="main">
+    <div class="badge-wrapper">
+      <div class="badge-container">
+        <div class="badge-card" id="badgeCard">
+          <div class="shimmer-overlay"></div>
 
-    <!-- Login Required State -->
-    <div id="login-state" class="hidden">
-      <div class="login-content">
-        <div class="login-icon">🔐</div>
-        <h2>Sign In Required</h2>
-        <p>Please sign in via the main app to save bookmarks.</p>
-        <button id="open-app-btn" class="creepy-btn">
-          <span class="creepy-btn__content">Open App to Sign In</span>
-        </button>
+          <div class="badge-content">
+            <!-- Logo Section -->
+            <div class="icon-container">
+              <div class="icon-wrapper" id="iconWrapper">
+                <img src="icons/cardinal-logo.png" class="app-logo" id="logo" alt="Thinkback">
+              </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="text-content">
+              <p class="label" id="label">Saving bookmark...</p>
+              <h3 class="title" id="title">Loading...</h3>
+              <p class="source" id="source">Web</p>
+            </div>
+
+            <!-- Status Badge & Arrow -->
+            <div class="badge-pill-container">
+              <div class="badge-pill" id="statusPill">
+                <span class="badge-text" id="statusText">Saving</span>
+              </div>
+              <svg class="arrow-icon" id="arrowIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Animated Border SVG -->
+        <svg class="border-svg" id="borderSvg">
+          <rect
+            x="1"
+            y="1"
+            width="calc(100% - 2px)"
+            height="calc(100% - 2px)"
+            rx="16"
+            ry="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            class="sliding-line"
+            pathLength="1"
+          />
+        </svg>
       </div>
-    </div>
 
-    <!-- Main Content -->
-    <div id="main-content" class="hidden">
-      <div class="header">
-        <div class="site-info">
-          <h1 id="page-title">Loading...</h1>
-          <span id="page-domain"></span>
+      <!-- Expandable Tags Section -->
+      <div class="details-section" id="detailsSection">
+        <div class="details-card">
+          <div class="details-content">
+            <!-- Quick Tags -->
+            <div class="detail-item">
+              <h4 class="detail-title">
+                <svg class="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                </svg>
+                Add Tags
+              </h4>
+              <div class="tag-chips" id="tagChips">
+                <button class="tag-chip" data-tag="read-later">read later</button>
+                <button class="tag-chip" data-tag="important">important</button>
+                <button class="tag-chip" data-tag="work">work</button>
+                <button class="tag-chip" data-tag="inspiration">inspiration</button>
+              </div>
+            </div>
+
+            <!-- Custom Tag Input -->
+            <div class="detail-item detail-item-2">
+              <div class="tag-input-wrapper">
+                <input type="text" class="tag-input" id="tagInput" placeholder="Add custom tag...">
+                <button class="tag-add-btn" id="addTagBtn">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Selected Tags -->
+            <div class="detail-item detail-item-3" id="selectedTagsSection" style="display: none;">
+              <h4 class="detail-title">
+                <svg class="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                Selected
+              </h4>
+              <div class="selected-tags" id="selectedTags"></div>
+            </div>
+          </div>
         </div>
       </div>
-
-      <div class="form-group">
-        <label for="tags-input">TAGS</label>
-        <input type="text" id="tags-input" placeholder="Add tags..." autocomplete="off">
-      </div>
-
-      <div class="form-group">
-        <label for="note-input">NOTE</label>
-        <textarea id="note-input" placeholder="Add a note about this page..." rows="3"></textarea>
-      </div>
-
-      <div class="actions">
-        <button id="save-btn" class="creepy-btn">
-          <span class="creepy-btn__content">Save to Mind</span>
-        </button>
-        <button id="cancel-btn" class="text-btn">Cancel</button>
-      </div>
     </div>
 
-    <!-- Success State -->
-    <div id="success-state" class="hidden">
-      <div class="success-content">
-        <div class="eye-animation">
-          <div class="eye"></div>
-        </div>
-        <h2 class="intriguing-text">Consumed.</h2>
-      </div>
-    </div>
-
-    <!-- Error State -->
-    <div id="error-state" class="hidden">
-      <p id="error-message">Something went wrong.</p>
-      <button id="retry-btn" class="creepy-btn">Try Again</button>
+    <!-- Timer Bar -->
+    <div class="timer-bar">
+      <div class="timer-progress" id="timerProgress"></div>
     </div>
   </div>
-  <!-- Load scripts in order -->
+
   <script src="config.js"></script>
-  <script src="supabase.js"></script>
   <script src="popup.js"></script>
 </body>
-
 </html>

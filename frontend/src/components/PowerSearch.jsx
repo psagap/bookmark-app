@@ -250,27 +250,35 @@ const FilterPill = ({
   );
 };
 
-// Tag Pill with custom color
+// Tag Pill with custom color - modern minimalist style
 const TagPill = ({ tag, isActive, onClick, size = 'default' }) => {
   const tagColor = getTagColor(tag);
-  const sizeClasses = size === 'small' ? 'text-xs px-2 py-1' : 'text-sm px-3 py-1.5';
+  const sizeClasses = size === 'small' ? 'text-[11px] px-2 py-0.5' : 'text-xs px-2.5 py-1';
+  const dotSize = size === 'small' ? 'w-1 h-1' : 'w-1.5 h-1.5';
 
   return (
     <button
       onClick={onClick}
       className={cn(
-        "flex items-center gap-1.5 rounded-full font-medium transition-all duration-200 border",
+        "flex items-center rounded-md font-medium transition-all duration-200",
         sizeClasses,
+        size === 'small' ? 'gap-1' : 'gap-1.5',
         isActive
-          ? 'border-current'
-          : 'border-transparent opacity-60 hover:opacity-100'
+          ? ''
+          : 'opacity-50 hover:opacity-90'
       )}
       style={{
-        backgroundColor: isActive ? tagColor.bg : 'rgba(60, 56, 54, 0.5)',
-        color: isActive ? tagColor.text : '#a89984',
+        backgroundColor: isActive ? tagColor.bg : 'color-mix(in srgb, var(--theme-fg-muted, #a89984) 10%, transparent)',
+        color: isActive ? tagColor.text : 'var(--theme-fg-muted, #a89984)',
       }}
     >
-      <Tag className={size === 'small' ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+      <span
+        className={cn("rounded-full flex-shrink-0", dotSize)}
+        style={{
+          backgroundColor: isActive ? tagColor.text : 'var(--theme-fg-muted, #a89984)',
+          opacity: 0.7,
+        }}
+      />
       <span>{tag}</span>
     </button>
   );

@@ -7,6 +7,7 @@ import { extractTagsFromContent } from '@/utils/tagExtraction';
 import { supabase } from '@/lib/supabaseClient';
 import { mapDbBookmark, toDbBookmarkPatch } from '@/lib/bookmarkMapper';
 import { useAuth } from '@/contexts/AuthContext';
+import LexicalNoteEditor from './LexicalNoteEditor';
 
 /**
  * NoteComposer - A minimal, ultra-readable note editor with satisfying save animations
@@ -206,17 +207,17 @@ const NoteComposer = ({ onSave, className }) => {
           position: relative;
           background: linear-gradient(
             165deg,
-            rgba(40, 40, 40, 0.95) 0%,
-            rgba(30, 30, 30, 0.98) 50%,
-            rgba(25, 25, 25, 1) 100%
+            rgba(42, 49, 66, 0.98) 0%,
+            rgba(30, 36, 51, 0.99) 50%,
+            rgba(26, 31, 46, 1) 100%
           );
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 24px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 20px;
           overflow: hidden;
           box-shadow:
-            0 4px 24px rgba(0, 0, 0, 0.4),
-            0 1px 2px rgba(0, 0, 0, 0.2),
-            inset 0 1px 0 rgba(255, 255, 255, 0.03);
+            0 4px 24px rgba(0, 0, 0, 0.3),
+            0 1px 2px rgba(0, 0, 0, 0.15),
+            inset 0 1px 0 rgba(255, 255, 255, 0.04);
         }
 
         .note-composer-gradient {
@@ -239,12 +240,12 @@ const NoteComposer = ({ onSave, className }) => {
         .note-composer-label {
           display: block;
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 600;
-          letter-spacing: 0.15em;
+          letter-spacing: 0.12em;
           text-transform: uppercase;
-          color: var(--theme-secondary, #fe8019);
-          margin-bottom: 20px;
+          color: var(--theme-primary, #e8594f);
+          margin-bottom: 16px;
           user-select: none;
         }
 
@@ -270,11 +271,11 @@ const NoteComposer = ({ onSave, className }) => {
           color: rgba(251, 241, 199, 0.92);
 
           /* Cursor styling */
-          caret-color: var(--theme-secondary, #fe8019);
+          caret-color: var(--theme-primary, #e8594f);
         }
 
         .note-composer-textarea::placeholder {
-          color: rgba(168, 153, 132, 0.5);
+          color: rgba(138, 154, 173, 0.5);
           font-weight: 400;
         }
 
@@ -284,8 +285,8 @@ const NoteComposer = ({ onSave, className }) => {
         }
 
         .note-composer-textarea::selection {
-          background: rgba(254, 128, 25, 0.25);
-          color: #fbf1c7;
+          background: rgba(232, 89, 79, 0.25);
+          color: #f5f6f8;
         }
 
         .note-composer-textarea:focus {
@@ -298,14 +299,14 @@ const NoteComposer = ({ onSave, className }) => {
           align-items: center;
           justify-content: center;
           width: 100%;
-          padding: 18px 24px;
+          padding: 16px 24px;
           background: linear-gradient(
             135deg,
-            var(--theme-secondary, #fe8019) 0%,
-            #e86a10 100%
+            var(--theme-primary, #e8594f) 0%,
+            #d04a40 100%
           );
           border: none;
-          border-radius: 0 0 24px 24px;
+          border-radius: 0 0 20px 20px;
           cursor: pointer;
           transition: filter 0.2s ease;
         }
@@ -363,18 +364,18 @@ const NoteComposer = ({ onSave, className }) => {
           padding: 48px 36px;
           background: linear-gradient(
             145deg,
-            var(--theme-secondary, #fe8019) 0%,
-            #e86a10 50%,
-            #d45d0e 100%
+            var(--theme-primary, #e8594f) 0%,
+            #d04a40 50%,
+            #c04038 100%
           );
-          border-radius: 24px;
+          border-radius: 20px;
         }
 
         .note-composer-feedback-text {
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
           font-size: clamp(18px, 3.5vw, 24px);
           font-weight: 500;
-          color: rgba(251, 241, 199, 0.95);
+          color: rgba(255, 255, 255, 0.95);
           text-align: center;
           letter-spacing: -0.01em;
         }
@@ -577,50 +578,36 @@ const NoteComposerDemo = () => {
 /**
  * InlineNoteComposer - Starts collapsed, expands into full composer inline
  * Features a slide-out drawer on the right edge for save actions
+ * Uses LexicalNoteEditor for rich text editing with markdown shortcuts
+ *
+ * If onClick prop is provided, it will be called instead of expanding inline
+ * (used to open the NoteModule side panel instead)
  */
-const InlineNoteComposer = ({ onNoteCreated, className }) => {
+const InlineNoteComposer = ({ onNoteCreated, onClick, className }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState({ text: '', html: '', json: null });
   const [state, setState] = useState('idle');
-  const textareaRef = useRef(null);
+  const [editorKey, setEditorKey] = useState(0); // Key to reset Lexical editor
   const cardRef = useRef(null);
   const shouldReduceMotion = useReducedMotion();
 
-  // Auto-resize textarea
-  const adjustHeight = useCallback(() => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = 'auto';
-      textarea.style.height = `${Math.max(60, textarea.scrollHeight)}px`;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isExpanded) {
-      adjustHeight();
-    }
-  }, [content, isExpanded, adjustHeight]);
-
-  // Focus textarea when expanded
-  useEffect(() => {
-    if (isExpanded && textareaRef.current) {
-      setTimeout(() => textareaRef.current?.focus(), 100);
-    }
-  }, [isExpanded]);
-
-  const handleChange = (e) => {
-    const newContent = e.target.value;
+  // Handle content change from Lexical editor
+  const handleContentChange = useCallback((newContent) => {
     setContent(newContent);
-    setState(newContent.trim() ? 'dirty' : 'idle');
-  };
+    if (newContent.text?.trim() && state === 'idle') {
+      setState('dirty');
+    } else if (!newContent.text?.trim() && state === 'dirty') {
+      setState('idle');
+    }
+  }, [state]);
 
   const handleSave = async () => {
-    if (state !== 'dirty' || !content.trim()) return;
+    if (state !== 'dirty' || !content.text?.trim()) return;
 
     setState('saving');
 
-    // Extract tags from content
-    const extractedTags = extractTagsFromContent(content);
+    // Extract tags from plain text content
+    const extractedTags = extractTagsFromContent(content.text);
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
@@ -629,9 +616,11 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
       user_id: user.id,
       user_email: user.email || '',
       url: `note://${Date.now()}`,
-      title: content.split('\n')[0].substring(0, 100) || 'Untitled Note',
-      notes: content,
-      content: content,
+      title: content.text.split('\n')[0].substring(0, 100) || 'Untitled Note',
+      notes: content.text,           // Plain text for search
+      notes_html: content.html,      // HTML for card display
+      notes_blocks: content.json,    // JSON for editor restoration
+      content: content.text,
       tags: extractedTags,
       type: 'note',
     };
@@ -650,7 +639,8 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
       setTimeout(() => {
         setState('resetting');
         setTimeout(() => {
-          setContent('');
+          setContent({ text: '', html: '', json: null });
+          setEditorKey(prev => prev + 1); // Reset Lexical editor
           setState('idle');
           setIsExpanded(false);
           onNoteCreated?.(mapDbBookmark(data));
@@ -662,18 +652,20 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
     }
   };
 
-  const handleKeyDown = (e) => {
+  // Handle keyboard shortcuts at the container level
+  const handleContainerKeyDown = (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       handleSave();
     }
-    if (e.key === 'Escape' && !content.trim()) {
+    if (e.key === 'Escape' && !content.text?.trim()) {
       setIsExpanded(false);
     }
   };
 
   const handleCancel = () => {
-    setContent('');
+    setContent({ text: '', html: '', json: null });
+    setEditorKey(prev => prev + 1); // Reset Lexical editor
     setState('idle');
     setIsExpanded(false);
   };
@@ -690,7 +682,7 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
       {!isExpanded && (
         <motion.div
           className="inline-composer-collapsed"
-          onClick={() => setIsExpanded(true)}
+          onClick={() => onClick ? onClick() : setIsExpanded(true)}
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           whileHover={{ scale: 1.02 }}
@@ -701,7 +693,7 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              setIsExpanded(true);
+              onClick ? onClick() : setIsExpanded(true);
             }
           }}
         >
@@ -716,7 +708,7 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
 
       {/* Expanded state rendered via portal */}
       {isExpanded && createPortal(
-        <div className="inline-composer-overlay">
+        <div className="inline-composer-overlay" onKeyDown={handleContainerKeyDown}>
           <div
             className="inline-composer-overlay-bg"
             onClick={handleCancel}
@@ -744,19 +736,15 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-                  <textarea
-                    ref={textareaRef}
-                    value={content}
-                    onChange={handleChange}
-                    onKeyDown={handleKeyDown}
-                    onFocus={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                    disabled={isLocked}
-                    placeholder="What's on your mind?"
-                    className="inline-composer-textarea"
-                    rows={2}
-                    autoFocus
-                  />
+                  <div className="inline-note-lexical-wrapper">
+                    <LexicalNoteEditor
+                      key={editorKey}
+                      initialContent={null}
+                      onContentChange={handleContentChange}
+                      placeholder="What's on your mind? Use markdown: # heading, **bold**, - list..."
+                      className="inline-note-lexical"
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -956,6 +944,88 @@ const InlineNoteComposer = ({ onNoteCreated, className }) => {
         .inline-composer-close:hover {
           background: rgba(255, 255, 255, 0.05);
           color: var(--theme-fg, #ebdbb2);
+        }
+
+        /* Inline Lexical Editor Wrapper */
+        .inline-note-lexical-wrapper {
+          min-height: 80px;
+          max-height: 400px;
+          overflow-y: auto;
+          border-radius: 8px;
+          background: transparent;
+        }
+
+        .inline-note-lexical {
+          font-size: 15px;
+        }
+
+        .inline-note-lexical .lexical-content-editable {
+          min-height: 80px;
+          outline: none;
+          padding: 0;
+        }
+
+        .inline-note-lexical .lexical-placeholder {
+          color: rgba(168, 153, 132, 0.4);
+          font-size: 15px;
+        }
+
+        .inline-note-lexical .lexical-paragraph {
+          margin: 0.35rem 0;
+          line-height: 1.5;
+        }
+
+        .inline-note-lexical .lexical-heading-h1 {
+          font-size: 1.5rem;
+          font-weight: 600;
+          margin: 0.5rem 0;
+        }
+
+        .inline-note-lexical .lexical-heading-h2 {
+          font-size: 1.25rem;
+          font-weight: 600;
+          margin: 0.4rem 0;
+        }
+
+        .inline-note-lexical .lexical-heading-h3 {
+          font-size: 1.1rem;
+          font-weight: 600;
+          margin: 0.35rem 0;
+        }
+
+        .inline-note-lexical .lexical-list-ul,
+        .inline-note-lexical .lexical-list-ol {
+          margin: 0.25rem 0;
+          padding-left: 1.25rem;
+        }
+
+        .inline-note-lexical .lexical-listitem {
+          margin: 0.15rem 0;
+        }
+
+        .inline-note-lexical .lexical-quote {
+          border-left: 3px solid var(--theme-secondary, #fe8019);
+          padding-left: 0.75rem;
+          margin: 0.35rem 0;
+          color: rgba(251, 241, 199, 0.8);
+        }
+
+        .inline-note-lexical .lexical-code {
+          background: rgba(0, 0, 0, 0.3);
+          border-radius: 4px;
+          padding: 0.5rem 0.75rem;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.85em;
+          margin: 0.35rem 0;
+          overflow-x: auto;
+        }
+
+        .inline-note-lexical .lexical-text-code {
+          background: rgba(0, 0, 0, 0.3);
+          border-radius: 3px;
+          padding: 0.1em 0.3em;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.9em;
         }
 
         .inline-composer-textarea {

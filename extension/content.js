@@ -9,6 +9,318 @@ function isTwitterPage(url) {
   return url.includes('twitter.com') || url.includes('x.com');
 }
 
+// Check if we're on an image-heavy site (AI art generators, design sites, etc.)
+function isImageHeavySite(url) {
+  const imageHeavyDomains = [
+    'midjourney.com',
+    'openai.com/dall-e',
+    'labs.openai.com',
+    'leonardo.ai',
+    'playground.ai',
+    'dreamstudio.ai',
+    'stability.ai',
+    'nightcafe.studio',
+    'artbreeder.com',
+    'runwayml.com',
+    'pika.art',
+    'dribbble.com',
+    'behance.net',
+    'pinterest.com',
+    'unsplash.com',
+    'pexels.com',
+    'flickr.com',
+    '500px.com',
+    'deviantart.com',
+    'artstation.com',
+  ];
+  return imageHeavyDomains.some(domain => url.includes(domain));
+}
+
+// Simple delay function for SPAs - gives dynamic content time to load
+function waitForImages(timeout = 100) {
+  return new Promise(resolve => setTimeout(resolve, timeout));
+}
+
+// Detect the main/hero image currently visible on screen
+// Returns the largest visible image that appears to be content (not UI/logos)
+async function detectHeroImage() {
+  // For SPAs, wait a bit for images to load
+  if (isImageHeavySite(window.location.href)) {
+    await waitForImages(2000);
+  }
+
+  const images = document.querySelectorAll('img');
+  let heroImage = null;
+  let maxScore = 0;
+
+  // Known CDN patterns for AI art and image sites
+  const cdnPatterns = [
+    'cdn.midjourney.com',
+    'mj-gallery',
+    'midjourney',
+    'oaidalleapiprodscus.blob.core.windows.net', // DALL-E
+    'cdn.leonardo.ai',
+    'cdn.discordapp.com',
+    'media.discordapp.net',
+    'images.unsplash.com',
+    'images.pexels.com',
+    'cdn.dribbble.com',
+    'mir-s3-cdn-cf.behance.net',
+    'i.pinimg.com',
+    'live.staticflickr.com',
+    'cdna.artstation.com',
+    'cdnb.artstation.com',
+    'replicate.delivery', // Replicate AI
+    'storage.googleapis.com', // Google Cloud Storage (used by some AI services)
+  ];
+
+  // Patterns to exclude (logos, icons, avatars, UI elements)
+  const excludePatterns = [
+    'logo',
+    'icon',
+    'avatar',
+    'profile',
+    'favicon',
+    'emoji',
+    'badge',
+    'button',
+    'sprite',
+    'loading',
+    'placeholder',
+    '/static/',
+    '/assets/',
+    'data:image', // inline SVGs
+  ];
+
+  images.forEach(img => {
+    // Skip tiny images (likely icons/UI)
+    if (img.naturalWidth < 200 || img.naturalHeight < 200) return;
+
+    // Skip hidden images
+    if (img.offsetParent === null) return;
+
+    // Skip images with excluded patterns in URL
+    const src = (img.src || '').toLowerCase();
+    if (excludePatterns.some(pattern => src.includes(pattern))) return;
+
+    // Check if image is in viewport
+    const rect = img.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+
+    // Image should be at least partially visible
+    const isVisible = (
+      rect.top < viewportHeight &&
+      rect.bottom > 0 &&
+      rect.left < viewportWidth &&
+      rect.right > 0
+    );
+
+    if (!isVisible) return;
+
+    // Calculate score based on multiple factors
+    let score = 0;
+
+    // Size score (larger is better, but diminishing returns)
+    const area = img.naturalWidth * img.naturalHeight;
+    score += Math.min(area / 10000, 100); // Cap at 100 points for size
+
+    // Visibility score (how much of the image is visible)
+    const visibleWidth = Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0);
+    const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+    const visibleArea = visibleWidth * visibleHeight;
+    const totalArea = rect.width * rect.height;
+    const visibilityRatio = totalArea > 0 ? visibleArea / totalArea : 0;
+    score += visibilityRatio * 50; // Up to 50 points for visibility
+
+    // Center score (images closer to center of viewport score higher)
+    const imgCenterX = rect.left + rect.width / 2;
+    const imgCenterY = rect.top + rect.height / 2;
+    const viewportCenterX = viewportWidth / 2;
+    const viewportCenterY = viewportHeight / 2;
+    const distanceFromCenter = Math.sqrt(
+      Math.pow(imgCenterX - viewportCenterX, 2) +
+      Math.pow(imgCenterY - viewportCenterY, 2)
+    );
+    const maxDistance = Math.sqrt(Math.pow(viewportWidth/2, 2) + Math.pow(viewportHeight/2, 2));
+    const centerScore = 1 - (distanceFromCenter / maxDistance);
+    score += centerScore * 30; // Up to 30 points for being centered
+
+    // CDN bonus (known image hosting CDNs get priority)
+    if (cdnPatterns.some(pattern => src.includes(pattern))) {
+      score += 50; // Bonus for known CDN
+    }
+
+    // Aspect ratio bonus (prefer images with reasonable aspect ratios)
+    const aspectRatio = img.naturalWidth / img.naturalHeight;
+    if (aspectRatio >= 0.5 && aspectRatio <= 2) {
+      score += 10; // Bonus for reasonable aspect ratio
+    }
+
+    if (score > maxScore) {
+      maxScore = score;
+      heroImage = {
+        url: img.src,
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        score: score
+      };
+    }
+  });
+
+  // Also check for background images on main containers (some sites use CSS backgrounds)
+  if (!heroImage || maxScore < 100) {
+    const containers = document.querySelectorAll('main, article, .content, [role="main"], #content, .image-container, .gallery');
+    containers.forEach(container => {
+      const bgImage = window.getComputedStyle(container).backgroundImage;
+      if (bgImage && bgImage !== 'none' && bgImage.includes('url(')) {
+        const match = bgImage.match(/url\(["']?([^"')]+)["']?\)/);
+        if (match && match[1]) {
+          const bgUrl = match[1].toLowerCase();
+          if (!excludePatterns.some(p => bgUrl.includes(p))) {
+            // Background images are often hero images
+            const rect = container.getBoundingClientRect();
+            if (rect.width > 300 && rect.height > 300) {
+              heroImage = {
+                url: match[1],
+                width: rect.width,
+                height: rect.height,
+                score: 150, // High score for large background images
+                isBackground: true
+              };
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // SPECIAL HANDLING: For Midjourney, always look for cdn.midjourney.com images
+  // This overrides any previous detection since we want the actual AI-generated content
+  if (window.location.href.includes('midjourney.com')) {
+    console.log('[Content Script] Midjourney detected, scanning for CDN images...');
+
+    const mjImages = document.querySelectorAll('img');
+    console.log('[Content Script] Total img elements:', mjImages.length);
+
+    // Helper to convert Midjourney thumbnail URL to full-size URL
+    // Thumbnails: cdn.midjourney.com/{id}/0_2_384_N.webp?quality=15
+    // Full size: cdn.midjourney.com/{id}/0_2.jpeg
+    const getFullSizeUrl = (url) => {
+      if (!url.includes('cdn.midjourney.com')) return url;
+      // Remove query params
+      const cleaned = url.split('?')[0];
+      // Pattern: /0_2_384_N.webp -> /0_2.jpeg
+      const fullUrl = cleaned.replace(/_\d+_N\.webp$/, '.jpeg').replace(/_\d+_N\.png$/, '.jpeg');
+      return fullUrl;
+    };
+
+    // Helper to score an image based on visibility and position
+    const scoreImage = (img) => {
+      const rect = img.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+
+      // Must be visible
+      if (rect.width === 0 || rect.height === 0) return 0;
+      if (rect.bottom < 0 || rect.top > viewportHeight) return 0;
+      if (rect.right < 0 || rect.left > viewportWidth) return 0;
+
+      let score = 0;
+
+      // Size score - larger images score higher
+      const area = rect.width * rect.height;
+      score += Math.min(area / 1000, 150);
+
+      // Center score - images closer to center score higher
+      const imgCenterX = rect.left + rect.width / 2;
+      const imgCenterY = rect.top + rect.height / 2;
+      const distX = Math.abs(imgCenterX - viewportWidth / 2);
+      const distY = Math.abs(imgCenterY - viewportHeight / 2);
+      const maxDist = Math.sqrt(Math.pow(viewportWidth/2, 2) + Math.pow(viewportHeight/2, 2));
+      const dist = Math.sqrt(distX * distX + distY * distY);
+      score += (1 - dist / maxDist) * 100;
+
+      // Visibility score - how much of the image is visible
+      const visibleWidth = Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0);
+      const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+      const visibleRatio = (visibleWidth * visibleHeight) / area;
+      score += visibleRatio * 50;
+
+      return score;
+    };
+
+    let mjHeroImage = null;
+    let bestScore = 0;
+
+    // Get all CDN images for debugging
+    const cdnImages = Array.from(mjImages).filter(i => i.src?.includes('cdn.midjourney.com'));
+    console.log('[Content Script] CDN images found:', cdnImages.length);
+
+    // Find the most visible/centered full-size image first
+    for (const img of cdnImages) {
+      const src = img.src || '';
+      if (!src.includes('_384_N') && !src.includes('quality=')) {
+        const score = scoreImage(img);
+        console.log('[Content Script] Full-size image:', src.substring(0, 60), 'score:', score.toFixed(0));
+        if (score > bestScore) {
+          bestScore = score;
+          mjHeroImage = {
+            url: src,
+            width: img.naturalWidth || img.width || 1024,
+            height: img.naturalHeight || img.height || 1024,
+            score: score,
+            isMidjourney: true,
+            isFullSize: true
+          };
+        }
+      }
+    }
+
+    // If no full-size found, find the most visible thumbnail and convert
+    if (!mjHeroImage) {
+      console.log('[Content Script] No full-size found, scoring thumbnails...');
+      let bestThumb = null;
+      bestScore = 0;
+
+      for (const img of cdnImages) {
+        const score = scoreImage(img);
+        if (score > bestScore) {
+          bestScore = score;
+          bestThumb = img;
+        }
+      }
+
+      if (bestThumb) {
+        const thumbnailUrl = bestThumb.src;
+        const fullUrl = getFullSizeUrl(thumbnailUrl);
+        console.log('[Content Script] Best thumbnail:', thumbnailUrl.substring(0, 60), 'score:', bestScore.toFixed(0));
+        console.log('[Content Script] Converting to full-size:', fullUrl);
+        mjHeroImage = {
+          url: fullUrl,
+          thumbnailUrl: thumbnailUrl,
+          width: bestThumb.naturalWidth || bestThumb.width || 512,
+          height: bestThumb.naturalHeight || bestThumb.height || 512,
+          score: bestScore,
+          isMidjourney: true,
+          convertedFromThumbnail: true
+        };
+      }
+    }
+
+    // Use Midjourney image if found
+    if (mjHeroImage) {
+      heroImage = mjHeroImage;
+      console.log('[Content Script] SUCCESS: Using Midjourney image:', heroImage.url, 'score:', heroImage.score.toFixed(0));
+    } else {
+      console.log('[Content Script] WARNING: No Midjourney CDN images found');
+    }
+  }
+
+  console.log('[Content Script] detectHeroImage result:', heroImage);
+  return heroImage;
+}
+
 // Check if we're on Wikipedia
 function isWikipediaPage(url) {
   return url.includes('wikipedia.org/wiki/');
@@ -569,6 +881,8 @@ async function detectPageMetadata() {
       favicon: '',
       tweetData: null,
       wikipediaData: null,
+      heroImage: null, // Main visible image on screen (for image-heavy sites)
+      isImageHeavySite: isImageHeavySite(url),
     };
 
     // Check if this is a Twitter page and extract rich tweet metadata
@@ -589,12 +903,36 @@ async function detectPageMetadata() {
       }
     }
 
-    // Try to get og:image
+    // Detect hero image on image-heavy sites (Midjourney, DALL-E, Dribbble, etc.)
+    // This finds the main visible image on the screen
+    try {
+      const heroImage = await detectHeroImage();
+      if (heroImage && heroImage.url) {
+        metadata.heroImage = heroImage;
+        console.log('[Content Script] Detected hero image:', heroImage.url, 'Score:', heroImage.score);
+
+        // For image-heavy sites, use the hero image as the primary image even with lower score
+        if (metadata.isImageHeavySite && heroImage.score > 50) {
+          metadata.ogImage = heroImage.url;
+          console.log('[Content Script] Using hero image as primary for image-heavy site');
+        }
+      }
+    } catch (e) {
+      console.warn('Could not detect hero image:', e);
+    }
+
+    // Try to get og:image (but don't overwrite hero image on image-heavy sites)
     try {
       const ogImage = document.querySelector('meta[property="og:image"]');
       if (ogImage && ogImage.content) {
-        metadata.ogImage = ogImage.content;
-        console.log('[Content Script] Found og:image:', metadata.ogImage);
+        // Only use og:image if we don't have a good hero image on an image-heavy site
+        const hasGoodHeroImage = metadata.heroImage && metadata.heroImage.score > 50 && metadata.isImageHeavySite;
+        if (!hasGoodHeroImage) {
+          metadata.ogImage = ogImage.content;
+          console.log('[Content Script] Found og:image:', metadata.ogImage);
+        } else {
+          console.log('[Content Script] Keeping hero image over og:image on image-heavy site');
+        }
       }
     } catch (e) {
       console.warn('Could not extract og:image:', e);
@@ -711,18 +1049,21 @@ async function detectPageMetadata() {
 
 // Listen for messages from popup/background
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log('[Content Script] Received message:', request.action);
   try {
     if (request.action === 'getPageMetadata') {
+      console.log('[Content Script] Processing getPageMetadata request...');
       // Handle async function
       detectPageMetadata().then(metadata => {
+        console.log('[Content Script] Metadata ready, heroImage:', metadata.heroImage ? 'YES' : 'NO');
         sendResponse({ success: true, data: metadata });
       }).catch(error => {
-        console.error('Error in detectPageMetadata:', error);
+        console.error('[Content Script] Error in detectPageMetadata:', error);
         sendResponse({ success: false, error: error.message });
       });
     }
   } catch (error) {
-    console.error('Error handling message:', error);
+    console.error('[Content Script] Error handling message:', error);
     sendResponse({ success: false, error: error.message });
   }
   return true; // Keep channel open for async response

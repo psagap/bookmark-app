@@ -85,6 +85,12 @@ export const themes = {
       meshColor4: 'rgba(254, 128, 25, 0.08)',
       meshColor5: 'rgba(40, 40, 40, 0.9)',
     },
+    noteCard: {
+      bg: '#3c3836',           // Warm sepia-brown
+      text: '#a89984',         // Muted cream text
+      heading: '#ebdbb2',      // Cream heading
+      accent: '#d79921',       // Golden accent
+    },
   },
 
   // ============================================
@@ -154,6 +160,12 @@ export const themes = {
       meshColor3: 'rgba(242, 34, 255, 0.12)',
       meshColor4: 'rgba(0, 255, 136, 0.08)',
       meshColor5: 'rgba(26, 26, 46, 0.9)',
+    },
+    noteCard: {
+      bg: '#2a3a5c',           // Deep purple-blue
+      text: '#9d8cc2',         // Muted lavender
+      heading: '#eee5ff',      // Soft white-pink
+      accent: '#ff2975',       // Hot pink
     },
   },
 
@@ -225,6 +237,12 @@ export const themes = {
       meshColor4: 'rgba(143, 188, 187, 0.1)',
       meshColor5: 'rgba(46, 52, 64, 0.9)',
     },
+    noteCard: {
+      bg: '#434c5e',           // Slate blue
+      text: '#8fbcbb',         // Soft teal
+      heading: '#eceff4',      // Snow white
+      accent: '#88c0d0',       // Ice blue
+    },
   },
 
   // ============================================
@@ -294,6 +312,12 @@ export const themes = {
       meshColor3: 'rgba(80, 250, 123, 0.08)',
       meshColor4: 'rgba(139, 233, 253, 0.1)',
       meshColor5: 'rgba(40, 42, 54, 0.9)',
+    },
+    noteCard: {
+      bg: '#44475a',           // Soft purple-gray
+      text: '#6272a4',         // Muted blue
+      heading: '#f8f8f2',      // Pure white
+      accent: '#bd93f9',       // Lavender
     },
   },
 
@@ -365,6 +389,12 @@ export const themes = {
       meshColor4: 'rgba(199, 125, 255, 0.08)',
       meshColor5: 'rgba(10, 22, 40, 0.9)',
     },
+    noteCard: {
+      bg: '#162a48',           // Deep ocean
+      text: '#5ea3b8',         // Teal muted
+      heading: '#e0f7ff',      // Light cyan
+      accent: '#00d9ff',       // Bright cyan
+    },
   },
 
   // ============================================
@@ -434,6 +464,12 @@ export const themes = {
       meshColor3: 'rgba(85, 139, 47, 0.15)',
       meshColor4: 'rgba(206, 147, 216, 0.06)',
       meshColor5: 'rgba(26, 35, 20, 0.9)',
+    },
+    noteCard: {
+      bg: '#2e3d28',           // Deep forest green
+      text: '#8ba67c',         // Muted sage
+      heading: '#e8f5e0',      // Soft mint
+      accent: '#7cb342',       // Leaf green
     },
   },
 
@@ -505,6 +541,12 @@ export const themes = {
       meshColor4: 'rgba(165, 94, 234, 0.08)',
       meshColor5: 'rgba(31, 20, 32, 0.9)',
     },
+    noteCard: {
+      bg: '#3a2838',           // Warm plum
+      text: '#b88a9c',         // Dusty rose
+      heading: '#fff5e6',      // Warm white
+      accent: '#ff9f43',       // Sunset orange
+    },
   },
 
   // ============================================
@@ -574,6 +616,12 @@ export const themes = {
       meshColor3: 'rgba(34, 211, 238, 0.05)',
       meshColor4: 'rgba(244, 114, 182, 0.04)',
       meshColor5: 'rgba(17, 17, 17, 0.95)',
+    },
+    noteCard: {
+      bg: '#1f1f1f',           // Clean dark gray
+      text: '#888888',         // Neutral gray
+      heading: '#f5f5f5',      // Off-white
+      accent: '#6366f1',       // Indigo
     },
   },
 
@@ -645,6 +693,12 @@ export const themes = {
       meshColor4: 'rgba(255, 107, 157, 0.06)',
       meshColor5: 'rgba(28, 22, 24, 0.9)',
     },
+    noteCard: {
+      bg: '#322828',           // Warm mauve
+      text: '#b8989c',         // Dusty pink
+      heading: '#faf0f2',      // Blush white
+      accent: '#e8b4b8',       // Rose
+    },
   },
 
   // ============================================
@@ -715,6 +769,12 @@ export const themes = {
       meshColor4: 'rgba(212, 165, 116, 0.06)',
       meshColor5: 'rgba(26, 21, 18, 0.92)',
     },
+    noteCard: {
+      bg: '#2e2620',           // Espresso brown
+      text: '#9a8778',         // Mocha
+      heading: '#f5ebe0',      // Cream
+      accent: '#c4a77d',       // Caramel
+    },
   },
 
   // ============================================
@@ -784,6 +844,12 @@ export const themes = {
       meshColor3: 'rgba(123, 44, 191, 0.15)',
       meshColor4: 'rgba(94, 234, 212, 0.06)',
       meshColor5: 'rgba(16, 0, 43, 0.9)',
+    },
+    noteCard: {
+      bg: '#240046',           // Deep violet
+      text: '#9d8ec2',         // Lavender mist
+      heading: '#f5e6ff',      // Soft white
+      accent: '#9d4edd',       // Bright purple
     },
   },
 
@@ -876,6 +942,12 @@ export const themes = {
       meshColor4: 'rgba(90, 90, 90, 0.02)',
       meshColor5: 'rgba(37, 37, 37, 0.98)',
     },
+    noteCard: {
+      bg: '#343434',           // Neutral dark
+      text: '#b5b5b5',         // Light gray
+      heading: '#fafafa',      // Pure white
+      accent: '#e04d30',       // Red accent
+    },
   },
 
   // ============================================
@@ -967,6 +1039,12 @@ export const themes = {
       meshColor4: 'rgba(143, 143, 143, 0.01)',
       meshColor5: 'rgba(255, 255, 255, 0.99)',
     },
+    noteCard: {
+      bg: '#f7f7f7',           // Soft white
+      text: '#8f8f8f',         // Gray
+      heading: '#252525',      // Dark text
+      accent: '#c84528',       // Red accent
+    },
   },
 
   // ============================================
@@ -1049,6 +1127,12 @@ export const themes = {
       meshColor4: 'rgba(134, 239, 172, 0.02)',  // Soft mint
       meshColor5: 'rgba(10, 15, 26, 0.97)',     // Deep midnight overlay
     },
+    noteCard: {
+      bg: '#1e293b',           // Slate blue
+      text: '#94a3b8',         // Soft slate
+      heading: '#e2e8f0',      // Light slate
+      accent: '#a5b4fc',       // Lavender
+    },
   },
 
   // ============================================
@@ -1119,6 +1203,188 @@ export const themes = {
       meshColor4: 'rgba(255, 255, 255, 0.6)',
       meshColor5: 'rgba(255, 255, 255, 0.95)',
     },
+    noteCard: {
+      bg: '#edece8',           // Warm off-white
+      text: '#8e8271',         // Taupe
+      heading: '#474139',      // Dark brown
+      accent: '#b0a89c',       // Stone
+    },
+  },
+
+  // ============================================
+  // DRACULA SOFT - Modern, calm Dracula with softer backgrounds
+  // Lighter blacks, muted accents, minimalist feel
+  // ============================================
+  draculaSoft: {
+    id: 'draculaSoft',
+    name: 'Dracula Soft',
+    description: 'Modern calm dark with soft purple undertones',
+    category: 'zen',
+    preview: {
+      primary: '#bd93f9',
+      secondary: '#ff79c6',
+      background: '#0f0f10',
+      accent: '#50fa7b',
+    },
+    colors: {
+      // Core semantic (HSL format)
+      // Neutral dark - dark background, subtle card blend
+      background: '240 2% 6%',
+      foreground: '60 30% 96%',
+      card: '240 2% 8%',
+      cardForeground: '60 30% 96%',
+      popover: '240 2% 9%',
+      popoverForeground: '60 30% 96%',
+      // Primary: Vibrant lavender-purple
+      primary: '265 70% 72%',
+      primaryForeground: '240 2% 5%',
+      // Secondary: Neutral dark
+      secondary: '240 2% 9%',
+      secondaryForeground: '60 30% 96%',
+      muted: '240 2% 8%',
+      mutedForeground: '240 3% 45%',
+      // Accent: Bright Dracula green
+      accent: '135 70% 60%',
+      accentForeground: '240 2% 5%',
+      destructive: '0 65% 58%',
+      destructiveForeground: '60 30% 96%',
+      border: '240 3% 14%',
+      input: '240 2% 8%',
+      ring: '265 70% 72%',
+      // Extended colors (HEX) - Dark with subtle elevation
+      bgDarkest: '#0a0a0b',      // Near black
+      bgDark: '#0f0f10',         // Main background - dark
+      bg: '#131314',             // Elevated surface
+      bgLight: '#171718',        // Cards - subtle step up
+      bgLighter: '#1c1c1d',      // Highest elevation
+      fg: '#f8f8f2',             // Dracula foreground
+      fgLight: '#ffffff',
+      fgMuted: '#6a7290',        // Muted text
+      // Primary: Bright Dracula purple
+      primaryHex: '#bd93f9',
+      primaryLightHex: '#d4b8ff',
+      // Secondary: Bright Dracula pink
+      secondaryHex: '#ff79c6',
+      secondaryLightHex: '#ff9ed8',
+      // Accents: Vibrant Dracula colors for pills
+      accent1: '#50fa7b',        // Bright green
+      accent2: '#ffb86c',        // Bright orange
+      accent3: '#8be9fd',        // Bright cyan
+      accent4: '#f1fa8c',        // Bright yellow
+      selectionBg: 'rgba(180, 167, 214, 0.25)',
+      selectionText: '#f8f8f2',
+    },
+    fonts: poppinsFonts,
+    glow: {
+      // Subtle glow with Dracula purple
+      color: '265 89% 78%',
+      colorRgb: '189, 147, 249',
+      secondary: '326 100% 74%',
+      secondaryRgb: '255, 121, 198',
+      intensity: '0.5',
+    },
+    effects: {
+      // Very subtle mesh - dark with hint of Dracula colors
+      meshColor1: 'rgba(189, 147, 249, 0.02)',  // Purple
+      meshColor2: 'rgba(255, 121, 198, 0.015)', // Pink
+      meshColor3: 'rgba(80, 250, 123, 0.01)',   // Green
+      meshColor4: 'rgba(139, 233, 253, 0.01)',  // Cyan
+      meshColor5: 'rgba(10, 10, 11, 0.99)',     // Near black
+    },
+    noteCard: {
+      bg: '#171718',           // Near black
+      text: '#6a7290',         // Muted slate
+      heading: '#f8f8f2',      // Soft white
+      accent: '#bd93f9',       // Lavender
+    },
+  },
+
+  // ============================================
+  // MYMIND - Deep blue-gray with coral accents
+  // Inspired by mymind.com's elegant dark design
+  // ============================================
+  mymind: {
+    id: 'mymind',
+    name: 'MyMind',
+    description: 'Deep blue-gray with warm coral accents',
+    category: 'zen',
+    preview: {
+      primary: '#e8594f',
+      secondary: '#ff7a6b',
+      background: '#1a1f2e',
+      accent: '#4ade80',
+    },
+    colors: {
+      // Core semantic (HSL format)
+      // Deep blue-gray background - the signature MyMind look
+      background: '222 20% 13%',
+      foreground: '210 20% 90%',
+      card: '222 18% 15%',
+      cardForeground: '210 20% 90%',
+      popover: '222 18% 17%',
+      popoverForeground: '210 20% 90%',
+      // Primary: Warm coral - distinctive accent
+      primary: '14 80% 55%',
+      primaryForeground: '0 0% 100%',
+      // Secondary: Muted blue-gray for surfaces
+      secondary: '222 15% 22%',
+      secondaryForeground: '210 20% 90%',
+      muted: '222 15% 20%',
+      mutedForeground: '220 15% 55%',
+      // Accent: Coral variants
+      accent: '14 80% 55%',
+      accentForeground: '0 0% 100%',
+      destructive: '0 75% 50%',
+      destructiveForeground: '0 0% 100%',
+      border: '222 15% 20%',
+      input: '222 15% 20%',
+      ring: '14 80% 55%',
+      // Extended colors (HEX) - MyMind palette
+      bgDarkest: '#141820',      // Deepest blue-gray
+      bgDark: '#1a1f2e',         // Main background
+      bg: '#1e2433',             // Elevated surface
+      bgLight: '#2a3142',        // Higher elevation
+      bgLighter: '#3a4255',      // Highest elevation
+      fg: '#e8eaf0',             // Primary text
+      fgLight: '#f5f6f8',        // Bright text
+      fgMuted: '#8a9aad',        // Secondary text
+      // Primary: Coral accent
+      primaryHex: '#e8594f',
+      primaryLightHex: '#ff6f61',
+      // Secondary: Light coral
+      secondaryHex: '#ff7a6b',
+      secondaryLightHex: '#ff8f82',
+      // Accents: Soft complementary colors
+      accent1: '#ef4444',        // Red
+      accent2: '#4ade80',        // Soft green
+      accent3: '#a78bfa',        // Soft purple
+      accent4: '#38bdf8',        // Soft cyan
+      selectionBg: 'rgba(232, 89, 79, 0.3)',
+      selectionText: '#f5f6f8',
+    },
+    fonts: poppinsFonts,
+    glow: {
+      // Subtle coral glow
+      color: '14 80% 55%',
+      colorRgb: '232, 89, 79',
+      secondary: '14 100% 70%',
+      secondaryRgb: '255, 111, 97',
+      intensity: '0.5',
+    },
+    effects: {
+      // Very subtle mesh - adds depth without distraction
+      meshColor1: 'rgba(232, 89, 79, 0.03)',   // Coral
+      meshColor2: 'rgba(167, 139, 250, 0.02)', // Violet
+      meshColor3: 'rgba(56, 189, 248, 0.02)',  // Cyan
+      meshColor4: 'rgba(74, 222, 128, 0.015)', // Green
+      meshColor5: 'rgba(20, 24, 32, 0.97)',    // Deep blue overlay
+    },
+    noteCard: {
+      bg: '#2a3142',           // Deep blue-gray
+      text: '#8a9aad',         // Muted blue
+      heading: '#e8eaf0',      // Soft white
+      accent: '#e8594f',       // Coral
+    },
   },
 };
 
@@ -1138,7 +1404,7 @@ export const themeCategories = [
 ];
 
 // Default theme ID
-export const DEFAULT_THEME_ID = 'strata';
+export const DEFAULT_THEME_ID = 'mymind';
 
 // Helper to get theme by ID
 export const getThemeById = (id) => themes[id] || null;

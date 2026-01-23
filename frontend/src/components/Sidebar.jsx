@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Home, Layers, PanelLeftClose, Play, Image, FileText, BookOpen, Sparkles } from 'lucide-react';
+import { Home, Layers, PanelLeftClose, Play, Image, FileText, BookOpen, Sparkles, Music, UtensilsCrossed, BookMarked, ShoppingBag, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import Logo from './Logo';
+import SpiderVerseLogo from './SpiderVerseLogo';
 
 // X (Twitter) Logo
 const XLogo = ({ className }) => (
@@ -12,38 +12,28 @@ const XLogo = ({ className }) => (
 );
 
 const NavItem = ({ icon: Icon, label, active, onClick, collapsed, count }) => {
-    const ICON_AREA_WIDTH = 36;
-
     // NO width animation on NavItem - let sidebar container control width
     // Button is always w-full, content uses opacity to hide/show
     return (
         <button
             onClick={onClick}
             className={cn(
-                "w-full flex items-center py-2.5 rounded-xl group relative cursor-pointer overflow-hidden",
+                "w-full flex items-center gap-3 py-2.5 px-3 rounded-xl group relative cursor-pointer overflow-hidden",
                 "transition-colors duration-200 ease-out",
                 active
                     ? "bg-primary/20 text-primary shadow-sm"
                     : "text-muted-foreground hover:bg-white/10 hover:text-foreground active:scale-[0.98]"
             )}
-            style={{ minWidth: ICON_AREA_WIDTH }}
             title={collapsed ? label : undefined}
         >
-            {/* Fixed-width icon container - icon never moves */}
-            <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{ width: ICON_AREA_WIDTH, minWidth: ICON_AREA_WIDTH }}
-            >
-                <Icon className={cn(
-                    "w-5 h-5",
-                    active && "fill-current"
-                )} strokeWidth={active ? 2 : 1.5} />
-            </div>
+            {/* Icon - fixed size, flex-shrink-0 to prevent compression */}
+            <Icon className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={active ? 2.5 : 1.5} />
 
             {/* Text and count - always in DOM, fade with opacity */}
             <span
-                className="text-sm font-medium truncate flex-1 text-left whitespace-nowrap"
+                className="font-medium truncate flex-1 text-left whitespace-nowrap"
                 style={{
+                    fontSize: '15px',
                     opacity: collapsed ? 0 : 1,
                     transition: 'opacity 200ms ease-out'
                 }}
@@ -52,7 +42,7 @@ const NavItem = ({ icon: Icon, label, active, onClick, collapsed, count }) => {
             </span>
             {count !== undefined && count > 0 && (
                 <span
-                    className="text-[10px] font-bold text-white bg-primary/80 px-1.5 py-0.5 rounded-md min-w-[20px] text-center mr-2 flex-shrink-0"
+                    className="text-[11px] font-bold text-white bg-primary/80 px-1.5 py-0.5 rounded-full min-w-[22px] text-center flex-shrink-0"
                     style={{
                         opacity: collapsed ? 0 : 1,
                         transition: 'opacity 200ms ease-out'
@@ -64,7 +54,7 @@ const NavItem = ({ icon: Icon, label, active, onClick, collapsed, count }) => {
 
             {/* Active Indicator Strip */}
             {active && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-primary" />
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-primary" />
             )}
         </button>
     );
@@ -78,11 +68,13 @@ const Sidebar = ({
     onToggleCollapse,
     mediaCounts = {},
     activeFilter,
-    onFilterChange
+    onFilterChange,
+    draftsCount = 0
 }) => {
     const navItems = [
         { id: 'home', icon: Home, label: 'Lounge' },
         { id: 'collections', icon: Layers, label: 'Sides' },
+        { id: 'drafts', icon: Mic, label: 'Drafts', count: draftsCount },
     ];
 
     // Resize state
@@ -139,12 +131,18 @@ const Sidebar = ({
         setIsResizing(true);
     }, []);
 
+    // Dynamic media types - only shown when bookmarks of that type exist
     const mediaTypes = [
         { id: 'video', icon: Play, label: 'Videos' },
         { id: 'image', icon: Image, label: 'Images' },
         { id: 'note', icon: FileText, label: 'Notes' },
+        { id: 'audio-note', icon: Mic, label: 'Voice Notes' },
         { id: 'tweet', icon: XLogo, label: 'Posts' },
         { id: 'article', icon: BookOpen, label: 'Articles' },
+        { id: 'music', icon: Music, label: 'Music' },
+        { id: 'recipe', icon: UtensilsCrossed, label: 'Recipes' },
+        { id: 'book', icon: BookMarked, label: 'Books' },
+        { id: 'product', icon: ShoppingBag, label: 'Products' },
     ];
 
     const visibleMediaTypes = mediaTypes.filter(type => (mediaCounts[type.id] || 0) > 0);
@@ -206,14 +204,15 @@ const Sidebar = ({
                     transition: 'padding 200ms cubic-bezier(0.4, 0, 0.2, 1)'
                 }}
             >
-                <Logo
+                <SpiderVerseLogo
                     size={40}
                     showText={!showCollapsed}
-                    textSize="text-xl"
+                    textSize="text-[20px]"
                     className="drop-shadow-[0_4px_8px_rgba(0,0,0,0.3)] flex-shrink-0"
                     interactive={showCollapsed}
                     onClick={showCollapsed ? onToggleCollapse : undefined}
                     isCollapsed={showCollapsed}
+                    playIntro={true}
                 />
 
                 {/* Spacer and collapse button - collapse to 0 width when sidebar collapsed */}
@@ -245,6 +244,7 @@ const Sidebar = ({
                         active={activeTab === item.id || (activeTab === 'lounge' && item.id === 'home')}
                         onClick={() => onNavigate(item.id === 'home' ? 'lounge' : item.id)}
                         collapsed={showCollapsed}
+                        count={item.count}
                     />
                 ))}
             </div>
@@ -274,7 +274,16 @@ const Sidebar = ({
                                 icon={type.icon}
                                 label={type.label}
                                 active={activeFilter === type.id}
-                                onClick={() => onFilterChange?.(activeFilter === type.id ? null : type.id)}
+                                onClick={() => {
+                                    // Toggle filter: if same filter clicked, clear it; otherwise set new filter
+                                    const newFilter = activeFilter === type.id ? null : type.id;
+                                    onFilterChange?.(newFilter);
+                                    // Navigate to lounge when setting a filter to show filtered results (MAL-21)
+                                    // Pass false to prevent clearing the filter we just set
+                                    if (newFilter) {
+                                        onNavigate('lounge', false);
+                                    }
+                                }}
                                 collapsed={showCollapsed}
                                 count={mediaCounts[type.id]}
                             />
@@ -283,7 +292,7 @@ const Sidebar = ({
                         !showCollapsed && (
                             <div className="px-3 py-4 text-center">
                                 <Sparkles className="w-6 h-6 text-muted-foreground/30 mx-auto mb-2" />
-                                <p className="text-xs text-muted-foreground/50">
+                                <p className="text-[11px] text-muted-foreground/50">
                                     Save bookmarks to see your library grow
                                 </p>
                             </div>
@@ -303,7 +312,7 @@ const Sidebar = ({
                 >
                     <div className="w-2 h-2 rounded-full bg-emerald-500" />
                     {!showCollapsed && (
-                        <span className="text-xs text-foreground/80 font-medium">All synced</span>
+                        <span className="text-[13px] text-foreground/80 font-medium">All synced</span>
                     )}
                 </div>
             </div>

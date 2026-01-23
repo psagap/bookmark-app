@@ -5,8 +5,140 @@ import { Image, Youtube, FileText, Zap, BookOpen } from 'lucide-react';
 
 /**
  * FolderTabs Component
- * Tab navigation with filter pills - selected pills animate away to search bar
+ * Premium-style animated toggle switch for Lounge/Sides navigation
  */
+
+// Premium Toggle Switch Component - Apple-style slider
+const PremiumToggle = ({ tabs, activeTab, onTabChange }) => {
+  const activeIndex = tabs.findIndex(t => t.id === activeTab);
+  const tabCount = tabs.length;
+  const indicatorWidth = 100 / tabCount;
+
+  // Hide indicator when activeTab is not in the tabs array (e.g., 'drafts' from sidebar)
+  const showIndicator = activeIndex >= 0;
+
+  return (
+    <div className="premium-toggle-wrapper" style={{ '--tab-count': tabCount }}>
+      <div className="premium-toggle" style={{ width: tabCount === 2 ? 200 : tabCount * 90 }}>
+        <div className="premium-toggle__track" style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}>
+          {/* Animated indicator - only show when activeTab is in tabs array */}
+          {showIndicator && (
+            <motion.div
+              className="premium-toggle__indicator"
+              style={{ width: `${indicatorWidth}%` }}
+              initial={false}
+              animate={{
+                x: `${activeIndex * 100}%`,
+              }}
+              transition={{
+                type: "spring",
+                stiffness: 500,
+                damping: 35,
+                mass: 0.8
+              }}
+            />
+          )}
+
+          {/* Tab buttons */}
+          {tabs.map((tab, index) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onTabChange?.(tab.id)}
+                className={cn(
+                  "premium-toggle__button",
+                  isActive && "premium-toggle__button--active"
+                )}
+              >
+                <span className="premium-toggle__label">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Scoped CSS */}
+      <style>{`
+        .premium-toggle-wrapper {
+          --toggle-duration: 0.22s;
+          --toggle-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          --toggle-primary: var(--theme-primary, #b8bb26);
+          --toggle-bg: rgba(255, 255, 255, 0.04);
+          --toggle-border: rgba(255, 255, 255, 0.08);
+          --toggle-text: rgba(255, 255, 255, 0.5);
+          --toggle-text-active: rgba(255, 255, 255, 0.95);
+          --toggle-shadow: 0deg 0% 0%;
+        }
+
+        .premium-toggle {
+          position: relative;
+          width: 200px;
+          height: 40px;
+          background: var(--toggle-bg);
+          border-radius: 100px;
+          border: 1px solid var(--toggle-border);
+          padding: 3px;
+          box-shadow:
+            0 2px 8px rgba(0, 0, 0, 0.15),
+            0 1px 2px rgba(0, 0, 0, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        .premium-toggle__track {
+          display: grid;
+          width: 100%;
+          height: 100%;
+          position: relative;
+          gap: 0;
+        }
+
+        .premium-toggle__indicator {
+          position: absolute;
+          height: 100%;
+          left: 0;
+          top: 0;
+          background: var(--toggle-primary);
+          border-radius: 100px;
+          box-shadow:
+            0 2px 8px rgba(0, 0, 0, 0.25),
+            0 0 20px rgba(var(--glow-color-rgb, 184, 187, 38), 0.15);
+        }
+
+        .premium-toggle__button {
+          position: relative;
+          z-index: 2;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          cursor: pointer;
+          background: transparent;
+          border: none;
+          padding: 0 16px;
+          transition: color var(--toggle-duration) var(--toggle-ease);
+        }
+
+        .premium-toggle__label {
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: 0.3px;
+          color: var(--toggle-text);
+          transition: color var(--toggle-duration) var(--toggle-ease);
+        }
+
+        .premium-toggle__button--active .premium-toggle__label {
+          color: var(--gruvbox-bg-darkest, #1d2021);
+          font-weight: 600;
+        }
+
+        .premium-toggle__button:not(.premium-toggle__button--active):hover .premium-toggle__label {
+          color: var(--toggle-text-active);
+        }
+      `}</style>
+    </div>
+  );
+};
 
 // Custom SVG Icons
 const XLogo = ({ className, style, ...props }) => (
@@ -167,34 +299,14 @@ const FolderTabs = ({
 
   return (
     <div className={cn("folder-container w-full", className)}>
-      {/* Header Row - Minimal Tabs + Filter Pills */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-1 mb-6 border-b border-white/5 pb-2">
-        {/* Main Tabs - Modern Minimal Design */}
-        <div className="flex items-center gap-8 relative">
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => onTabChange?.(tab.id)}
-                className={cn(
-                  "relative py-3 text-base font-medium transition-colors duration-200",
-                  isActive ? "text-gruvbox-fg" : "text-gruvbox-fg-muted hover:text-gruvbox-fg/80"
-                )}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="active-tab-underline"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
-                    style={{ background: 'var(--theme-primary)' }}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-10 tracking-wide">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
+      {/* Header Row - Premium Toggle Switch */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-1 mb-6 pb-2">
+        {/* Main Tabs - Premium Animated Toggle */}
+        <PremiumToggle
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+        />
       </div>
 
       {/* Content Area - Clean Surface */}

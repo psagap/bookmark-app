@@ -21,6 +21,7 @@ export const mapDbBookmark = (row = {}) => ({
     thumbnail: row.thumbnail ?? row.cover_image ?? row.coverImage ?? null,
     metadata: row.metadata ?? {},
     archived: row.archived ?? false,
+    status: row.status ?? 'published', // 'published' | 'draft'
     createdAt: row.created_at ?? row.createdAt ?? null,
     updatedAt: row.updated_at ?? row.updatedAt ?? null,
 });
@@ -52,6 +53,7 @@ export const toDbBookmarkPatch = (bookmark = {}) => {
     assignIfDefined(payload, 'thumbnail', bookmark.thumbnail);
     assignIfDefined(payload, 'metadata', bookmark.metadata);
     assignIfDefined(payload, 'archived', bookmark.archived);
+    assignIfDefined(payload, 'status', bookmark.status);
     assignIfDefined(payload, 'updated_at', bookmark.updated_at ?? bookmark.updatedAt);
     return payload;
 };

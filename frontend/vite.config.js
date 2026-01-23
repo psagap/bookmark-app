@@ -5,6 +5,7 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  cacheDir: '/tmp/vite-cache',
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -17,5 +18,8 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  build: {
+    target: 'esnext',
   },
 })

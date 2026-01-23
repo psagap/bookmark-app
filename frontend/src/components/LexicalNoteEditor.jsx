@@ -9,12 +9,15 @@ import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin';
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+import { HorizontalRuleNode } from '@lexical/react/LexicalHorizontalRuleNode';
+import { HorizontalRulePlugin } from '@lexical/react/LexicalHorizontalRulePlugin';
 import {
   $getRoot,
   $getSelection,
   $isRangeSelection,
   $createParagraphNode,
   $createTextNode,
+  $getNearestNodeFromDOMNode,
   COMMAND_PRIORITY_LOW,
   COMMAND_PRIORITY_HIGH,
   KEY_ENTER_COMMAND,
@@ -22,10 +25,11 @@ import {
   INDENT_CONTENT_COMMAND,
   OUTDENT_CONTENT_COMMAND,
   KEY_TAB_COMMAND,
+  KEY_BACKSPACE_COMMAND,
 } from 'lexical';
 import { HeadingNode, QuoteNode, $createHeadingNode, $createQuoteNode } from '@lexical/rich-text';
-import { ListNode, ListItemNode, $createListNode, $createListItemNode, $isListItemNode } from '@lexical/list';
-import { CodeNode, CodeHighlightNode } from '@lexical/code';
+import { ListNode, ListItemNode, $createListNode, $createListItemNode, $isListItemNode, $isListNode } from '@lexical/list';
+import { CodeNode, CodeHighlightNode, $isCodeNode } from '@lexical/code';
 import { LinkNode, AutoLinkNode } from '@lexical/link';
 import {
   TRANSFORMERS,
@@ -36,6 +40,7 @@ import {
   CODE,
   $convertFromMarkdownString,
 } from '@lexical/markdown';
+import { $createHorizontalRuleNode, $isHorizontalRuleNode } from '@lexical/react/LexicalHorizontalRuleNode';
 import { $generateHtmlFromNodes, $generateNodesFromDOM } from '@lexical/html';
 import { cn } from '@/lib/utils';
 
@@ -100,6 +105,27 @@ const editorTheme = {
     code: 'lexical-text-code',
   },
   link: 'lexical-link',
+  hr: 'lexical-hr',
+};
+
+// ============================================================================
+// CUSTOM HORIZONTAL RULE TRANSFORMER
+// Converts `---`, `***`, or `___` to a horizontal rule
+// ============================================================================
+const HORIZONTAL_RULE = {
+  dependencies: [HorizontalRuleNode],
+  export: (node) => {
+    return $isHorizontalRuleNode(node) ? '---' : null;
+  },
+  regExp: /^(---|\*\*\*|___)\s?$/,
+  replace: (parentNode, _children, _match, isImport) => {
+    const hrNode = $createHorizontalRuleNode();
+    parentNode.replace(hrNode);
+    if (isImport) {
+      hrNode.selectNext();
+    }
+  },
+  type: 'element',
 };
 
 // ============================================================================
@@ -156,12 +182,25 @@ function InitialContentPlugin({ initialContent }) {
 
   useEffect(() => {
     if (initialContent && !hasLoaded) {
+      // Helper to move cursor to beginning after content loads
+      const moveCursorToStart = () => {
+        editor.update(() => {
+          const root = $getRoot();
+          const firstChild = root.getFirstChild();
+          if (firstChild) {
+            firstChild.selectStart();
+          }
+        });
+      };
+
       // Prefer JSON state for lossless round-trip (preserves nested lists, formatting)
       if (initialContent.json) {
         try {
           const editorState = editor.parseEditorState(initialContent.json);
           editor.setEditorState(editorState);
           setHasLoaded(true);
+          // Move cursor to start after state is loaded
+          setTimeout(moveCursorToStart, 0);
           return;
         } catch (e) {
           console.warn('Failed to parse JSON editor state, falling back to HTML/text:', e);
@@ -189,6 +228,12 @@ function InitialContentPlugin({ initialContent }) {
             }
             root.append(paragraph);
           });
+        }
+
+        // Move cursor to start
+        const firstChild = root.getFirstChild();
+        if (firstChild) {
+          firstChild.selectStart();
         }
       });
       setHasLoaded(true);
@@ -325,6 +370,203 @@ function TabIndentPlugin() {
 }
 
 // ============================================================================
+// LIST BACKSPACE PLUGIN
+// Handles backspace at the beginning of a list item:
+// - If indented: decrease indent first
+// - If not indented: convert to paragraph (remove bullet)
+// ============================================================================
+function ListBackspacePlugin() {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    const removeListener = editor.registerCommand(
+      KEY_BACKSPACE_COMMAND,
+      (event) => {
+        const selection = $getSelection();
+        if (!$isRangeSelection(selection)) return false;
+
+        // Only handle if cursor is collapsed (no text selected)
+        if (!selection.isCollapsed()) return false;
+
+        const anchorNode = selection.anchor.getNode();
+        const anchorOffset = selection.anchor.offset;
+
+        // Find the list item node
+        let listItem = anchorNode;
+        while (listItem && !$isListItemNode(listItem)) {
+          listItem = listItem.getParent();
+        }
+
+        if (!$isListItemNode(listItem)) return false;
+
+        // Check if we're at the very beginning of the list item's text content
+        // We need to check if the anchor is at offset 0 and it's the first text node
+        const listItemChildren = listItem.getChildren();
+        const firstChild = listItemChildren[0];
+
+        // If the first child is the anchor node (or contains it) and offset is 0
+        let isAtStart = false;
+        if (anchorOffset === 0) {
+          if (anchorNode === firstChild) {
+            isAtStart = true;
+          } else if (firstChild && anchorNode.getParent() === firstChild && anchorOffset === 0) {
+            isAtStart = true;
+          } else {
+            // Check if anchor is a descendant of first child at position 0
+            let current = anchorNode;
+            while (current && current !== listItem) {
+              const parent = current.getParent();
+              if (parent) {
+                const siblings = parent.getChildren();
+                if (siblings[0] !== current) {
+                  break;
+                }
+              }
+              if (current === firstChild) {
+                isAtStart = true;
+                break;
+              }
+              current = parent;
+            }
+          }
+        }
+
+        if (!isAtStart) return false;
+
+        // We're at the beginning of a list item
+        event.preventDefault();
+
+        editor.update(() => {
+          const currentIndent = listItem.getIndent();
+
+          if (currentIndent > 0) {
+            // Decrease indent first
+            listItem.setIndent(currentIndent - 1);
+          } else {
+            // Convert list item to paragraph
+            const listNode = listItem.getParent();
+
+            // Get all children of the list item (the text content)
+            const children = listItem.getChildren();
+
+            // Create a new paragraph with the content
+            const paragraph = $createParagraphNode();
+            children.forEach(child => {
+              paragraph.append(child);
+            });
+
+            // Insert paragraph before the list
+            if ($isListNode(listNode)) {
+              const listParent = listNode.getParent();
+              if (listParent) {
+                // Get siblings in the list
+                const listItems = listNode.getChildren();
+                const itemIndex = listItems.indexOf(listItem);
+
+                if (listItems.length === 1) {
+                  // This is the only item, replace the entire list with paragraph
+                  listNode.replace(paragraph);
+                } else if (itemIndex === 0) {
+                  // First item - insert paragraph before list
+                  listNode.insertBefore(paragraph);
+                  listItem.remove();
+                } else {
+                  // Middle or last item - insert paragraph after previous items
+                  // Split the list: items before stay, current becomes paragraph, items after become new list
+                  listNode.insertAfter(paragraph);
+
+                  // Move remaining items after current to a new list
+                  const remainingItems = listItems.slice(itemIndex + 1);
+                  if (remainingItems.length > 0) {
+                    const newList = $createListNode(listNode.getListType());
+                    remainingItems.forEach(item => {
+                      newList.append(item);
+                    });
+                    paragraph.insertAfter(newList);
+                  }
+
+                  listItem.remove();
+                }
+              }
+            }
+
+            // Move cursor to the paragraph
+            paragraph.selectStart();
+          }
+        });
+
+        return true;
+      },
+      COMMAND_PRIORITY_HIGH
+    );
+
+    return () => {
+      removeListener();
+    };
+  }, [editor]);
+
+  return null;
+}
+
+// ============================================================================
+// CODE BLOCK EXIT PLUGIN
+// Allows clicking outside code blocks to exit them
+// ============================================================================
+function CodeBlockExitPlugin() {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    const rootElement = editor.getRootElement();
+    if (!rootElement) return;
+
+    const handleClick = (event) => {
+      const target = event.target;
+
+      // Check if click target is inside a code block element
+      const isInsideCodeBlock = target.closest('.lexical-code');
+      if (isInsideCodeBlock) return; // Clicking inside code block - do nothing
+
+      // Check if current selection is inside a code node
+      editor.getEditorState().read(() => {
+        const selection = $getSelection();
+        if (!$isRangeSelection(selection)) return;
+
+        const anchorNode = selection.anchor.getNode();
+
+        // Walk up the tree to find if we're inside a CodeNode
+        let current = anchorNode;
+        let codeNode = null;
+        while (current !== null) {
+          if ($isCodeNode(current)) {
+            codeNode = current;
+            break;
+          }
+          current = current.getParent();
+        }
+
+        if (codeNode) {
+          // We're in a code block but clicked outside it
+          // Create a new paragraph after the code block
+          editor.update(() => {
+            const paragraph = $createParagraphNode();
+            codeNode.insertAfter(paragraph);
+            paragraph.selectStart();
+          });
+        }
+      });
+    };
+
+    rootElement.addEventListener('click', handleClick);
+
+    return () => {
+      rootElement.removeEventListener('click', handleClick);
+    };
+  }, [editor]);
+
+  return null;
+}
+
+// ============================================================================
 // MAIN EDITOR COMPONENT
 // ============================================================================
 const LexicalNoteEditor = ({
@@ -348,6 +590,7 @@ const LexicalNoteEditor = ({
       CodeHighlightNode,
       LinkNode,
       AutoLinkNode,
+      HorizontalRuleNode,
     ],
   };
 
@@ -358,6 +601,7 @@ const LexicalNoteEditor = ({
     UNORDERED_LIST,
     ORDERED_LIST,
     CODE,
+    HORIZONTAL_RULE,
     ...TRANSFORMERS,
   ];
 
@@ -377,7 +621,10 @@ const LexicalNoteEditor = ({
         <HistoryPlugin />
         <AutoFocusPlugin />
         <ListPlugin />
+        <HorizontalRulePlugin />
         <TabIndentPlugin />
+        <ListBackspacePlugin />
+        <CodeBlockExitPlugin />
         <MarkdownShortcutPlugin transformers={markdownTransformers} />
         <MarkdownPastePlugin transformers={markdownTransformers} />
         <ContentExtractorPlugin onContentChange={onContentChange} />
