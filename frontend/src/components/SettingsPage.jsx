@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Check, Palette, Sparkles, Moon, Sun, Monitor, ChevronDown, Minimize2, Maximize2, Type } from 'lucide-react';
+import { ArrowLeft, Check, Palette, Sparkles, Moon, Sun, Monitor, ChevronDown, Minimize2, Maximize2, Type, PenTool, LogOut, User } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-import { usePreferences, UI_SIZES, FONT_SIZES } from '../contexts/PreferencesContext';
+import { usePreferences, UI_SIZES, FONT_SIZES, NOTE_FONTS } from '../contexts/PreferencesContext';
+import { useAuth } from '../contexts/AuthContext';
 import { themeCategories } from '../config/themes';
 
 // Theme Preview Card Component
@@ -473,10 +474,149 @@ const FontSizeOptionCard = ({ size, isSelected, onSelect }) => {
   );
 };
 
+// Note Font Option Card
+const NoteFontOptionCard = ({ font, isSelected, onSelect }) => {
+  return (
+    <button
+      onClick={() => onSelect(font.id)}
+      className={`
+        relative flex-1 p-5 rounded-xl text-left transition-all duration-200
+        ${isSelected ? 'ring-2 scale-[1.02]' : 'hover:scale-[1.01]'}
+      `}
+      style={{
+        backgroundColor: 'var(--theme-bg-light)',
+        border: `1px solid ${isSelected ? 'var(--theme-primary)' : 'var(--theme-bg-lighter)'}`,
+        ringColor: isSelected ? 'var(--theme-primary)' : 'transparent',
+      }}
+    >
+      {/* Selected indicator */}
+      {isSelected && (
+        <div
+          className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center"
+          style={{ backgroundColor: 'var(--theme-primary)' }}
+        >
+          <Check className="w-3.5 h-3.5" style={{ color: 'var(--theme-bg-darkest)' }} />
+        </div>
+      )}
+
+      {/* Icon and label */}
+      <div className="flex items-center gap-3 mb-4">
+        <div
+          className="w-10 h-10 rounded-lg flex items-center justify-center"
+          style={{ backgroundColor: `var(--theme-primary)${isSelected ? '30' : '15'}` }}
+        >
+          <PenTool
+            className="w-5 h-5"
+            style={{ color: isSelected ? 'var(--theme-primary)' : 'var(--theme-fg-muted)' }}
+          />
+        </div>
+        <div>
+          <h4
+            className="font-semibold"
+            style={{
+              color: isSelected ? 'var(--theme-primary)' : 'var(--theme-fg)',
+              fontFamily: font.fontFamily,
+            }}
+          >
+            {font.label}
+          </h4>
+          <p
+            className="text-xs"
+            style={{ color: 'var(--theme-fg-muted)' }}
+          >
+            {font.description}
+          </p>
+        </div>
+      </div>
+
+      {/* Preview text */}
+      <div
+        className="p-3 rounded-lg"
+        style={{ backgroundColor: 'var(--theme-bg-darker, var(--theme-bg-dark))' }}
+      >
+        <p
+          style={{
+            fontFamily: font.fontFamily,
+            fontSize: '18px',
+            color: 'var(--theme-fg)',
+            lineHeight: 1.6,
+          }}
+        >
+          {font.previewText}
+        </p>
+      </div>
+    </button>
+  );
+};
+
+// Account Section Component
+const AccountSection = ({ user, onSignOut }) => {
+  if (!user) return null;
+
+  return (
+    <SettingsSection
+      title="Account"
+      icon={User}
+      description="Manage your account settings"
+    >
+      <div
+        className="flex items-center justify-between p-5 rounded-xl max-w-2xl"
+        style={{
+          backgroundColor: 'var(--theme-bg-light)',
+          border: '1px solid var(--theme-bg-lighter)',
+        }}
+      >
+        <div className="flex items-center gap-4">
+          {/* Avatar */}
+          <div
+            className="w-12 h-12 rounded-full flex items-center justify-center font-semibold text-lg"
+            style={{
+              backgroundColor: 'var(--theme-primary)',
+              color: 'var(--theme-bg-darkest)',
+            }}
+          >
+            {user.email?.[0]?.toUpperCase() || 'U'}
+          </div>
+          {/* Email */}
+          <div>
+            <p
+              className="font-medium text-base"
+              style={{ color: 'var(--theme-fg)' }}
+            >
+              {user.email}
+            </p>
+            <p
+              className="text-sm mt-0.5"
+              style={{ color: 'var(--theme-fg-muted)' }}
+            >
+              Signed in
+            </p>
+          </div>
+        </div>
+
+        {/* Sign Out Button */}
+        <button
+          onClick={onSignOut}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 hover:scale-105"
+          style={{
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            color: '#ef4444',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+          }}
+        >
+          <LogOut className="w-4 h-4" />
+          Sign Out
+        </button>
+      </div>
+    </SettingsSection>
+  );
+};
+
 // Main Settings Page Component
 const SettingsPage = ({ onBack }) => {
   const { currentTheme, currentThemeId, setTheme, availableThemes } = useTheme();
-  const { uiSize, setUiSize, sizes, fontSize, setFontSize, fontSizes } = usePreferences();
+  const { uiSize, setUiSize, sizes, fontSize, setFontSize, fontSizes, noteFont, setNoteFont, noteFonts } = usePreferences();
+  const { user, signOut } = useAuth();
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -552,6 +692,9 @@ const SettingsPage = ({ onBack }) => {
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* Account Section */}
+        <AccountSection user={user} onSignOut={signOut} />
+
         {/* Theme Selection Section */}
         <SettingsSection
           title="Appearance"
@@ -641,6 +784,24 @@ const SettingsPage = ({ onBack }) => {
                 size={size}
                 isSelected={fontSize === size.id}
                 onSelect={setFontSize}
+              />
+            ))}
+          </div>
+        </SettingsSection>
+
+        {/* Note Font Settings Section */}
+        <SettingsSection
+          title="Note Font"
+          icon={PenTool}
+          description="Choose the font style for your notes"
+        >
+          <div className="flex gap-4 max-w-2xl">
+            {Object.values(noteFonts).map(font => (
+              <NoteFontOptionCard
+                key={font.id}
+                font={font}
+                isSelected={noteFont === font.id}
+                onSelect={setNoteFont}
               />
             ))}
           </div>

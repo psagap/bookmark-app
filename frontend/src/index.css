@@ -1,5 +1,86 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&family=Source+Serif+4:wght@400;500;600;700&display=swap');
 
+/* Note Font Faces */
+@font-face {
+  font-family: 'Excalifont';
+  src: url('./assets/fonts/Excalifont-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  src: url('./assets/fonts/Nunito-300.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  src: url('./assets/fonts/Nunito-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  src: url('./assets/fonts/Nunito-400-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  src: url('./assets/fonts/Nunito-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  src: url('./assets/fonts/Nunito-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Libre Franklin';
+  src: url('./assets/fonts/LibreFranklin-Variable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Libre Franklin';
+  src: url('./assets/fonts/LibreFranklin-Italic-Variable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  src: url('./assets/fonts/DMSans-Variable.ttf') format('truetype');
+  font-weight: 100 1000;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  src: url('./assets/fonts/DMSans-Italic-Variable.ttf') format('truetype');
+  font-weight: 100 1000;
+  font-style: italic;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -301,41 +382,26 @@ html.font-size-large {
     background: rgba(var(--glow-color-rgb), 0.5);
   }
 
-  /* Note card scroll area - hidden scrollbar by default, shows on hover */
+  /* Note card scroll area - hairline scrollbar */
   .note-scroll-area {
-    scrollbar-width: none;
-    /* Firefox */
-    -ms-overflow-style: none;
-    /* IE/Edge */
+    scrollbar-width: none; /* Hide default Firefox scrollbar */
   }
 
   .note-scroll-area::-webkit-scrollbar {
-    width: 4px;
-    height: 0;
+    width: 2px !important;
   }
 
   .note-scroll-area::-webkit-scrollbar-track {
-    background: transparent;
+    background: transparent !important;
   }
 
   .note-scroll-area::-webkit-scrollbar-thumb {
-    background: transparent;
-    border-radius: 2px;
-    transition: background 0.2s;
+    background: rgba(255, 255, 255, 0.15) !important;
+    border-radius: 1px !important;
   }
 
-  .note-scroll-area:hover::-webkit-scrollbar-thumb {
-    background: rgba(var(--glow-color-rgb), 0.3);
-  }
-
-  .note-scroll-area:hover::-webkit-scrollbar-thumb:hover {
-    background: rgba(var(--glow-color-rgb), 0.5);
-  }
-
-  /* For Firefox - show scrollbar on hover using a workaround */
-  .note-scroll-area:hover {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(var(--glow-color-rgb), 0.3) transparent;
+  .note-scroll-area::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3) !important;
   }
 
   /* Theme-aware mesh gradient background */

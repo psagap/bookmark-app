@@ -9,8 +9,42 @@ const PreferencesContext = createContext(null);
 
 const STORAGE_KEY = 'bookmark-app-ui-size';
 const FONT_SIZE_STORAGE_KEY = 'bookmark-app-font-size';
+const NOTE_FONT_STORAGE_KEY = 'bookmark-app-note-font';
 const DEFAULT_SIZE = 'large';
 const DEFAULT_FONT_SIZE = 'default';
+const DEFAULT_NOTE_FONT = 'excalifont';
+
+// Note font presets
+export const NOTE_FONTS = {
+  excalifont: {
+    id: 'excalifont',
+    label: 'Excalifont',
+    description: 'Handwritten style',
+    fontFamily: "'Excalifont', 'Nunito', -apple-system, sans-serif",
+    previewText: 'Handwritten notes',
+  },
+  nunito: {
+    id: 'nunito',
+    label: 'Nunito',
+    description: 'Clean sans-serif',
+    fontFamily: "'Nunito', -apple-system, BlinkMacSystemFont, sans-serif",
+    previewText: 'Clean modern text',
+  },
+  libreFranklin: {
+    id: 'libreFranklin',
+    label: 'Libre Franklin',
+    description: 'Modern geometric',
+    fontFamily: "'Libre Franklin', -apple-system, BlinkMacSystemFont, sans-serif",
+    previewText: 'Modern geometric',
+  },
+  dmSans: {
+    id: 'dmSans',
+    label: 'DM Sans',
+    description: 'Friendly geometric',
+    fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+    previewText: 'Friendly geometric',
+  },
+};
 
 // Size presets
 export const UI_SIZES = {
@@ -71,6 +105,17 @@ export const PreferencesProvider = ({ children }) => {
     return DEFAULT_FONT_SIZE;
   });
 
+  // Initialize note font from localStorage
+  const [noteFont, setNoteFontState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(NOTE_FONT_STORAGE_KEY);
+      if (saved && NOTE_FONTS[saved]) {
+        return saved;
+      }
+    }
+    return DEFAULT_NOTE_FONT;
+  });
+
   // Apply size class to document root
   const applySize = useCallback((size) => {
     const root = document.documentElement;
@@ -101,6 +146,16 @@ export const PreferencesProvider = ({ children }) => {
     root.style.setProperty('--font-scale', fontConfig.scale);
   }, []);
 
+  // Apply note font to document root
+  const applyNoteFont = useCallback((fontId) => {
+    const root = document.documentElement;
+    const fontConfig = NOTE_FONTS[fontId];
+
+    if (fontConfig) {
+      root.style.setProperty('--note-font-family', fontConfig.fontFamily);
+    }
+  }, []);
+
   // Update size and persist
   const setUiSize = useCallback((size) => {
     if (UI_SIZES[size]) {
@@ -117,6 +172,14 @@ export const PreferencesProvider = ({ children }) => {
     }
   }, []);
 
+  // Update note font and persist
+  const setNoteFont = useCallback((fontId) => {
+    if (NOTE_FONTS[fontId]) {
+      setNoteFontState(fontId);
+      localStorage.setItem(NOTE_FONT_STORAGE_KEY, fontId);
+    }
+  }, []);
+
   // Apply size on mount and when it changes
   useEffect(() => {
     applySize(uiSize);
@@ -127,6 +190,11 @@ export const PreferencesProvider = ({ children }) => {
     applyFontSize(fontSize);
   }, [fontSize, applyFontSize]);
 
+  // Apply note font on mount and when it changes
+  useEffect(() => {
+    applyNoteFont(noteFont);
+  }, [noteFont, applyNoteFont]);
+
   const value = {
     uiSize,
     setUiSize,
@@ -134,6 +202,9 @@ export const PreferencesProvider = ({ children }) => {
     fontSize,
     setFontSize,
     fontSizes: FONT_SIZES,
+    noteFont,
+    setNoteFont,
+    noteFonts: NOTE_FONTS,
   };
 
   return (

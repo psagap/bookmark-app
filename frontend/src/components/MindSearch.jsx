@@ -252,8 +252,14 @@ const findCategoryByKeyword = (keyword) => {
 // ============================================================================
 
 // Active pill in search bar - uses inline styles for consistent colors with FolderTabs
-const ActiveSearchPill = ({ category, onRemove }) => {
+const ActiveSearchPill = ({ category, onRemove, isCompact = false }) => {
   const Icon = category.icon;
+  
+  // Size values based on compact mode
+  const pillPadding = isCompact ? '6px 12px' : '10px 18px';
+  const pillGap = isCompact ? '6px' : '10px';
+  const pillFontSize = isCompact ? '13px' : '16px';
+  const iconSize = isCompact ? '14px' : '18px';
 
   return (
     <motion.div
@@ -266,12 +272,12 @@ const ActiveSearchPill = ({ category, onRemove }) => {
       style={{
         backgroundColor: `${category.hexColor}20`,
         color: category.hexColor,
-        padding: 'var(--ui-pill-py) var(--ui-pill-px)',
-        gap: 'var(--ui-pill-gap)',
-        fontSize: 'var(--ui-pill-text)',
+        padding: pillPadding,
+        gap: pillGap,
+        fontSize: pillFontSize,
       }}
     >
-      <Icon style={{ width: 'var(--ui-pill-icon)', height: 'var(--ui-pill-icon)' }} />
+      <Icon style={{ width: iconSize, height: iconSize }} />
       <span className="font-medium">{category.label}</span>
       <span className="active-search-pill-remove overflow-hidden transition-all duration-200 ease-out opacity-0 group-hover:opacity-100 flex items-center">
         <button
@@ -283,7 +289,7 @@ const ActiveSearchPill = ({ category, onRemove }) => {
           style={{ color: category.hexColor }}
           aria-label={`Remove ${category.label} filter`}
         >
-          <X style={{ width: 'var(--ui-pill-icon)', height: 'var(--ui-pill-icon)' }} />
+          <X style={{ width: iconSize, height: iconSize }} />
         </button>
       </span>
       <style>{`
@@ -477,6 +483,8 @@ const MindSearch = ({
   onTagFilterChange, // Callback for tag filter changes
   tagRefreshTrigger = 0, // Trigger to refetch tags
   mediaCounts = {}, // Counts for each category (video, image, note, tweet, article)
+  isCompact = false, // Compact mode when scrolled
+  sidebarCollapsed = false, // Sidebar collapse state for fluid animation
 }) => {
   // ========== STATE ==========
   const [query, setQuery] = useState('');
@@ -745,34 +753,60 @@ const MindSearch = ({
   };
 
   // ========== RENDER ==========
+  // Fluid spring config for sidebar collapse/expand animation
+  const fluidSpring = {
+    type: "spring",
+    stiffness: 120,
+    damping: 20,
+    mass: 0.8,
+  };
+
   return (
-    <div ref={containerRef} className="relative flex-1 max-w-4xl mx-4">
-      {/* Search Bar Container */}
+    <motion.div 
+      ref={containerRef} 
+      className={cn(
+        "relative flex-1 mr-6",
+        isCompact ? "max-w-2xl" : "max-w-4xl"
+      )}
+      layout
+      transition={fluidSpring}
+    >
+      {/* Search Bar Container - Minimalist, focus-only underline */}
       <motion.div
         className={cn(
-          "relative flex items-center gap-3 rounded-2xl px-6 transition-colors duration-300 ease-out",
-          isFocused
-            ? "bg-gruvbox-bg-dark/40"
-            : "bg-transparent"
+          "relative flex items-center",
+          isCompact ? "gap-3 px-0 py-1 mt-4" : "gap-4 px-0 py-2 mt-6"
         )}
+        style={{
+          borderBottom: isFocused 
+            ? '1px solid rgba(138, 161, 184, 0.35)' 
+            : '1px solid transparent',
+          boxShadow: isFocused
+            ? '0 1px 0 0 rgba(138, 161, 184, 0.1)'
+            : 'none',
+          transition: 'border-color 200ms ease-out, box-shadow 200ms ease-out',
+        }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         layout
-        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        transition={fluidSpring}
       >
-        {/* Search Icon */}
+        {/* Search Icon - soft blue-gray, brightens on focus */}
         <Search
-          className={cn(
-            "w-6 h-6 flex-shrink-0 transition-all duration-200",
-            isFocused ? "text-gruvbox-yellow" : "text-gruvbox-fg-muted/50"
-          )}
+          className="flex-shrink-0 transition-all duration-300"
+          style={{
+            width: isCompact ? '18px' : '22px',
+            height: isCompact ? '18px' : '22px',
+            color: isFocused ? 'rgba(138, 161, 184, 0.85)' : 'rgba(138, 161, 184, 0.5)',
+          }}
+          strokeWidth={1.5}
         />
 
         {/* Active Pills in Search Bar */}
         <motion.div
-          className="flex items-center gap-2"
+          className={cn("flex items-center", isCompact ? "gap-2" : "gap-3")}
           layout
-          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
         >
           <AnimatePresence mode="popLayout">
             {activePills.map(pill => (
@@ -780,6 +814,7 @@ const MindSearch = ({
                 key={pill.id}
                 category={pill}
                 onRemove={() => removePill(pill.id)}
+                isCompact={isCompact}
               />
             ))}
           </AnimatePresence>
@@ -795,12 +830,12 @@ const MindSearch = ({
                 transition={{ type: "spring", stiffness: 500, damping: 35 }}
                 className="flex items-center rounded-full font-medium bg-gruvbox-aqua/20 text-gruvbox-aqua"
                 style={{
-                  padding: 'var(--ui-pill-py) var(--ui-pill-px)',
-                  gap: 'var(--ui-pill-gap)',
-                  fontSize: 'var(--ui-pill-text)',
+                  padding: isCompact ? '6px 12px' : '10px 18px',
+                  gap: isCompact ? '6px' : '10px',
+                  fontSize: isCompact ? '13px' : '16px',
                 }}
               >
-                <Hash style={{ width: 'var(--ui-pill-icon)', height: 'var(--ui-pill-icon)' }} />
+                <Hash style={{ width: isCompact ? '14px' : '18px', height: isCompact ? '14px' : '18px' }} />
                 <span className="font-medium">{tag}</span>
                 <button
                   onClick={(e) => {
@@ -810,7 +845,7 @@ const MindSearch = ({
                   className="ml-0.5 p-0.5 rounded-full hover:bg-black/20 transition-colors text-gruvbox-aqua"
                   aria-label={`Remove ${tag} tag filter`}
                 >
-                  <X style={{ width: 'var(--ui-pill-icon)', height: 'var(--ui-pill-icon)' }} />
+                  <X style={{ width: isCompact ? '14px' : '18px', height: isCompact ? '14px' : '18px' }} />
                 </button>
               </motion.div>
             ))}
@@ -819,9 +854,12 @@ const MindSearch = ({
 
         {/* Input with Ghost Text Overlay */}
         <motion.div
-          className="relative flex-1 min-w-[200px]"
+          className={cn(
+            "relative flex-1 transition-all duration-500",
+            isCompact ? "min-w-[160px]" : "min-w-[240px]"
+          )}
           layout
-          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
         >
           <input
             ref={inputRef}
@@ -830,19 +868,35 @@ const MindSearch = ({
             onChange={(e) => handleQueryChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => setIsFocused(true)}
-            placeholder={getPlaceholder()}
+            placeholder=""
             className={cn(
-              "w-full py-3 bg-transparent text-gruvbox-fg focus:outline-none relative z-10",
-              "font-light tracking-wide",
-              "placeholder:text-gruvbox-fg-muted/30 placeholder:font-light placeholder:italic placeholder:tracking-wide"
+              "w-full bg-transparent text-gruvbox-fg focus:outline-none relative z-10 transition-all duration-300",
+              isCompact
+                ? "py-1 text-[15px] font-normal"
+                : "py-1 text-[22px] font-light tracking-tight"
             )}
             style={{
-              fontFamily: 'Georgia, serif',
-              fontSize: 'var(--ui-search-text)',
+              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
             }}
             aria-label="Search filters"
             autoComplete="off"
           />
+          {/* Italic serif placeholder overlay - shown when input is empty */}
+          {!query && (
+            <div
+              className="absolute inset-0 flex items-center pointer-events-none select-none"
+              style={{
+                fontFamily: "'Georgia', 'Playfair Display', 'Times New Roman', serif",
+                fontStyle: 'italic',
+                fontWeight: 400,
+                fontSize: isCompact ? '16px' : '24px',
+                color: 'rgba(138, 161, 184, 0.7)',
+                letterSpacing: '0.02em',
+              }}
+            >
+              {getPlaceholder()}
+            </div>
+          )}
 
           <GhostTextOverlay query={query} ghostText={ghostText} />
 
@@ -923,14 +977,19 @@ const MindSearch = ({
           {hasActivePills && (
             <motion.button
               onClick={clearAll}
-              className="p-2 rounded-lg text-gruvbox-fg-muted/60 hover:text-gruvbox-red hover:bg-gruvbox-red/10 transition-colors"
+              className="rounded-full hover:bg-red-500/10 transition-all p-2"
+              style={{
+                color: 'rgba(138, 161, 184, 0.5)',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(239, 68, 68, 0.8)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(138, 161, 184, 0.5)'}
               title="Clear all filters"
               aria-label="Clear all filters"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 transition-all" strokeWidth={1.75} />
             </motion.button>
           )}
         </AnimatePresence>
@@ -942,7 +1001,7 @@ const MindSearch = ({
         <motion.div
           className="mt-4 flex items-center justify-center gap-3 overflow-hidden"
           layout
-          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          transition={fluidSpring}
         >
           {MIND_CATEGORIES.map((category) => (
             <TabPill
@@ -954,7 +1013,7 @@ const MindSearch = ({
           ))}
         </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 };
 

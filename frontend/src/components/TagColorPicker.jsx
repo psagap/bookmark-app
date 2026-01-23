@@ -1,37 +1,37 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, MoreHorizontal, Palette } from 'lucide-react';
+import { Check, X, MoreHorizontal, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAllTagColors, getTagColor, setTagColor } from '@/utils/tagColors';
 
 /**
- * TagColorPicker - Notion-style color picker for tags
+ * Modern Tag System - Minimalist, theme-adaptive tag pills with color picker
  *
- * Usage:
- * <TagColorPicker tagName="myTag" onColorChange={(colorId) => { ... }}>
- *   <TagPill>myTag</TagPill>
- * </TagColorPicker>
- *
- * Or use the hook:
- * const { showPicker, openPicker, closePicker } = useTagColorPicker();
+ * Design principles:
+ * - Clean, borderless pills with subtle backgrounds
+ * - Smooth micro-interactions (scale, opacity transitions)
+ * - Theme-adaptive using CSS variables
+ * - Accessible with proper contrast
+ * - No harsh borders or heavy shadows
  */
 
 const ColorSwatch = ({ color, isSelected, onClick }) => (
   <button
     onClick={onClick}
     className={cn(
-      "relative w-7 h-7 rounded-lg transition-all duration-150 flex items-center justify-center",
-      "hover:scale-110 hover:ring-2 ring-offset-1 ring-offset-gruvbox-bg-dark",
-      isSelected && "ring-2"
+      "relative w-5 h-5 rounded-full transition-all duration-150 flex items-center justify-center",
+      "hover:scale-110 focus:outline-none",
+      isSelected && "ring-[1.5px] ring-offset-[2px] scale-105"
     )}
     style={{
       backgroundColor: color.hover,
-      ringColor: color.text,
+      '--tw-ring-color': color.hover,
+      '--tw-ring-offset-color': 'var(--theme-bg-dark, #1d2021)',
     }}
     title={color.name}
   >
     {isSelected && (
-      <Check className="w-4 h-4 text-gruvbox-bg-darkest" strokeWidth={3} />
+      <Check className="w-2.5 h-2.5" strokeWidth={3} style={{ color: color.hoverText }} />
     )}
   </button>
 );
@@ -45,6 +45,26 @@ const ColorPickerDropdown = ({
 }) => {
   const dropdownRef = useRef(null);
   const colors = getAllTagColors();
+  const [adjustedPos, setAdjustedPos] = useState(position);
+
+  // Adjust position after render to stay in viewport
+  useEffect(() => {
+    if (dropdownRef.current) {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      const newPos = { ...position };
+
+      if (position.left + rect.width > window.innerWidth - 16) {
+        newPos.left = window.innerWidth - rect.width - 16;
+      }
+      if (position.top + rect.height > window.innerHeight - 16) {
+        newPos.top = position.top - rect.height - 8;
+      }
+      if (newPos.left < 16) newPos.left = 16;
+      if (newPos.top < 16) newPos.top = 16;
+
+      setAdjustedPos(newPos);
+    }
+  }, [position]);
 
   // Close on click outside, escape, or scroll
   useEffect(() => {
@@ -55,18 +75,13 @@ const ColorPickerDropdown = ({
     };
 
     const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
 
-    const handleScroll = () => {
-      onClose();
-    };
+    const handleScroll = () => onClose();
 
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
-    // Use capture phase to catch scroll events from any scrollable container
     window.addEventListener('scroll', handleScroll, true);
 
     return () => {
@@ -76,50 +91,27 @@ const ColorPickerDropdown = ({
     };
   }, [onClose]);
 
-  // Adjust position to stay in viewport
-  const adjustedPosition = { ...position };
-  if (typeof window !== 'undefined') {
-    const dropdownWidth = 200;
-    const dropdownHeight = 120;
-
-    if (position.left + dropdownWidth > window.innerWidth - 16) {
-      adjustedPosition.left = window.innerWidth - dropdownWidth - 16;
-    }
-    if (position.top + dropdownHeight > window.innerHeight - 16) {
-      adjustedPosition.top = position.top - dropdownHeight - 8;
-    }
-  }
-
   return createPortal(
     <div
       ref={dropdownRef}
-      className="fixed z-[10000] animate-in fade-in zoom-in-95 duration-150"
+      className="fixed z-[10000]"
       style={{
-        top: adjustedPosition.top,
-        left: adjustedPosition.left,
+        top: adjustedPos.top,
+        left: adjustedPos.left,
+        animation: 'tagPickerIn 0.12s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       <div
-        className="rounded-xl shadow-2xl overflow-hidden"
+        className="rounded-lg overflow-hidden"
         style={{
-          background: 'linear-gradient(180deg, rgba(60, 56, 54, 0.98) 0%, rgba(40, 40, 40, 0.98) 100%)',
-          backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(215, 153, 33, 0.2)',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05) inset',
+          background: 'var(--theme-bg-dark, #282828)',
+          border: '1px solid color-mix(in srgb, var(--theme-fg-muted, #a89984) 12%, transparent)',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.35)',
         }}
       >
-        {/* Header */}
-        <div className="px-3 py-2 border-b border-gruvbox-bg-lighter/30">
-          <div className="flex items-center gap-2 text-xs text-gruvbox-fg-muted">
-            <Palette className="w-3 h-3" />
-            <span>Color for</span>
-            <span className="font-medium text-gruvbox-fg">#{tagName}</span>
-          </div>
-        </div>
-
         {/* Color Grid */}
-        <div className="p-3">
-          <div className="grid grid-cols-4 gap-2">
+        <div className="px-3 py-2.5">
+          <div className="flex items-center gap-2">
             {colors.map((color) => (
               <ColorSwatch
                 key={color.id}
@@ -135,18 +127,37 @@ const ColorPickerDropdown = ({
         </div>
 
         {/* Reset option */}
-        <div className="px-3 pb-3">
+        <div
+          className="px-3 pb-2"
+          style={{
+            borderTop: '1px solid color-mix(in srgb, var(--theme-fg-muted, #a89984) 8%, transparent)',
+          }}
+        >
           <button
             onClick={() => {
-              onSelect(null); // Reset to default
+              onSelect(null);
               onClose();
             }}
-            className="w-full text-xs text-gruvbox-fg-muted hover:text-gruvbox-fg py-1.5 rounded-md hover:bg-gruvbox-bg-lighter/30 transition-colors"
+            className="w-full text-[10px] pt-1.5 pb-0.5 rounded transition-all duration-150 hover:opacity-100 opacity-40"
+            style={{ color: 'var(--theme-fg-muted, #a89984)' }}
           >
-            Reset to default
+            Reset
           </button>
         </div>
       </div>
+
+      <style>{`
+        @keyframes tagPickerIn {
+          from {
+            opacity: 0;
+            transform: scale(0.96) translateY(-2px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+      `}</style>
     </div>,
     document.body
   );
@@ -177,7 +188,7 @@ export const TagColorPicker = ({
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect) {
       setPosition({
-        top: rect.bottom + 8,
+        top: rect.bottom + 6,
         left: rect.left,
       });
     }
@@ -233,7 +244,7 @@ export const TagColorPickerTrigger = ({
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect) {
       setPosition({
-        top: rect.bottom + 8,
+        top: rect.bottom + 6,
         left: rect.left,
       });
     }
@@ -251,13 +262,15 @@ export const TagColorPickerTrigger = ({
         ref={triggerRef}
         onClick={handleClick}
         className={cn(
-          "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-gruvbox-fg-muted hover:text-gruvbox-fg hover:bg-gruvbox-bg-lighter/50 transition-colors",
+          "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-all duration-150",
+          "opacity-60 hover:opacity-100",
           className
         )}
+        style={{ color: 'var(--theme-fg-muted, #a89984)' }}
       >
         <div
           className="w-3 h-3 rounded-full"
-          style={{ backgroundColor: currentColor.hover }}
+          style={{ backgroundColor: currentColor.text }}
         />
         <Palette className="w-3 h-3" />
       </button>
@@ -276,8 +289,9 @@ export const TagColorPickerTrigger = ({
 };
 
 /**
- * Tag Pill with built-in color picker
- * Click to open color picker, appears on all tag displays
+ * Modern Tag Pill
+ * Minimal, borderless pill with subtle tinted background
+ * Right-click for color picker
  */
 export const TagPill = ({
   tag,
@@ -292,14 +306,24 @@ export const TagPill = ({
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const pillRef = useRef(null);
 
-  // Get color from props or fetch it
   const tagColor = color || getTagColor(tag);
 
-  const sizeClasses = {
-    small: 'text-[10px] px-2 py-0.5',
-    default: 'text-xs px-2.5 py-1',
-    large: 'text-sm px-3 py-1.5',
+  const sizeConfig = {
+    small: {
+      text: 'text-[10px]',
+      padding: 'px-1.5 py-[2px]',
+    },
+    default: {
+      text: 'text-[11px]',
+      padding: 'px-2 py-[3px]',
+    },
+    large: {
+      text: 'text-xs',
+      padding: 'px-2.5 py-[4px]',
+    },
   };
+
+  const config = sizeConfig[size];
 
   const handleContextMenu = (e) => {
     if (!showColorPicker) return;
@@ -310,7 +334,7 @@ export const TagPill = ({
     const rect = pillRef.current?.getBoundingClientRect();
     if (rect) {
       setPosition({
-        top: rect.bottom + 8,
+        top: rect.bottom + 6,
         left: rect.left,
       });
     }
@@ -329,20 +353,21 @@ export const TagPill = ({
         onClick={onClick}
         onContextMenu={handleContextMenu}
         className={cn(
-          "inline-flex items-center gap-1 rounded-full font-medium transition-all duration-150",
-          showColorPicker && "cursor-context-menu hover:ring-2 hover:ring-offset-1 hover:ring-offset-gruvbox-bg-dark",
+          "modern-tag-pill inline-flex items-center rounded-full font-medium transition-all duration-150",
+          "hover:brightness-125",
+          config.text,
+          config.padding,
+          showColorPicker && "cursor-context-menu",
           onClick && "cursor-pointer",
-          sizeClasses[size],
           className
         )}
         style={{
           backgroundColor: tagColor.bg,
           color: tagColor.text,
-          '--tw-ring-color': tagColor.border,
         }}
         title={showColorPicker ? "Right-click to change color" : undefined}
       >
-        #{tag}
+        <span className="leading-none">{tag}</span>
       </span>
 
       {isPickerOpen && (
@@ -359,8 +384,8 @@ export const TagPill = ({
 };
 
 /**
- * DeletableTagPill - Tag pill with animated hover-to-reveal action button
- * Action expands from the right on hover
+ * DeletableTagPill - Clean minimal pill with hover-reveal close button
+ * No dot, no border - just text on subtle background
  */
 export const DeletableTagPill = ({
   tag,
@@ -369,7 +394,7 @@ export const DeletableTagPill = ({
   onDelete,
   onColorChange,
   showColorPicker = true,
-  size = 'default', // 'small' | 'default' | 'large'
+  size = 'default',
   actionIcon = 'delete', // 'delete' | 'menu'
   className,
 }) => {
@@ -377,31 +402,31 @@ export const DeletableTagPill = ({
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const pillRef = useRef(null);
 
-  // Get color from props or fetch it
   const tagColor = color || getTagColor(tag);
 
-  const sizeClasses = {
-    small: 'text-[10px] py-0.5',
-    default: 'text-xs py-1',
-    large: 'text-sm py-1.5',
+  const sizeConfig = {
+    small: {
+      text: 'text-[10px]',
+      padding: 'px-1.5 py-[2px]',
+      btnSize: 'w-3 h-3',
+      iconSize: 'w-2 h-2',
+    },
+    default: {
+      text: 'text-[11px]',
+      padding: 'px-2 py-[3px]',
+      btnSize: 'w-3.5 h-3.5',
+      iconSize: 'w-2.5 h-2.5',
+    },
+    large: {
+      text: 'text-xs',
+      padding: 'px-2.5 py-[4px]',
+      btnSize: 'w-4 h-4',
+      iconSize: 'w-3 h-3',
+    },
   };
 
-  const paddingClasses = {
-    small: 'px-2',
-    default: 'px-2.5',
-    large: 'px-3',
-  };
-
-  const deleteButtonSizes = {
-    small: 'w-3.5 h-3.5 text-[9px]',
-    default: 'w-4 h-4 text-[10px]',
-    large: 'w-5 h-5 text-xs',
-  };
-  const actionIconSizes = {
-    small: 'w-3 h-3',
-    default: 'w-3.5 h-3.5',
-    large: 'w-4 h-4',
-  };
+  const config = sizeConfig[size];
+  const showActionButton = actionIcon === 'menu' ? showColorPicker : !!onDelete;
 
   const openColorPicker = (e) => {
     if (!showColorPicker) return;
@@ -410,7 +435,7 @@ export const DeletableTagPill = ({
     const rect = pillRef.current?.getBoundingClientRect();
     if (rect) {
       setPosition({
-        top: rect.bottom + 8,
+        top: rect.bottom + 6,
         left: rect.left,
       });
     }
@@ -442,15 +467,8 @@ export const DeletableTagPill = ({
   };
 
   const handleClick = (e) => {
-    if (onClick) {
-      onClick(e, tag);
-    }
+    if (onClick) onClick(e, tag);
   };
-
-  const showActionButton = actionIcon === 'menu' ? showColorPicker : !!onDelete;
-  const actionLabel = actionIcon === 'menu'
-    ? `Change color for ${tag}`
-    : `Remove ${tag} tag`;
 
   return (
     <>
@@ -459,41 +477,39 @@ export const DeletableTagPill = ({
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         className={cn(
-          "deletable-tag-pill inline-flex items-center rounded-full font-medium transition-all duration-150 group",
+          "modern-tag-pill inline-flex items-center gap-1 rounded-full font-medium transition-all duration-150 group/tag",
+          "hover:brightness-125",
+          config.text,
+          config.padding,
           showColorPicker && "cursor-context-menu",
           onClick && "cursor-pointer",
-          sizeClasses[size],
           className
         )}
         style={{
           backgroundColor: tagColor.bg,
           color: tagColor.text,
-          border: `1px solid ${tagColor.border}`,
-          '--tw-ring-color': tagColor.border,
         }}
         title={showColorPicker ? "Right-click to change color" : undefined}
       >
-        <span className={paddingClasses[size]}>#{tag}</span>
+        <span className="leading-none">{tag}</span>
 
-        {/* Animated delete button - expands from right on hover */}
+        {/* Action button - appears on hover */}
         {showActionButton && (
-          <span className="deletable-tag-delete-wrapper overflow-hidden transition-all duration-200 ease-out opacity-0 group-hover:opacity-100 flex items-center">
-            <button
-              onClick={handleActionClick}
-              className={cn(
-                "flex items-center justify-center rounded-full transition-all duration-150",
-                "bg-black/20 hover:bg-black/40",
-                deleteButtonSizes[size]
-              )}
-              aria-label={actionLabel}
-            >
-              {actionIcon === 'menu' ? (
-                <MoreHorizontal className={actionIconSizes[size]} />
-              ) : (
-                <span className="leading-none">×</span>
-              )}
-            </button>
-          </span>
+          <button
+            onClick={handleActionClick}
+            className={cn(
+              "flex items-center justify-center rounded-full transition-all duration-150",
+              "opacity-0 scale-75 group-hover/tag:opacity-70 group-hover/tag:scale-100 hover:!opacity-100",
+              config.btnSize
+            )}
+            aria-label={actionIcon === 'menu' ? `Change color for ${tag}` : `Remove ${tag} tag`}
+          >
+            {actionIcon === 'menu' ? (
+              <MoreHorizontal className={config.iconSize} />
+            ) : (
+              <X className={config.iconSize} strokeWidth={2.5} />
+            )}
+          </button>
         )}
       </span>
 
@@ -506,19 +522,6 @@ export const DeletableTagPill = ({
           onClose={() => setIsPickerOpen(false)}
         />
       )}
-
-      {/* Inline styles for the animation */}
-      <style>{`
-        .deletable-tag-pill .deletable-tag-delete-wrapper {
-          max-width: 0;
-          padding-right: 0;
-          transition: max-width 0.2s ease-out, opacity 0.15s ease-out, padding 0.2s ease-out;
-        }
-        .deletable-tag-pill:hover .deletable-tag-delete-wrapper {
-          max-width: 18px;
-          padding-right: 6px;
-        }
-      `}</style>
     </>
   );
 };

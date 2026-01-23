@@ -161,6 +161,35 @@ async function saveBookmarkToSupabase(bookmark) {
   return savedBookmark;
 }
 
+/**
+ * Update tags for an existing bookmark
+ */
+async function updateBookmarkTags(bookmarkId, tags) {
+  const accessToken = await getAccessToken();
+
+  if (!accessToken) {
+    throw new Error('Not authenticated');
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/bookmarks?id=eq.${bookmarkId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${accessToken}`,
+      'Prefer': 'return=minimal',
+    },
+    body: JSON.stringify({ tags }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to update tags');
+  }
+
+  return true;
+}
+
 // Initialize IndexedDB for offline storage
 const DB_NAME = 'BookmarkAppDB';
 const DB_VERSION = 1;
@@ -229,6 +258,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Context menu registration - acknowledge the message to prevent callback errors
     sendResponse({ success: true });
     return false; // Synchronous response
+  }
+
+  if (request.action === 'updateBookmarkTags') {
+    updateBookmarkTags(request.data.id, request.data.tags)
+      .then(() => sendResponse({ success: true }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
   }
 });
 

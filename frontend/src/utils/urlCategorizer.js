@@ -212,6 +212,18 @@ const DOMAIN_PATTERNS = {
     /\/dp\//i,
   ],
 
+  // Books
+  book: [
+    /goodreads\.com\/book\//i,
+    /goodreads\.com\/author\//i,
+    /books\.google\.com/i,
+    /amazon\..*\/dp\/\w+.*(?:book|paperback|hardcover|kindle)/i,
+    /bookshop\.org/i,
+    /librarything\.com/i,
+    /openlibrary\.org/i,
+    /storygraph\.com/i,
+  ],
+
   // Academic / Research
   academic: [
     /arxiv\.org/i,
@@ -362,6 +374,12 @@ export const CATEGORY_META = {
     color: '#7c3aed',
     subCategories: ['paper', 'journal', 'research'],
   },
+  book: {
+    label: 'Book',
+    icon: 'BookOpen',
+    color: '#8B4513',
+    subCategories: ['fiction', 'non-fiction', 'ebook'],
+  },
   recipe: {
     label: 'Recipe',
     icon: 'ChefHat',
@@ -507,6 +525,46 @@ function getSubCategory(category, url, hostname, pathname) {
       if (pathname.includes('/api')) return 'api-docs';
       return 'docs';
 
+    case 'audio':
+      if (hostname.includes('spotify')) {
+        if (pathname.includes('/track/')) return 'spotify-track';
+        if (pathname.includes('/album/')) return 'spotify-album';
+        if (pathname.includes('/playlist/')) return 'spotify-playlist';
+        if (pathname.includes('/artist/')) return 'spotify-artist';
+        if (pathname.includes('/episode/')) return 'podcast-episode';
+        if (pathname.includes('/show/')) return 'podcast-show';
+        return 'spotify';
+      }
+      if (hostname.includes('music.apple.com')) return 'apple-music';
+      if (hostname.includes('soundcloud')) return 'soundcloud';
+      if (hostname.includes('bandcamp')) return 'bandcamp';
+      if (hostname.includes('podcasts.apple.com')) return 'podcast';
+      return 'music';
+
+    case 'book':
+      if (hostname.includes('goodreads')) return 'goodreads';
+      if (hostname.includes('books.google')) return 'google-books';
+      if (hostname.includes('bookshop.org')) return 'bookshop';
+      if (hostname.includes('openlibrary')) return 'openlibrary';
+      return 'book';
+
+    case 'product':
+      if (hostname.includes('amazon.')) return 'amazon';
+      if (hostname.includes('ebay.')) return 'ebay';
+      if (hostname.includes('etsy.')) return 'etsy';
+      if (hostname.includes('walmart.')) return 'walmart';
+      if (hostname.includes('bestbuy.')) return 'bestbuy';
+      return 'shop';
+
+    case 'recipe':
+      if (hostname.includes('allrecipes')) return 'allrecipes';
+      if (hostname.includes('seriouseats')) return 'seriouseats';
+      if (hostname.includes('epicurious')) return 'epicurious';
+      if (hostname.includes('bonappetit')) return 'bonappetit';
+      if (hostname.includes('food52')) return 'food52';
+      if (hostname.includes('tasty')) return 'tasty';
+      return 'recipe';
+
     default:
       return category;
   }
@@ -563,6 +621,10 @@ export function getCardType(bookmark) {
         return 'audio';
       case 'product':
         return 'product';
+      case 'book':
+        return 'book';
+      case 'recipe':
+        return 'recipe';
       case 'academic':
         return 'academic';
       case 'design':

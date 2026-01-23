@@ -1,320 +1,328 @@
-// Auto-detect source/category from URL
-function detectSource(url) {
-  const urlLower = url.toLowerCase();
+// ============================================
+// Thinkback Extension - Popup Controller
+// ============================================
 
-  // X/Twitter
-  if (urlLower.includes('twitter.com') || urlLower.includes('x.com')) {
-    const isThread = urlLower.includes('/status/') && document.title?.includes('Thread');
-    return {
-      category: 'X',
-      subCategory: isThread ? 'thread' : 'tweet',
-      source: 'X'
-    };
-  }
+// Elements
+const badgeCard = document.getElementById('badgeCard');
+const borderSvg = document.getElementById('borderSvg');
+const detailsSection = document.getElementById('detailsSection');
+const arrowIcon = document.getElementById('arrowIcon');
+const iconWrapper = document.getElementById('iconWrapper');
+const logo = document.getElementById('logo');
+const label = document.getElementById('label');
+const title = document.getElementById('title');
+const source = document.getElementById('source');
+const statusPill = document.getElementById('statusPill');
+const statusText = document.getElementById('statusText');
+const timerProgress = document.getElementById('timerProgress');
+const tagChips = document.getElementById('tagChips');
+const tagInput = document.getElementById('tagInput');
+const addTagBtn = document.getElementById('addTagBtn');
+const selectedTagsSection = document.getElementById('selectedTagsSection');
+const selectedTags = document.getElementById('selectedTags');
 
-  // Instagram
-  if (urlLower.includes('instagram.com')) {
-    let subCategory = 'post';
-    if (urlLower.includes('/reel/')) subCategory = 'reel';
-    else if (urlLower.includes('/stories/')) subCategory = 'story';
-    return { category: 'Instagram', subCategory, source: 'Instagram' };
-  }
+// State
+let isOpen = false;
+let selectedTagsList = [];
+let currentBookmarkId = null;
+let running = false;
+let paused = false;
+let start = 0;
+let remaining = 6000; // 6 seconds
 
-  // Substack
-  if (urlLower.includes('substack.com') || urlLower.includes('.substack.')) {
-    return { category: 'Substack', subCategory: 'article', source: 'Substack' };
-  }
+// ============================================
+// Toggle Details Section
+// ============================================
 
-  // YouTube
-  if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) {
-    let subCategory = 'video';
-    if (urlLower.includes('/shorts/')) subCategory = 'short';
-    if (urlLower.includes('/playlist')) subCategory = 'playlist';
-    return { category: 'YouTube', subCategory, source: 'YouTube' };
-  }
+function toggleDetails() {
+  isOpen = !isOpen;
+  detailsSection.classList.toggle('open', isOpen);
+  arrowIcon.classList.toggle('open', isOpen);
 
-  // Wikipedia
-  if (urlLower.includes('wikipedia.org')) {
-    return { category: 'Wikipedia', subCategory: 'article', source: 'Wikipedia' };
-  }
-
-  // GitHub
-  if (urlLower.includes('github.com')) {
-    let subCategory = 'repo';
-    if (urlLower.includes('/issues/')) subCategory = 'issue';
-    else if (urlLower.includes('/pull/')) subCategory = 'pr';
-    else if (urlLower.includes('/discussions/')) subCategory = 'discussion';
-    return { category: 'GitHub', subCategory, source: 'GitHub' };
-  }
-
-  // Reddit
-  if (urlLower.includes('reddit.com')) {
-    return { category: 'Reddit', subCategory: 'post', source: 'Reddit' };
-  }
-
-  // Medium
-  if (urlLower.includes('medium.com')) {
-    return { category: 'Medium', subCategory: 'article', source: 'Medium' };
-  }
-
-  // LinkedIn
-  if (urlLower.includes('linkedin.com')) {
-    let subCategory = 'post';
-    if (urlLower.includes('/article/')) subCategory = 'article';
-    return { category: 'LinkedIn', subCategory, source: 'LinkedIn' };
-  }
-
-  // TikTok
-  if (urlLower.includes('tiktok.com')) {
-    return { category: 'TikTok', subCategory: 'video', source: 'TikTok' };
-  }
-
-  // Default: extract domain as source
-  try {
-    const hostname = new URL(url).hostname.replace('www.', '');
-    const domain = hostname.split('.')[0];
-    const sourceName = domain.charAt(0).toUpperCase() + domain.slice(1);
-    return { category: 'Article', subCategory: 'webpage', source: sourceName };
-  } catch {
-    return { category: 'Article', subCategory: 'webpage', source: 'Web' };
+  // Pause timer when details are open
+  if (isOpen && running) {
+    paused = true;
+    remaining -= performance.now() - start;
   }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-  const timerLine = document.getElementById('timer-line');
-  const pageTitle = document.getElementById('page-title');
-  const pageDomain = document.getElementById('page-domain');
-  const tagsInput = document.getElementById('tags-input');
-  const noteInput = document.getElementById('note-input');
-  const saveBtn = document.getElementById('save-btn');
-  const cancelBtn = document.getElementById('cancel-btn');
-  const retryBtn = document.getElementById('retry-btn');
-  const openAppBtn = document.getElementById('open-app-btn');
-
-  const loginState = document.getElementById('login-state');
-  const inputState = document.getElementById('main-content');
-  const successState = document.getElementById('success-state');
-  const errorState = document.getElementById('error-state');
-
-  let currentMetadata = null;
-  let timerInterval;
-  const TOTAL_TIME = 7000; // 7 seconds
-  let timeLeft = TOTAL_TIME;
-  let isPaused = false;
-
-  // Check authentication first
-  const checkAuth = () => {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action: 'checkAuth' }, (response) => {
-        resolve(response?.authenticated || false);
-      });
-    });
-  };
-
-  const isAuthenticated = await checkAuth();
-
-  if (!isAuthenticated) {
-    // Show login required state
-    loginState.classList.remove('hidden');
-    timerLine.parentElement.classList.add('hidden');
-
-    openAppBtn.addEventListener('click', () => {
-      // Open the main app for login
-      chrome.tabs.create({ url: 'http://localhost:5173' });
-      window.close();
-    });
-    return; // Don't proceed further
+badgeCard.addEventListener('click', (e) => {
+  // Don't toggle if clicking on input or buttons inside
+  if (e.target.closest('.tag-input') || e.target.closest('.tag-add-btn') || e.target.closest('.tag-chip')) {
+    return;
   }
+  toggleDetails();
+});
 
-  // User is authenticated, show main content
-  inputState.classList.remove('hidden');
+// ============================================
+// Timer
+// ============================================
 
-  // Initialize
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-    // Optimistically set title/domain
-    pageTitle.textContent = tab.title;
-    try {
-      pageDomain.textContent = new URL(tab.url).hostname;
-    } catch (e) {
-      pageDomain.textContent = tab.url;
-    }
-
-    // Request full metadata
-    chrome.tabs.sendMessage(tab.id, { action: 'getPageMetadata' }, (response) => {
-      if (chrome.runtime.lastError) {
-        // Fallback
-        currentMetadata = {
-          url: tab.url,
-          title: tab.title,
-          favicon: tab.favIconUrl
-        };
-      } else if (response && response.success) {
-        currentMetadata = response.data;
-        pageTitle.textContent = currentMetadata.title || tab.title;
-      }
-
-      // Auto-tagging after metadata is ready
-      generateAutoTags(currentMetadata);
-    });
-
-    // Start Timer
-    startTimer();
-
-  } catch (err) {
-    console.error(err);
-    showError('Could not connect to page.');
-  }
-
-  function startTimer() {
-    const startTime = Date.now();
-    const endTime = startTime + timeLeft;
-
-    timerInterval = setInterval(() => {
-      if (isPaused) return;
-
-      const now = Date.now();
-      const remaining = endTime - now;
-
-      if (remaining <= 0) {
-        clearInterval(timerInterval);
-        timerLine.style.width = '0%';
-        saveBookmark(); // Auto-save when timer ends
-      } else {
-        const percentage = (remaining / TOTAL_TIME) * 100;
-        timerLine.style.width = `${percentage}%`;
-      }
-    }, 16); // ~60fps
-  }
-
-  function pauseTimer() {
-    isPaused = true;
-    timerLine.style.opacity = '0.5';
-  }
-
-  function generateAutoTags(metadata) {
-    if (!metadata) return;
-    const tags = [];
-    const url = metadata.url.toLowerCase();
-
-    // Auto-tags based on detected source
-    if (url.includes('youtube') || url.includes('youtu.be')) tags.push('video');
-    if (url.includes('twitter') || url.includes('x.com')) tags.push('social');
-    if (url.includes('instagram')) tags.push('social');
-    if (url.includes('substack')) tags.push('newsletter', 'read');
-    if (url.includes('github')) tags.push('code', 'dev');
-    if (url.includes('medium') || url.includes('dev.to')) tags.push('article', 'read');
-    if (url.includes('wikipedia')) tags.push('reference', 'learn');
-    if (url.includes('reddit')) tags.push('discussion', 'social');
-    if (url.includes('linkedin')) tags.push('professional', 'social');
-    if (url.includes('tiktok')) tags.push('video', 'social');
-    if (url.includes('design') || url.includes('dribbble') || url.includes('figma')) tags.push('design', 'inspiration');
-
-    // Set tags if any found
-    if (tags.length > 0) {
-      tagsInput.value = tags.join(', ');
-    }
-  }
-
-  // User Interaction pauses timer
-  [tagsInput, noteInput].forEach(input => {
-    input.addEventListener('focus', pauseTimer);
-    input.addEventListener('input', pauseTimer);
-  });
-
-  // Save Handler
-  async function saveBookmark() {
-    clearInterval(timerInterval);
-
-    if (!currentMetadata) {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      currentMetadata = { url: tab.url, title: tab.title, favicon: tab.favIconUrl };
-    }
-
-    const tags = tagsInput.value.split(',').map(t => t.trim()).filter(t => t);
-    const notes = noteInput.value.trim();
-
-    // Auto-detect source from URL
-    const { category, subCategory, source } = detectSource(currentMetadata.url);
-
-    // Build thumbnail with comprehensive fallback chain
-    // For tweets: cardImage (embedded links) > tweetMedia > ogImage
-    // For other sites: ogImage > site-specific images
-    let thumbnail = '';
-    if (currentMetadata.tweetData) {
-      // Tweet-specific thumbnail priority:
-      // 1. Card image (embedded link preview - the user's main request)
-      // 2. First tweet media image
-      // 3. Video poster
-      // 4. OG image from meta tags
-      const tweetData = currentMetadata.tweetData;
-      const firstMedia = tweetData.tweetMedia?.[0];
-      thumbnail = tweetData.cardImage
-        || (firstMedia?.type === 'image' ? firstMedia.url : '')
-        || (firstMedia?.type === 'video' ? firstMedia.poster : '')
-        || currentMetadata.ogImage
-        || '';
-    } else {
-      thumbnail = currentMetadata.ogImage || currentMetadata.wikipediaData?.thumbnail || '';
-    }
-
-    const bookmarkData = {
-      url: currentMetadata.url,
-      title: currentMetadata.title,
-      category,
-      subCategory,
-      source,
-      tags,
-      notes,
-      thumbnail,
-      metadata: {
-        ogDescription: currentMetadata.ogDescription,
-        tweetData: currentMetadata.tweetData,
-        wikipediaData: currentMetadata.wikipediaData
-      }
-    };
-
-    // DEBUG: Log what's being saved
-    console.log('[Popup] Saving bookmark:', JSON.stringify(bookmarkData, null, 2));
-
-    // Send to background
-    chrome.runtime.sendMessage({ action: 'saveBookmark', data: bookmarkData }, (response) => {
-      if (chrome.runtime.lastError) {
-        showError('Background service error.');
-      } else if (response && response.success) {
-        showSuccess();
-      } else {
-        showError(response?.error || 'Failed to save.');
-      }
-    });
-  }
-
-  saveBtn.addEventListener('click', saveBookmark);
-
-  cancelBtn.addEventListener('click', () => {
-    window.close();
-  });
-
-  retryBtn.addEventListener('click', () => {
-    errorState.classList.add('hidden');
-    inputState.classList.remove('hidden');
-    startTimer();
-  });
-
-  function showSuccess() {
-    inputState.classList.add('hidden');
-    timerLine.parentElement.classList.add('hidden'); // Hide timer
-    successState.classList.remove('hidden');
-
-    setTimeout(() => {
-      window.close();
-    }, 2000);
-  }
-
-  function showError(msg) {
-    inputState.classList.add('hidden');
-    errorState.classList.remove('hidden');
-    document.getElementById('error-message').textContent = msg;
+badgeCard.addEventListener('mouseenter', () => {
+  if (running && !isOpen) {
+    paused = true;
+    remaining -= performance.now() - start;
   }
 });
+
+badgeCard.addEventListener('mouseleave', () => {
+  if (running && paused && !isOpen) {
+    paused = false;
+    start = performance.now();
+  }
+});
+
+function tick() {
+  if (!running) return;
+  if (paused) return requestAnimationFrame(tick);
+
+  const left = remaining - (performance.now() - start);
+  timerProgress.style.transform = `scaleX(${Math.max(0, left / 6000)})`;
+
+  if (left <= 0) window.close();
+  else requestAnimationFrame(tick);
+}
+
+function startTimer() {
+  running = true;
+  start = performance.now();
+  remaining = 6000;
+  tick();
+}
+
+// ============================================
+// Tag Management
+// ============================================
+
+function addTag(tag) {
+  const normalizedTag = tag.trim().toLowerCase();
+  if (!normalizedTag || selectedTagsList.includes(normalizedTag)) return;
+
+  selectedTagsList.push(normalizedTag);
+  updateSelectedTagsUI();
+  updateTagChipsUI();
+  saveTagsToBookmark();
+}
+
+function removeTag(tag) {
+  selectedTagsList = selectedTagsList.filter(t => t !== tag);
+  updateSelectedTagsUI();
+  updateTagChipsUI();
+  saveTagsToBookmark();
+}
+
+function updateSelectedTagsUI() {
+  if (selectedTagsList.length === 0) {
+    selectedTagsSection.style.display = 'none';
+    return;
+  }
+
+  selectedTagsSection.style.display = 'block';
+  selectedTags.innerHTML = selectedTagsList.map(tag => `
+    <span class="selected-tag">
+      ${tag}
+      <button onclick="removeTag('${tag}')">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </span>
+  `).join('');
+}
+
+function updateTagChipsUI() {
+  document.querySelectorAll('.tag-chip').forEach(chip => {
+    const tag = chip.dataset.tag;
+    chip.classList.toggle('selected', selectedTagsList.includes(tag));
+  });
+}
+
+// Tag chip clicks
+tagChips.addEventListener('click', (e) => {
+  const chip = e.target.closest('.tag-chip');
+  if (!chip) return;
+
+  const tag = chip.dataset.tag;
+  if (selectedTagsList.includes(tag)) {
+    removeTag(tag);
+  } else {
+    addTag(tag);
+  }
+});
+
+// Custom tag input
+tagInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && tagInput.value.trim()) {
+    e.preventDefault();
+    addTag(tagInput.value);
+    tagInput.value = '';
+  }
+});
+
+addTagBtn.addEventListener('click', () => {
+  if (tagInput.value.trim()) {
+    addTag(tagInput.value);
+    tagInput.value = '';
+  }
+});
+
+// Save tags to bookmark
+async function saveTagsToBookmark() {
+  if (!currentBookmarkId) return;
+
+  try {
+    await chrome.runtime.sendMessage({
+      action: 'updateBookmarkTags',
+      data: {
+        id: currentBookmarkId,
+        tags: selectedTagsList
+      }
+    });
+  } catch (error) {
+    console.error('Failed to save tags:', error);
+  }
+}
+
+// ============================================
+// UI State Updates
+// ============================================
+
+function setSaving() {
+  badgeCard.classList.add('saving');
+  logo.classList.add('saving');
+  label.textContent = 'Saving bookmark...';
+  label.classList.remove('success', 'error');
+  statusText.textContent = 'Saving';
+  statusPill.classList.remove('success', 'error');
+}
+
+function setSuccess(pageTitle, sourceType) {
+  badgeCard.classList.remove('saving');
+  badgeCard.classList.add('success');
+  borderSvg.classList.add('active', 'success');
+  iconWrapper.classList.add('success');
+  logo.classList.remove('saving');
+  logo.classList.add('success');
+
+  label.textContent = 'Bookmark saved';
+  label.classList.add('success');
+  title.textContent = pageTitle || 'Untitled';
+  source.textContent = sourceType || 'Web';
+
+  statusText.textContent = 'Saved';
+  statusPill.classList.add('success');
+  timerProgress.classList.add('success');
+
+  startTimer();
+}
+
+function setError(message) {
+  badgeCard.classList.remove('saving');
+  badgeCard.classList.add('error');
+  iconWrapper.classList.add('error');
+  logo.classList.remove('saving');
+
+  label.textContent = 'Failed to save';
+  label.classList.add('error');
+  title.textContent = message || 'Unknown error';
+  source.textContent = 'Please try again';
+
+  statusText.textContent = 'Error';
+  statusPill.classList.add('error');
+  timerProgress.classList.add('error');
+
+  setTimeout(() => window.close(), 4000);
+}
+
+function setLogin() {
+  logo.classList.remove('saving');
+  label.textContent = 'Sign in required';
+  label.classList.remove('success', 'error');
+  title.textContent = 'Click to open app';
+  source.textContent = 'Authentication needed';
+  statusText.textContent = 'Login';
+  arrowIcon.style.display = 'none';
+
+  badgeCard.onclick = () => {
+    chrome.tabs.create({ url: 'http://localhost:5173' });
+    window.close();
+  };
+}
+
+// ============================================
+// Main Execution
+// ============================================
+
+(async () => {
+  try {
+    setSaving();
+
+    // Check auth
+    const auth = await chrome.runtime.sendMessage({ action: 'checkAuth' });
+    if (!auth?.authenticated) return setLogin();
+
+    // Get active tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const pageTitle = tab.title?.slice(0, 40) || 'Untitled';
+    title.textContent = pageTitle;
+
+    // Try to get page metadata
+    let meta = { url: tab.url, title: tab.title };
+    try {
+      const res = await chrome.tabs.sendMessage(tab.id, { action: 'getPageMetadata' });
+      if (res?.success) meta = res.data;
+    } catch {}
+
+    // Detect source type
+    const url = (meta.url || '').toLowerCase();
+    let category = 'Article';
+    let sourceType = 'Web';
+
+    if (url.includes('twitter.com') || url.includes('x.com')) {
+      category = 'X';
+      sourceType = 'X (Twitter)';
+    } else if (url.includes('youtube.com')) {
+      category = 'YouTube';
+      sourceType = 'YouTube';
+    } else if (url.includes('github.com')) {
+      category = 'GitHub';
+      sourceType = 'GitHub';
+    } else if (url.includes('reddit.com')) {
+      category = 'Reddit';
+      sourceType = 'Reddit';
+    } else if (url.includes('medium.com')) {
+      category = 'Article';
+      sourceType = 'Medium';
+    } else if (url.includes('linkedin.com')) {
+      category = 'LinkedIn';
+      sourceType = 'LinkedIn';
+    }
+
+    // Save bookmark
+    const result = await chrome.runtime.sendMessage({
+      action: 'saveBookmark',
+      data: {
+        url: meta.url,
+        title: meta.title,
+        category: category,
+        source: sourceType,
+        tags: [],
+        notes: '',
+        thumbnail: meta.ogImage || '',
+        metadata: {
+          ogDescription: meta.ogDescription,
+          tweetData: meta.tweetData
+        }
+      }
+    });
+
+    if (result?.success) {
+      currentBookmarkId = result.data?.bookmark?.id;
+      setSuccess(pageTitle, sourceType);
+    } else {
+      setError(result?.error || 'Failed to save');
+    }
+  } catch (error) {
+    setError(error.message);
+  }
+})();

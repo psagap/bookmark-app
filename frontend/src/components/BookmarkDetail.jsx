@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Play, ExternalLink, X, Plus, Link2, MoreHorizontal, StickyNote } from "lucide-react";
+import { Play, ExternalLink, X, Plus, Link2, MoreHorizontal, StickyNote, Clock, Users, Flame, ChefHat, Star, CheckCircle2 } from "lucide-react";
 import { getTagColor, getTagColors, getAllTagColors, setTagColor } from '@/utils/tagColors';
 import { extractTagsFromContent } from '@/utils/tagExtraction';
 import { motion } from 'framer-motion';
@@ -175,23 +175,22 @@ const TagColorDropdown = ({ tag, currentColor, onSelect, onClose, position }) =>
     return (
         <div
             ref={dropdownRef}
-            className="absolute z-50 animate-in fade-in zoom-in-95 duration-150"
+            className="absolute z-50 animate-in fade-in zoom-in-95 duration-100"
             style={{
                 top: position === 'above' ? 'auto' : '100%',
                 bottom: position === 'above' ? '100%' : 'auto',
                 right: 0,
-                marginTop: position === 'above' ? 0 : '6px',
-                marginBottom: position === 'above' ? '6px' : 0,
+                marginTop: position === 'above' ? 0 : '4px',
+                marginBottom: position === 'above' ? '4px' : 0,
             }}
         >
-            {/* Compact color picker - 2 columns, 4 rows */}
             <div
-                className="grid grid-cols-2 gap-1.5 p-2 rounded-lg"
+                className="flex items-center gap-1.5 p-2 rounded-lg"
                 style={{
-                    background: 'rgba(29, 32, 33, 0.95)',
+                    background: 'var(--theme-bg-dark, rgba(29, 32, 33, 0.95))',
                     backdropFilter: 'blur(12px)',
-                    border: '1px solid rgba(102, 92, 84, 0.3)',
-                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+                    border: '1px solid color-mix(in srgb, var(--theme-fg-muted, #a89984) 12%, transparent)',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
                 }}
             >
                 {allColors.map((color) => {
@@ -206,22 +205,23 @@ const TagColorDropdown = ({ tag, currentColor, onSelect, onClose, position }) =>
                                 onSelect(color.id);
                                 onClose();
                             }}
-                            className="relative w-5 h-5 rounded-full transition-all duration-150 hover:scale-110 focus:outline-none"
+                            className="relative w-4 h-4 rounded-full transition-all duration-150 hover:scale-125 focus:outline-none flex items-center justify-center"
                             style={{
-                                backgroundColor: color.text,
+                                backgroundColor: color.hover,
                                 boxShadow: isSelected
-                                    ? `0 0 0 2px #1d2021, 0 0 0 3px ${color.text}`
+                                    ? `0 0 0 1.5px var(--theme-bg-dark, #1d2021), 0 0 0 2.5px ${color.hover}`
                                     : 'none',
                             }}
                             title={color.name}
                         >
                             {isSelected && (
                                 <svg
-                                    className="absolute inset-0 m-auto w-2.5 h-2.5 text-gruvbox-bg-darkest"
+                                    className="w-2 h-2"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
                                     strokeWidth={4}
+                                    style={{ color: color.hoverText }}
                                 >
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                 </svg>
@@ -269,8 +269,8 @@ const TagColumnsContainer = ({ tags, onRemoveTag, onAddTag }) => {
     };
 
     return (
-        <div className="flex flex-wrap gap-2 items-center">
-            {/* Tags - compact cohesive pills */}
+        <div className="flex flex-wrap gap-1.5 items-center">
+            {/* Tags - minimal pills */}
             {tagsList.map((tag, idx) => {
                 const color = tagColors[idx];
                 const isMenuOpen = openMenuTag === tag;
@@ -278,58 +278,42 @@ const TagColumnsContainer = ({ tags, onRemoveTag, onAddTag }) => {
                 return (
                     <div
                         key={idx}
-                        className="relative group"
+                        className="relative group/tag"
                     >
-                        {/* Tag pill - tighter spacing, cohesive feel */}
                         <div
-                            className="inline-flex items-center rounded-lg text-sm font-medium border transition-all duration-200 hover:brightness-110"
+                            className="inline-flex items-center gap-0.5 rounded-full text-[11px] font-medium px-2 py-[3px] transition-all duration-150 hover:brightness-125"
                             style={{
                                 backgroundColor: color.bg,
-                                borderColor: color.border,
+                                color: color.text,
                             }}
                         >
-                            {/* Tag name - main clickable area */}
-                            <span
-                                className="py-1.5 pl-2.5 pr-2.5 truncate max-w-[100px] transition-[padding] duration-200 group-hover:pr-1"
-                                style={{ color: color.text }}
-                            >
+                            <span className="truncate max-w-[100px] leading-none">
                                 {tag}
                             </span>
 
-                            {/* Action buttons - grouped tightly */}
-                            <div className="flex items-center overflow-hidden min-w-0 max-w-0 pr-0 opacity-0 pointer-events-none transition-all duration-200 ease-out group-hover:max-w-[100px] group-hover:pr-1 group-hover:opacity-100 group-hover:pointer-events-auto">
-                                {/* Subtle divider */}
-                                <div
-                                    className="w-px h-4 mx-0.5"
-                                    style={{ backgroundColor: `${color.text}30` }}
-                                />
-
-                                {/* Ellipsis menu */}
+                            {/* Action buttons - fade in on hover */}
+                            <div className="flex items-center gap-0 overflow-hidden max-w-0 opacity-0 transition-all duration-150 group-hover/tag:max-w-[50px] group-hover/tag:opacity-100">
                                 <button
                                     type="button"
                                     onClick={(e) => handleMenuToggle(tag, e)}
-                                    className="p-1 rounded hover:bg-white/15 transition-colors"
-                                    style={{ color: color.text }}
+                                    className="p-0.5 rounded-full hover:opacity-100 opacity-60 transition-opacity"
                                 >
-                                    <MoreHorizontal className="w-3.5 h-3.5" />
+                                    <MoreHorizontal className="w-3 h-3" />
                                 </button>
-
-                                {/* Remove button */}
                                 <button
                                     type="button"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         onRemoveTag(idx);
                                     }}
-                                    className="p-1 rounded hover:bg-white/15 transition-colors"
-                                    style={{ color: color.text }}
+                                    className="p-0.5 rounded-full hover:opacity-100 opacity-60 transition-opacity"
                                 >
-                                    <X className="w-3.5 h-3.5" />
+                                    <X className="w-3 h-3" />
                                 </button>
                             </div>
                         </div>
 
-                        {/* Color dropdown - opens on click of ellipsis */}
+                        {/* Color dropdown */}
                         {isMenuOpen && (
                             <TagColorDropdown
                                 tag={tag}
@@ -343,13 +327,12 @@ const TagColumnsContainer = ({ tags, onRemoveTag, onAddTag }) => {
                 );
             })}
 
-            {/* Add tag - inline input that blends with tags */}
+            {/* Add tag - ghost button */}
             {isAdding ? (
                 <div
-                    className="inline-flex items-center rounded-lg border transition-all duration-200"
+                    className="inline-flex items-center rounded-full transition-all duration-150"
                     style={{
-                        backgroundColor: 'rgba(40, 40, 40, 0.9)',
-                        borderColor: 'rgba(250, 189, 47, 0.5)',
+                        backgroundColor: 'color-mix(in srgb, var(--theme-fg-muted, #a89984) 8%, transparent)',
                     }}
                 >
                     <input
@@ -357,12 +340,12 @@ const TagColumnsContainer = ({ tags, onRemoveTag, onAddTag }) => {
                         type="text"
                         value={newTag}
                         onChange={(e) => setNewTag(e.target.value)}
-                        placeholder="new tag..."
-                        className="bg-transparent text-sm py-1.5 pl-2.5 pr-1 focus:outline-none placeholder:text-gruvbox-fg-muted/60"
+                        placeholder="tag..."
+                        className="bg-transparent text-[11px] py-[3px] pl-2 pr-1 focus:outline-none placeholder:opacity-40"
                         style={{
-                            color: '#ebdbb2',
-                            width: `${Math.max(70, newTag.length * 8 + 30)}px`,
-                            caretColor: '#fabd2f',
+                            color: 'var(--theme-fg, #ebdbb2)',
+                            width: `${Math.max(50, newTag.length * 7 + 24)}px`,
+                            caretColor: 'var(--theme-primary, #fabd2f)',
                         }}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -375,7 +358,6 @@ const TagColumnsContainer = ({ tags, onRemoveTag, onAddTag }) => {
                             }
                         }}
                         onBlur={() => {
-                            // Small delay to allow click on add button
                             setTimeout(() => {
                                 if (!newTag.trim()) {
                                     setIsAdding(false);
@@ -383,32 +365,31 @@ const TagColumnsContainer = ({ tags, onRemoveTag, onAddTag }) => {
                             }, 150);
                         }}
                     />
-                    {/* Add/confirm button */}
                     <button
                         type="button"
                         onClick={handleAddTag}
                         disabled={!newTag.trim()}
-                        className="p-1.5 mr-0.5 rounded transition-all"
+                        className="p-1 mr-0.5 rounded-full transition-opacity"
                         style={{
-                            color: newTag.trim() ? '#fabd2f' : 'rgba(146, 131, 116, 0.5)',
+                            opacity: newTag.trim() ? 0.8 : 0.3,
+                            color: 'var(--theme-fg-muted, #a89984)',
                         }}
                     >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-3 h-3" />
                     </button>
                 </div>
             ) : (
                 <button
                     type="button"
                     onClick={() => setIsAdding(true)}
-                    className="group inline-flex items-center gap-1 py-1.5 px-2.5 rounded-lg border border-dashed transition-all duration-200 hover:border-gruvbox-yellow/50 hover:bg-gruvbox-yellow/5"
+                    className="inline-flex items-center gap-0.5 py-[3px] px-2 rounded-full text-[11px] transition-all duration-150 opacity-40 hover:opacity-70"
                     style={{
-                        borderColor: 'rgba(146, 131, 116, 0.35)',
+                        color: 'var(--theme-fg-muted, #a89984)',
+                        backgroundColor: 'color-mix(in srgb, var(--theme-fg-muted, #a89984) 5%, transparent)',
                     }}
                 >
-                    <Plus className="w-3.5 h-3.5 text-gruvbox-fg-muted group-hover:text-gruvbox-yellow transition-colors" />
-                    <span className="text-sm text-gruvbox-fg-muted group-hover:text-gruvbox-yellow transition-colors">
-                        Add
-                    </span>
+                    <Plus className="w-3 h-3" />
+                    <span>add</span>
                 </button>
             )}
         </div>
@@ -916,22 +897,13 @@ const NotePreview = ({ bookmark, notes, onNotesChange, title, onTitleChange, onS
                                             e.stopPropagation();
                                             onTagClick?.(tag);
                                         }}
-                                        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-all hover:scale-105 cursor-pointer"
+                                        className="inline-flex items-center px-2 py-[3px] rounded-full text-[11px] font-medium transition-all duration-150 cursor-pointer hover:brightness-125"
                                         style={{
                                             backgroundColor: tagColor.bg,
                                             color: tagColor.text,
-                                            border: `1px solid ${tagColor.border}`,
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = tagColor.hover;
-                                            e.currentTarget.style.color = tagColor.hoverText;
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.backgroundColor = tagColor.bg;
-                                            e.currentTarget.style.color = tagColor.text;
                                         }}
                                     >
-                                        #{tag}
+                                        {tag}
                                     </button>
                                 );
                             })}
@@ -1603,6 +1575,274 @@ const WikiPreview = ({ bookmark }) => {
     );
 };
 
+// Recipe preview - shows full recipe with ingredients and instructions
+const RecipePreview = ({ bookmark }) => {
+    const [revealed, setRevealed] = useState(false);
+    const { metadata = {}, title, thumbnail, url } = bookmark;
+
+    // Extract recipe metadata
+    const cookTime = metadata.cookTime;
+    const prepTime = metadata.prepTime;
+    const totalTime = metadata.totalTime;
+    const servings = metadata.servings;
+    const calories = metadata.calories;
+    const rating = metadata.rating;
+    const ratingCount = metadata.ratingCount;
+    const ingredients = metadata.ingredients || [];
+    const instructions = metadata.instructions || [];
+    const author = metadata.author;
+    const cuisine = metadata.cuisine;
+
+    // Get domain for source display
+    const getDomain = (url) => {
+        try {
+            return new URL(url).hostname.replace('www.', '');
+        } catch {
+            return url;
+        }
+    };
+    const domain = getDomain(url);
+
+    // Determine primary time to show
+    const primaryTime = totalTime || cookTime;
+
+    // Trigger reveal animation
+    useEffect(() => {
+        setTimeout(() => setRevealed(true), 100);
+    }, []);
+
+    // Parse instruction text - handle both string and object formats
+    const parseInstruction = (instruction, index) => {
+        if (typeof instruction === 'string') {
+            return instruction;
+        }
+        if (instruction?.text) {
+            return instruction.text;
+        }
+        if (instruction?.['@type'] === 'HowToStep') {
+            return instruction.text || instruction.name || '';
+        }
+        return JSON.stringify(instruction);
+    };
+
+    // Star rating component
+    const StarRating = ({ rating, maxStars = 5 }) => {
+        if (!rating) return null;
+        const fullStars = Math.floor(rating);
+        const hasHalf = rating - fullStars >= 0.5;
+
+        return (
+            <div className="flex items-center gap-1.5">
+                <div className="flex">
+                    {[...Array(maxStars)].map((_, i) => (
+                        <Star
+                            key={i}
+                            className={`w-4 h-4 ${
+                                i < fullStars
+                                    ? "text-amber-400 fill-amber-400"
+                                    : i === fullStars && hasHalf
+                                        ? "text-amber-400 fill-amber-400/50"
+                                        : "text-white/20"
+                            }`}
+                        />
+                    ))}
+                </div>
+                <span className="text-sm text-white/60">{rating.toFixed(1)}</span>
+                {ratingCount && (
+                    <span className="text-sm text-white/40">({ratingCount.toLocaleString()} reviews)</span>
+                )}
+            </div>
+        );
+    };
+
+    return (
+        <div className="h-full bg-[#0f0a08] text-neutral-100 relative flex flex-col overflow-hidden">
+            {/* Subtle texture overlay */}
+            <div className="absolute inset-0 opacity-[0.03] pointer-events-none z-50"
+                style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+                }}
+            />
+
+            {/* Reveal animation curtain */}
+            <div
+                className="absolute inset-0 bg-[#0f0a08] z-40 pointer-events-none transition-transform duration-1000 ease-out"
+                style={{
+                    transform: revealed ? 'translateY(-100%)' : 'translateY(0)',
+                }}
+            >
+                <div className="absolute bottom-0 left-0 right-0 h-8 flex justify-center">
+                    {[...Array(20)].map((_, i) => (
+                        <div
+                            key={i}
+                            className="w-8 h-8 rounded-b-full bg-red-900/50"
+                            style={{ marginLeft: i > 0 ? '-4px' : 0 }}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            {/* Header with site info */}
+            <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 flex items-center gap-3 px-6 py-3 border-b border-red-900/20 bg-black/40 backdrop-blur-sm relative z-10 group hover:bg-red-900/10 transition-colors"
+            >
+                <div className="w-8 h-8 rounded-lg bg-red-900/30 flex items-center justify-center overflow-hidden border border-red-900/30 group-hover:border-red-700/50 transition-colors">
+                    <img
+                        src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                        alt={domain}
+                        className="w-5 h-5"
+                        onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.parentElement.innerHTML = '<span class="text-red-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg></span>';
+                        }}
+                    />
+                </div>
+                <div className="flex-1">
+                    <span className="text-sm font-medium text-red-300 group-hover:text-red-200 transition-colors">{domain}</span>
+                    {author && <span className="text-xs text-white/40 ml-2">by {author}</span>}
+                </div>
+                <ExternalLink className="w-4 h-4 text-white/30 group-hover:text-red-300 transition-colors" />
+            </a>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto">
+                {/* Hero Image */}
+                {thumbnail && (
+                    <div className="relative aspect-[16/9] max-h-[300px] overflow-hidden">
+                        <img
+                            src={thumbnail}
+                            alt={title}
+                            className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0f0a08] via-transparent to-transparent" />
+                    </div>
+                )}
+
+                {/* Recipe Content */}
+                <div className="px-6 py-6 space-y-6">
+                    {/* Title */}
+                    <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">
+                        {title}
+                    </h1>
+
+                    {/* Rating */}
+                    {rating && <StarRating rating={rating} />}
+
+                    {/* Quick metadata pills */}
+                    <div className="flex flex-wrap gap-3">
+                        {primaryTime && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-900/30 border border-red-900/40 text-white">
+                                <Clock className="w-4 h-4 text-red-400" />
+                                <span className="text-sm font-medium">{primaryTime}</span>
+                                {prepTime && prepTime !== primaryTime && (
+                                    <span className="text-xs text-white/50">(+{prepTime} prep)</span>
+                                )}
+                            </div>
+                        )}
+                        {servings && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white">
+                                <Users className="w-4 h-4 text-white/60" />
+                                <span className="text-sm">{servings}</span>
+                            </div>
+                        )}
+                        {calories && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white">
+                                <Flame className="w-4 h-4 text-orange-400" />
+                                <span className="text-sm">{calories}</span>
+                            </div>
+                        )}
+                        {cuisine && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white">
+                                <span className="text-sm">{cuisine}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Ingredients Section */}
+                    {ingredients.length > 0 && (
+                        <div className="space-y-4">
+                            <h2 className="text-lg font-semibold text-red-300 flex items-center gap-2">
+                                <span className="w-8 h-8 rounded-lg bg-red-900/30 flex items-center justify-center">
+                                    <ChefHat className="w-4 h-4 text-red-400" />
+                                </span>
+                                Ingredients
+                                <span className="text-sm font-normal text-white/40">({ingredients.length} items)</span>
+                            </h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {ingredients.map((ingredient, index) => (
+                                    <div
+                                        key={index}
+                                        className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] transition-colors group"
+                                    >
+                                        <div className="w-5 h-5 rounded-full border-2 border-red-900/50 flex-shrink-0 mt-0.5 group-hover:border-red-700/70 transition-colors" />
+                                        <span className="text-sm text-white/80 leading-relaxed">{ingredient}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Instructions Section */}
+                    {instructions.length > 0 && (
+                        <div className="space-y-4">
+                            <h2 className="text-lg font-semibold text-red-300 flex items-center gap-2">
+                                <span className="w-8 h-8 rounded-lg bg-red-900/30 flex items-center justify-center">
+                                    <CheckCircle2 className="w-4 h-4 text-red-400" />
+                                </span>
+                                Instructions
+                                <span className="text-sm font-normal text-white/40">({instructions.length} steps)</span>
+                            </h2>
+                            <div className="space-y-3">
+                                {instructions.map((instruction, index) => {
+                                    const text = parseInstruction(instruction, index);
+                                    return (
+                                        <div
+                                            key={index}
+                                            className="flex gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] transition-colors group"
+                                        >
+                                            <div className="flex-shrink-0">
+                                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-900/40 text-red-300 text-sm font-bold border border-red-900/50 group-hover:bg-red-900/60 transition-colors">
+                                                    {index + 1}
+                                                </span>
+                                            </div>
+                                            <p className="text-white/80 leading-relaxed flex-1 pt-1">
+                                                {text}
+                                            </p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* No recipe data fallback */}
+                    {ingredients.length === 0 && instructions.length === 0 && (
+                        <div className="text-center py-12">
+                            <div className="w-16 h-16 rounded-2xl bg-red-900/20 flex items-center justify-center mx-auto mb-4">
+                                <ChefHat className="w-8 h-8 text-red-400/50" />
+                            </div>
+                            <p className="text-white/40 text-sm">
+                                Recipe details not available.
+                                <a
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-red-400 hover:text-red-300 ml-1 underline"
+                                >
+                                    View on source site
+                                </a>
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // Humorous placeholder options for the title field
 const TITLE_PLACEHOLDERS = [
     "Give me a name, I'm feeling anonymous...",
@@ -1888,6 +2128,31 @@ const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave, allTags = [], au
 
     const isWiki = bookmark.url?.includes('wikipedia.org');
 
+    // Recipe detection - check metadata, category, and URL patterns
+    const isRecipe = bookmark.metadata?.contentType === 'recipe' ||
+        bookmark.metadata?.cookTime !== undefined ||
+        bookmark.metadata?.ingredients !== undefined ||
+        bookmark.category === 'recipe' ||
+        bookmark.subCategory === 'recipe' ||
+        bookmark.url?.includes('allrecipes.com') ||
+        bookmark.url?.includes('seriouseats.com') ||
+        bookmark.url?.includes('epicurious.com') ||
+        bookmark.url?.includes('food52.com') ||
+        bookmark.url?.includes('bonappetit.com') ||
+        bookmark.url?.includes('tasty.co') ||
+        bookmark.url?.includes('delish.com') ||
+        bookmark.url?.includes('foodnetwork.com') ||
+        bookmark.url?.includes('budgetbytes.com') ||
+        bookmark.url?.includes('minimalistbaker.com') ||
+        bookmark.url?.includes('halfbakedharvest.com') ||
+        bookmark.url?.includes('skinnytaste.com') ||
+        bookmark.url?.includes('cookieandkate.com') ||
+        bookmark.url?.includes('pinchofyum.com') ||
+        bookmark.url?.includes('smittenkitchen.com') ||
+        bookmark.url?.includes('thekitchn.com') ||
+        /\/recipes?\//.test(bookmark.url) ||
+        /\/cooking\//.test(bookmark.url);
+
     const isArticle = bookmark.category === 'Article' ||
         bookmark.subCategory === 'article' ||
         bookmark.subCategory === 'webpage' ||
@@ -1925,6 +2190,10 @@ const BookmarkDetail = ({ bookmark, open, onOpenChange, onSave, allTags = [], au
         }
         if (type?.includes('video') || bookmark.url?.includes('youtube')) {
             return <VideoPreview bookmark={bookmark} autoPlay={autoPlay} />;
+        }
+        // Recipe preview for recipe bookmarks
+        if (isRecipe) {
+            return <RecipePreview bookmark={bookmark} />;
         }
         // Use ArticlePreview for articles/webpages
         if (isArticle) {

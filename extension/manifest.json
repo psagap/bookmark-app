@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Bookmark Saver - MyMind Style",
-  "version": "1.0.0",
-  "description": "Save content from any website with auto-categorization. Works offline with local sync.",
+  "name": "Thinkback",
+  "version": "1.0.1",
+  "description": "Save content from any website with auto-categorization.",
   "permissions": [
     "activeTab",
     "scripting",

@@ -17,6 +17,7 @@ create table public.bookmarks (
   url text,
   description text,
   notes text,
+  notes_html text,
   content text,
   notes_blocks jsonb,
   tags text[],
@@ -29,6 +30,7 @@ create table public.bookmarks (
   thumbnail text,
   metadata jsonb,
   archived boolean default false,
+  status text default 'published', -- 'published' | 'draft'
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -91,3 +93,4 @@ create policy "Users can delete their own bookmarks"
 create index bookmarks_user_id_idx on public.bookmarks(user_id);
 create index collections_user_id_idx on public.collections(user_id);
 create index bookmarks_collection_id_idx on public.bookmarks(collection_id);
+create index bookmarks_status_idx on public.bookmarks(status);

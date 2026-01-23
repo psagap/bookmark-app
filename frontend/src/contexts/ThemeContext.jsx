@@ -95,6 +95,14 @@ export const ThemeProvider = ({ children }) => {
     root.style.setProperty('--selection-bg', colors.selectionBg);
     root.style.setProperty('--selection-text', colors.selectionText);
 
+    // Note card colors - use theme-specific noteCard colors if available, otherwise fall back
+    const noteCard = theme.noteCard || {};
+    root.style.setProperty('--note-bg', noteCard.bg || colors.bgLight);
+    root.style.setProperty('--note-heading', noteCard.heading || colors.fg);
+    root.style.setProperty('--note-text', noteCard.text || colors.fgMuted);
+    root.style.setProperty('--note-accent', noteCard.accent || colors.primaryHex);
+    root.style.setProperty('--note-divider', `${noteCard.accent || colors.primaryHex}25`);
+
     // Add theme class to body for CSS targeting
     document.body.className = document.body.className
       .replace(/theme-\w+/g, '')

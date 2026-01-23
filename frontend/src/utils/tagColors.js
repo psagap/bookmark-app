@@ -9,79 +9,79 @@
  * - Bookmark detail view
  */
 
-// Warm amber/orange color palette for tags - Gruvbox themed
-// Ordered to maximize visual difference between adjacent colors
+// Modern minimal color palette for tags
+// Muted, low-contrast colors inspired by Linear/Notion
 const TAG_COLORS = [
     {
         id: 'yellow',
-        bg: 'rgba(250, 189, 47, 0.15)',
-        hover: 'rgba(250, 189, 47, 0.9)',
-        text: '#fabd2f',
+        bg: 'rgba(250, 189, 47, 0.08)',
+        hover: 'rgba(250, 189, 47, 0.85)',
+        text: 'rgba(250, 189, 47, 0.85)',
         hoverText: '#1d2021',
-        border: 'rgba(250, 189, 47, 0.4)',
+        border: 'rgba(250, 189, 47, 0.15)',
         name: 'Yellow'
     },
     {
         id: 'purple',
-        bg: 'rgba(177, 98, 134, 0.15)',
-        hover: 'rgba(177, 98, 134, 0.9)',
-        text: '#b16286',
+        bg: 'rgba(177, 98, 134, 0.08)',
+        hover: 'rgba(177, 98, 134, 0.85)',
+        text: 'rgba(211, 134, 155, 0.9)',
         hoverText: '#1d2021',
-        border: 'rgba(177, 98, 134, 0.4)',
+        border: 'rgba(177, 98, 134, 0.15)',
         name: 'Purple'
     },
     {
         id: 'aqua',
-        bg: 'rgba(131, 165, 152, 0.15)',
-        hover: 'rgba(131, 165, 152, 0.9)',
-        text: '#83a598',
+        bg: 'rgba(131, 165, 152, 0.08)',
+        hover: 'rgba(131, 165, 152, 0.85)',
+        text: 'rgba(131, 165, 152, 0.9)',
         hoverText: '#1d2021',
-        border: 'rgba(131, 165, 152, 0.4)',
+        border: 'rgba(131, 165, 152, 0.15)',
         name: 'Aqua'
     },
     {
         id: 'orange',
-        bg: 'rgba(254, 128, 25, 0.15)',
-        hover: 'rgba(254, 128, 25, 0.9)',
-        text: '#fe8019',
+        bg: 'rgba(254, 128, 25, 0.08)',
+        hover: 'rgba(254, 128, 25, 0.85)',
+        text: 'rgba(254, 128, 25, 0.85)',
         hoverText: '#1d2021',
-        border: 'rgba(254, 128, 25, 0.4)',
+        border: 'rgba(254, 128, 25, 0.15)',
         name: 'Orange'
     },
     {
         id: 'pink',
-        bg: 'rgba(211, 134, 155, 0.15)',
-        hover: 'rgba(211, 134, 155, 0.9)',
-        text: '#d3869b',
+        bg: 'rgba(211, 134, 155, 0.08)',
+        hover: 'rgba(211, 134, 155, 0.85)',
+        text: 'rgba(211, 134, 155, 0.85)',
         hoverText: '#1d2021',
-        border: 'rgba(211, 134, 155, 0.4)',
+        border: 'rgba(211, 134, 155, 0.15)',
         name: 'Pink'
     },
     {
         id: 'green',
-        bg: 'rgba(184, 187, 38, 0.15)',
-        hover: 'rgba(184, 187, 38, 0.9)',
-        text: '#b8bb26',
+        bg: 'rgba(184, 187, 38, 0.08)',
+        hover: 'rgba(184, 187, 38, 0.85)',
+        text: 'rgba(184, 187, 38, 0.85)',
         hoverText: '#1d2021',
-        border: 'rgba(184, 187, 38, 0.4)',
+        border: 'rgba(184, 187, 38, 0.15)',
         name: 'Green'
     },
     {
         id: 'red',
-        bg: 'rgba(251, 73, 52, 0.15)',
-        hover: 'rgba(251, 73, 52, 0.85)',
-        text: '#fb4934',
+        bg: 'rgba(251, 73, 52, 0.08)',
+        hover: 'rgba(251, 73, 52, 0.8)',
+        text: 'rgba(251, 73, 52, 0.8)',
         hoverText: '#1d2021',
-        border: 'rgba(251, 73, 52, 0.4)',
+        border: 'rgba(251, 73, 52, 0.15)',
         name: 'Red'
     },
     {
         id: 'gold',
-        bg: 'rgba(213, 153, 0, 0.15)',
-        hover: 'rgba(213, 153, 0, 0.9)',
-        text: '#d79921',
+        bg: 'rgba(213, 153, 0, 0.08)',
+        hover: 'rgba(213, 153, 0, 0.85)',
+        text: 'rgba(215, 153, 33, 0.85)',
         hoverText: '#1d2021',
-        border: 'rgba(213, 153, 0, 0.4)',
+        border: 'rgba(213, 153, 0, 0.15)',
         name: 'Gold'
     },
 ];

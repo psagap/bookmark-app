@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +24,7 @@ const AppShell = ({
     mediaCounts = {},
     activeFilter,
     onFilterChange,
+    draftsCount = 0,
     // MindSearch props
     activeFilters = [],
     onTypeFilterChange,
@@ -34,6 +35,8 @@ const AppShell = ({
     const { user } = useAuth();
     // Sidebar collapsed state - default to open on large screens
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    // Ref for scroll container to track scroll position
+    const scrollContainerRef = useRef(null);
 
     // Auto-collapse on small screens
     useEffect(() => {
@@ -64,6 +67,7 @@ const AppShell = ({
                 mediaCounts={mediaCounts}
                 activeFilter={activeFilter}
                 onFilterChange={onFilterChange}
+                draftsCount={draftsCount}
             />
 
             {/* Main Content Area */}
@@ -84,10 +88,15 @@ const AppShell = ({
                     onTagFilterChange={onTagFilterChange}
                     tagRefreshTrigger={tagRefreshTrigger}
                     mediaCounts={mediaCounts}
+                    sidebarCollapsed={sidebarCollapsed}
+                    scrollContainerRef={scrollContainerRef}
                 />
 
                 {/* Scrollable Page Content */}
-                <main className="flex-1 overflow-y-auto overflow-x-hidden relative scrollbar-thin">
+                <main 
+                    ref={scrollContainerRef}
+                    className="flex-1 overflow-y-auto overflow-x-hidden relative scrollbar-thin"
+                >
                     <div className="min-h-full w-full max-w-[1920px] mx-auto">
                         {children}
                     </div>

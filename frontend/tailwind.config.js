@@ -18,6 +18,20 @@ module.exports = {
         },
         extend: {
             colors: {
+                // Custom violet override - using #9b8cb6 as base
+                violet: {
+                    50: '#f5f3f7',
+                    100: '#ebe7ef',
+                    200: '#d7cfe0',
+                    300: '#c3b7d1',
+                    400: '#af9fc2',
+                    500: '#9b8cb6',  // Base color
+                    600: '#7c6f92',
+                    700: '#5d536d',
+                    800: '#3e3749',
+                    900: '#1f1b24',
+                    950: '#0f0d12',
+                },
                 border: "hsl(var(--border))",
                 input: "hsl(var(--input))",
                 ring: "hsl(var(--ring))",

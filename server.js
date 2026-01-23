@@ -6,6 +6,11 @@ const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
 
+// Smart metadata extraction pipeline
+const metadataExtractor = require('./lib/metadataExtractor');
+const aiClassifier = require('./lib/aiClassifier');
+const gemmaProcessor = require('./lib/gemmaProcessor');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -71,11 +76,13 @@ const fromDbBookmark = (row) => ({
   thumbnail: row.thumbnail || '',
   createdAt: toEpochMs(row.created_at),
   updatedAt: toEpochMs(row.updated_at),
+  type: row.type || null,
   category: row.category || null,
   subCategory: row.sub_category || null,
   tags: Array.isArray(row.tags) ? row.tags : [],
   metadata: row.metadata || {},
   notes: row.notes || '',
+  pinned: row.pinned ?? false,
   archived: row.archived ?? false,
   collectionId: row.collection_id || null,
   description: row.description || '',
@@ -283,6 +290,59 @@ const extractYouTubeVideoId = (url) => {
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
   const match = url.match(regExp);
   return (match && match[2].length === 11) ? match[2] : null;
+};
+
+// Check if URL is a recipe site
+const isRecipeUrl = (url) => {
+  if (!url) return false;
+  const recipeSites = [
+    'allrecipes.com',
+    'seriouseats.com',
+    'epicurious.com',
+    'food52.com',
+    'bonappetit.com',
+    'foodnetwork.com',
+    'tasty.co',
+    'delish.com',
+    'simplyrecipes.com',
+    'cookinglight.com',
+    'eatingwell.com',
+    'myrecipes.com',
+    'thekitchn.com',
+    'food.com',
+    'yummly.com',
+    'bbcgoodfood.com',
+    'jamieoliver.com',
+    'budgetbytes.com',
+    'minimalistbaker.com',
+    'halfbakedharvest.com',
+    'skinnytaste.com',
+    'pinchofyum.com',
+    'sallysbakingaddiction.com',
+    'kingarthurbaking.com',
+    'recipetineats.com',
+    'gimmesomeoven.com',
+    'damndelicious.net',
+    'cafedelites.com',
+    'smittenkitchen.com',
+    '101cookbooks.com',
+    'loveandlemons.com',
+    'cookieandkate.com',
+    'hostthetoast.com',
+    'tastesbetterfromscratch.com',
+  ];
+
+  // Check if URL matches any recipe site
+  if (recipeSites.some(site => url.includes(site))) {
+    return true;
+  }
+
+  // Check for recipe-related URL patterns
+  if (/\/recipes?\//.test(url) || /\/cooking\//.test(url)) {
+    return true;
+  }
+
+  return false;
 };
 
 // Fetch YouTube video description by scraping the page
@@ -645,7 +705,68 @@ app.post('/api/bookmarks', asyncHandler(async (req, res) => {
       console.log('X FxTwitter video fetch skipped:', err.message);
     }
   }
-  // For article/webpage URLs (not YouTube, Twitter, or Wikipedia), extract metadata
+  // For recipe URLs, extract rich recipe metadata (ingredients, instructions, etc.)
+  else if (isRecipeUrl(url)) {
+    try {
+      console.log(`Extracting recipe metadata for: ${url}`);
+      const recipeData = await metadataExtractor.extractMetadata(url);
+      if (recipeData && recipeData.contentType === 'recipe') {
+        metadata = {
+          ...metadata,
+          contentType: 'recipe',
+          description: recipeData.description,
+          cookTime: recipeData.cookTime,
+          prepTime: recipeData.prepTime,
+          totalTime: recipeData.totalTime,
+          servings: recipeData.servings,
+          calories: recipeData.calories,
+          rating: recipeData.rating,
+          ratingCount: recipeData.ratingCount,
+          author: recipeData.author,
+          ingredients: recipeData.ingredients || [],
+          instructions: recipeData.instructions || [],
+          cuisine: recipeData.cuisine,
+          category: recipeData.category,
+          keywords: recipeData.keywords,
+        };
+        extractedThumbnail = recipeData.image || '';
+        console.log(`Recipe metadata extracted: ${recipeData.name}, ${(recipeData.ingredients || []).length} ingredients, ${(recipeData.instructions || []).length} steps`);
+      } else {
+        // Fallback to article extraction if not a recipe
+        console.log(`URL detected as recipe but no recipe schema found, falling back to article extraction`);
+        const articleData = await extractArticleMetadata(url);
+        if (articleData) {
+          metadata = {
+            ...metadata,
+            siteName: articleData.siteName,
+            author: articleData.author,
+            publishedDate: articleData.publishedDate,
+            ogImage: articleData.ogImage,
+            ogDescription: articleData.ogDescription
+          };
+          extractedThumbnail = articleData.ogImage || '';
+        }
+      }
+    } catch (err) {
+      console.log('Recipe metadata extraction failed, trying article extraction:', err.message);
+      try {
+        const articleData = await extractArticleMetadata(url);
+        if (articleData) {
+          metadata = {
+            ...metadata,
+            siteName: articleData.siteName,
+            author: articleData.author,
+            ogImage: articleData.ogImage,
+            ogDescription: articleData.ogDescription
+          };
+          extractedThumbnail = articleData.ogImage || '';
+        }
+      } catch (articleErr) {
+        console.log('Article fallback also failed:', articleErr.message);
+      }
+    }
+  }
+  // For article/webpage URLs (not YouTube, Twitter, Wikipedia, or Recipe), extract metadata
   else {
     try {
       console.log(`Extracting article metadata for: ${url}`);
@@ -1065,6 +1186,112 @@ app.post('/api/article/backfill', asyncHandler(async (req, res) => {
   }
 }));
 
+// POST backfill recipe metadata for existing bookmarks
+// This fetches ingredients, instructions, cook time etc. for recipe URLs
+app.post('/api/recipe/backfill', asyncHandler(async (req, res) => {
+  try {
+    const bookmarks = await loadBookmarks();
+
+    // Find recipe bookmarks missing ingredients OR instructions
+    const recipeBookmarks = bookmarks.filter(b => {
+      const url = b.url || '';
+      const isRecipe = isRecipeUrl(url);
+      const missingIngredients = !b.metadata?.ingredients || b.metadata?.ingredients?.length === 0;
+      const missingInstructions = !b.metadata?.instructions || b.metadata?.instructions?.length === 0;
+      return isRecipe && (missingIngredients || missingInstructions) && url;
+    });
+
+    if (recipeBookmarks.length === 0) {
+      return res.json({
+        message: 'No recipe bookmarks need backfilling',
+        processed: 0,
+        total: 0
+      });
+    }
+
+    console.log(`Backfilling ${recipeBookmarks.length} recipe bookmarks...`);
+
+    let processed = 0;
+    let failed = 0;
+    const results = [];
+
+    for (const bookmark of recipeBookmarks) {
+      try {
+        console.log(`[recipe/backfill] Processing: ${bookmark.url}`);
+        const recipeData = await metadataExtractor.extractMetadata(bookmark.url);
+
+        if (recipeData && recipeData.contentType === 'recipe') {
+          const updateData = {
+            metadata: {
+              ...bookmark.metadata,
+              contentType: 'recipe',
+              description: recipeData.description,
+              cookTime: recipeData.cookTime,
+              prepTime: recipeData.prepTime,
+              totalTime: recipeData.totalTime,
+              servings: recipeData.servings,
+              calories: recipeData.calories,
+              rating: recipeData.rating,
+              ratingCount: recipeData.ratingCount,
+              author: recipeData.author,
+              ingredients: recipeData.ingredients || [],
+              instructions: recipeData.instructions || [],
+              cuisine: recipeData.cuisine,
+              category: recipeData.category,
+              keywords: recipeData.keywords,
+            },
+            updatedAt: Date.now()
+          };
+
+          // Update thumbnail if we got a better image
+          if (recipeData.image && !bookmark.thumbnail) {
+            updateData.thumbnail = recipeData.image;
+          }
+
+          const updated = await updateBookmarkById(bookmark.id, updateData);
+
+          if (!updated) {
+            failed++;
+            results.push({ id: bookmark.id, status: 'failed', reason: 'Bookmark not found' });
+          } else {
+            processed++;
+            results.push({
+              id: bookmark.id,
+              title: bookmark.title,
+              status: 'success',
+              ingredients: (recipeData.ingredients || []).length,
+              instructions: (recipeData.instructions || []).length,
+              cookTime: recipeData.cookTime
+            });
+            console.log(`[recipe/backfill] Success: ${bookmark.title} - ${(recipeData.ingredients || []).length} ingredients`);
+          }
+        } else {
+          failed++;
+          results.push({ id: bookmark.id, status: 'failed', reason: 'No recipe schema found' });
+        }
+      } catch (err) {
+        failed++;
+        results.push({ id: bookmark.id, status: 'failed', reason: err.message });
+        console.log(`[recipe/backfill] Failed: ${bookmark.url} - ${err.message}`);
+      }
+
+      // Small delay between requests to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    res.json({
+      message: 'Recipe backfill complete',
+      processed,
+      failed,
+      total: recipeBookmarks.length,
+      results
+    });
+  } catch (error) {
+    console.error('Recipe backfill error:', error);
+    res.status(500).json({ error: error.message });
+  }
+}));
+
 // POST backfill X/Twitter oEmbed data for existing bookmarks
 // This fetches oEmbed for X bookmarks that are missing embedHtml
 app.post('/api/x/backfill', asyncHandler(async (req, res) => {
@@ -1437,6 +1664,102 @@ app.get('/api/og-image', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('[og-image] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET Smart metadata extraction - extracts JSON-LD, Open Graph, oEmbed
+// Returns structured data for products, books, recipes, music, etc.
+app.get('/api/metadata/extract', async (req, res) => {
+  const { url, classify } = req.query;
+
+  if (!url) {
+    return res.status(400).json({ error: 'URL required' });
+  }
+
+  // Validate URL
+  try {
+    new URL(url);
+  } catch {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
+
+  try {
+    console.log('[metadata/extract] Extracting metadata from:', url);
+
+    // Extract structured metadata
+    const metadata = await metadataExtractor.extractMetadata(url);
+
+    // Optionally enhance with AI classification
+    if (classify === 'true' && metadata.contentType === 'article' && aiClassifier.isAvailable()) {
+      console.log('[metadata/extract] Running AI classification...');
+      const aiResult = await aiClassifier.classifyWithAI(url, {
+        title: metadata.title,
+        description: metadata.description,
+        siteName: metadata.siteName,
+        type: metadata.contentType,
+      });
+
+      // Merge AI results if it found a more specific type
+      if (aiResult.contentType !== 'article' && aiResult.contentType !== 'other') {
+        metadata.contentType = aiResult.contentType;
+        metadata.aiClassified = true;
+      }
+      if (aiResult.tags?.length > 0) {
+        metadata.suggestedTags = aiResult.tags;
+      }
+      metadata.aiConfidence = aiResult.confidence;
+    }
+
+    console.log('[metadata/extract] Result:', {
+      url,
+      contentType: metadata.contentType,
+      title: metadata.title?.substring(0, 50),
+    });
+
+    res.json(metadata);
+  } catch (error) {
+    console.error('[metadata/extract] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST AI content classification (standalone endpoint)
+app.post('/api/metadata/classify', async (req, res) => {
+  const { url, title, description } = req.body;
+
+  if (!aiClassifier.isAvailable()) {
+    return res.status(503).json({
+      error: 'AI classification not available',
+      message: 'GROQ_API_KEY not configured',
+    });
+  }
+
+  try {
+    const result = await aiClassifier.classifyWithAI(url, { title, description });
+    res.json(result);
+  } catch (error) {
+    console.error('[metadata/classify] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST Generate AI tags for a bookmark
+app.post('/api/metadata/generate-tags', async (req, res) => {
+  const { url, title, description, category } = req.body;
+
+  if (!aiClassifier.isAvailable()) {
+    return res.status(503).json({
+      error: 'AI classification not available',
+      message: 'GROQ_API_KEY not configured',
+    });
+  }
+
+  try {
+    const tags = await aiClassifier.generateTags({ url, title, description, category });
+    res.json({ tags });
+  } catch (error) {
+    console.error('[metadata/generate-tags] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -3424,6 +3747,91 @@ app.post('/api/video/backfill', asyncHandler(async (req, res) => {
 }));
 
 // ==================== END VIDEO DOWNLOAD API ====================
+
+// ==================== AUDIO NOTES API ====================
+
+// Check if Gemma model is available
+app.get('/api/audio-notes/status', asyncHandler(async (req, res) => {
+  try {
+    const status = await gemmaProcessor.checkModelAvailable();
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}));
+
+// Process raw transcript with Gemma LLM
+app.post('/api/audio-notes/process', asyncHandler(async (req, res) => {
+  const { rawTranscript, options = {} } = req.body;
+
+  if (!rawTranscript || rawTranscript.trim().length === 0) {
+    return res.status(400).json({ error: 'rawTranscript is required' });
+  }
+
+  try {
+    const result = await gemmaProcessor.processTranscript(rawTranscript, options);
+    res.json(result);
+  } catch (error) {
+    console.error('[Audio Notes] Processing error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      modelUsed: 'gemma-3-4b'
+    });
+  }
+}));
+
+// Save audio note to database
+app.post('/api/audio-notes/save', asyncHandler(async (req, res) => {
+  const { title, rawTranscript, polishedText, tags, userId } = req.body;
+
+  if (!polishedText) {
+    return res.status(400).json({ error: 'polishedText is required' });
+  }
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const client = ensureSupabase();
+
+  const audioNote = {
+    user_id: userId,
+    url: `audio-note://${Date.now()}`,
+    title: title || polishedText.split('\n')[0].substring(0, 100),
+    notes: polishedText,
+    type: 'audio-note',
+    category: 'note',
+    sub_category: 'audio-note',
+    metadata: {
+      rawTranscript: rawTranscript || '',
+      modelUsed: 'gemma-3-4b'
+    },
+    tags: tags || [],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  try {
+    const { data, error } = await client
+      .from('bookmarks')
+      .insert([audioNote])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      audioNote: fromDbBookmark(data)
+    });
+  } catch (error) {
+    console.error('[Audio Notes] Save error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}));
+
+// ==================== END AUDIO NOTES API ====================
 
 // SPA fallback route - serve index.html for any non-API routes (must be after all API routes)
 app.get('*', (req, res) => {
